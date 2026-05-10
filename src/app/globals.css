@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: #edf4f7;
+  --foreground: #18181b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 8% 14%, rgba(125, 211, 252, 0.42), transparent 26rem),
+    radial-gradient(circle at 86% 10%, rgba(251, 191, 36, 0.22), transparent 22rem),
+    linear-gradient(135deg, #eef7f8 0%, #f7f2ec 48%, #edf4f8 100%);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.liquid-glass {
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.78), transparent 38%),
+    linear-gradient(300deg, rgba(255, 255, 255, 0.18), transparent 40%);
+  opacity: 0.84;
+}
+
+.liquid-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
