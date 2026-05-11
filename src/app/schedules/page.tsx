@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
-import { lessonModeOptions, recurringPatternOptions, scheduleStatusOptions } from "@/lib/options";
+import { lessonDayOptions, lessonModeOptions, scheduleStatusOptions } from "@/lib/options";
 
 export default function SchedulesPage() {
   return (
@@ -20,6 +20,11 @@ export default function SchedulesPage() {
             label: "Student",
             type: "relation",
             relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+            relationFilter: {
+              sourceField: "courseId",
+              sourceOptionField: "instrumentId",
+              optionField: "primaryInstrumentId",
+            },
             required: true,
           },
           {
@@ -27,6 +32,12 @@ export default function SchedulesPage() {
             label: "Instructor",
             type: "relation",
             relation: { resource: "instructors", labelFields: ["instructorName"] },
+            relationFilter: {
+              sourceField: "courseId",
+              sourceOptionField: "instrumentId",
+              optionField: "instrumentIds",
+              mode: "includes",
+            },
             required: true,
           },
           {
@@ -34,36 +45,82 @@ export default function SchedulesPage() {
             label: "Instrument",
             type: "relation",
             relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            relationFilter: {
+              sourceField: "courseId",
+              sourceOptionField: "instrumentId",
+              optionField: "id",
+            },
+            autoSelectSingleOption: true,
             required: true,
           },
-          { key: "scheduleDate", label: "Date", type: "date", required: true },
+          { key: "scheduleMonth", label: "Schedule month", type: "month" },
+          {
+            key: "lessonDays",
+            label: "Lesson days",
+            type: "select",
+            options: lessonDayOptions,
+            multiple: true,
+          },
+          { key: "lessonCount", label: "Lesson count", type: "number" },
+          {
+            key: "scheduleDate",
+            label: "Single/reschedule date",
+            type: "date",
+            hideOnCreate: true,
+          },
           { key: "fromTime", label: "From", type: "time", required: true },
           { key: "toTime", label: "To", type: "time", required: true },
           {
-            key: "recurringPattern",
-            label: "Recurring pattern",
+            key: "lessonMode",
+            label: "Lesson mode",
             type: "select",
-            options: recurringPatternOptions,
+            options: lessonModeOptions,
+            deriveFrom: { sourceField: "studentId", sourceOptionField: "preferredLessonMode" },
+            hidden: true,
           },
-          { key: "recurrenceEndDate", label: "Recurring until", type: "date" },
-          { key: "lessonMode", label: "Lesson mode", type: "select", options: lessonModeOptions },
           {
             key: "studioRoomId",
             label: "Studio Room",
             type: "relation",
             relation: { resource: "rooms", labelFields: ["roomName"] },
+            visibleWhen: { field: "lessonMode", value: "Studio" },
+            relationFilter: {
+              sourceField: "instrumentId",
+              optionField: "instrumentIds",
+              mode: "includes",
+            },
           },
-          { key: "homeVisitAddress", label: "Home visit address" },
-          { key: "travelNotes", label: "Travel notes", type: "textarea" },
-          { key: "privateLesson", label: "Private lesson", type: "checkbox" },
-          { key: "scheduleStatus", label: "Status", type: "select", options: scheduleStatusOptions },
+          {
+            key: "homeVisitAddress",
+            label: "Home visit address",
+            visibleWhen: { field: "lessonMode", value: "Home Visit" },
+          },
+          {
+            key: "travelNotes",
+            label: "Travel notes",
+            type: "textarea",
+            visibleWhen: { field: "lessonMode", value: "Home Visit" },
+          },
+          {
+            key: "scheduleStatus",
+            label: "Status",
+            type: "select",
+            options: scheduleStatusOptions,
+            hideOnCreate: true,
+          },
           {
             key: "originalScheduleId",
             label: "Original schedule",
             type: "relation",
             relation: { resource: "schedules", labelFields: ["scheduleDate", "fromTime"] },
+            hideOnCreate: true,
           },
-          { key: "rescheduleReason", label: "Reschedule reason", type: "textarea" },
+          {
+            key: "rescheduleReason",
+            label: "Reschedule reason",
+            type: "textarea",
+            hideOnCreate: true,
+          },
         ]}
         resource="schedules"
         title="Course Schedules"

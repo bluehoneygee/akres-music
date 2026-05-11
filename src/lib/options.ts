@@ -20,10 +20,15 @@ export const lessonModeOptions = ["Studio", "Home Visit"].map((value) => ({
   value,
 }));
 
-export const recurringPatternOptions = ["None", "Weekly", "Biweekly", "Monthly"].map((value) => ({
-  label: value,
-  value,
-}));
+export const lessonDayOptions = [
+  ["1", "Monday"],
+  ["2", "Tuesday"],
+  ["3", "Wednesday"],
+  ["4", "Thursday"],
+  ["5", "Friday"],
+  ["6", "Saturday"],
+  ["0", "Sunday"],
+].map(([value, label]) => ({ label, value }));
 
 export const scheduleStatusOptions = [
   "Scheduled",
@@ -33,6 +38,7 @@ export const scheduleStatusOptions = [
 ].map((value) => ({ label: value, value }));
 
 export const studentAttendanceStatusOptions = [
+  "Pending",
   "Present",
   "Absent",
   "Sick",
@@ -42,6 +48,7 @@ export const studentAttendanceStatusOptions = [
 ].map((value) => ({ label: value, value }));
 
 export const instructorAttendanceStatusOptions = [
+  "Pending",
   "Present",
   "Absent",
   "Substitute",

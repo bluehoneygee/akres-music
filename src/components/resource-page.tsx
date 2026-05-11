@@ -16,6 +16,7 @@ export type FieldConfig = {
     | "text"
     | "number"
     | "date"
+    | "month"
     | "time"
     | "checkbox"
     | "textarea"
@@ -27,6 +28,17 @@ export type FieldConfig = {
     labelFields: string[];
     valueField?: string;
   };
+  relationFilter?: {
+    sourceField: string;
+    sourceOptionField?: string;
+    optionField: string;
+    mode?: "equals" | "includes";
+  };
+  deriveFrom?: {
+    sourceField: string;
+    sourceOptionField: string;
+  };
+  autoSelectSingleOption?: boolean;
   multiple?: boolean;
   visibleWhen?: {
     field: string;
@@ -34,10 +46,13 @@ export type FieldConfig = {
   };
   required?: boolean;
   writeOnly?: boolean;
+  hidden?: boolean;
+  hideOnCreate?: boolean;
 };
 
 type RecordValue = string | number | boolean | string[];
 type UiRecord = Record<string, RecordValue> & { id: string };
+type RelationOption = { label: string; record: UiRecord; value: string };
 
 export function ResourcePage({
   title,
@@ -66,10 +81,11 @@ export function ResourcePage({
   const [pendingDelete, setPendingDelete] = useState<UiRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [relationOptions, setRelationOptions] = useState<
-    Record<string, { label: string; value: string }[]>
-  >({});
-  const formFields = fields.filter((field) => isFieldVisible(field, draft));
+  const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
+  const fieldsSignature = useMemo(() => JSON.stringify(fields), [fields]);
+  const formFields = fields.filter(
+    (field) => !field.hidden && (!field.hideOnCreate || editingId) && isFieldVisible(field, draft),
+  );
   const tableFields = fields.filter((field) => !field.writeOnly);
 
   async function loadRows() {
@@ -123,6 +139,7 @@ export function ResourcePage({
                     .map((labelField) => record[labelField])
                     .filter(Boolean)
                     .join(" ") || String(record[valueField] ?? record.id),
+                record,
               })),
             ] as const;
           } catch {
@@ -141,7 +158,59 @@ export function ResourcePage({
     return () => {
       mounted = false;
     };
-  }, [fields]);
+  }, [fieldsSignature, fields]);
+
+  useEffect(() => {
+    setDraft((current) => {
+      const updates = Object.fromEntries(
+        fields
+          .filter((field) => field.type === "relation" || field.deriveFrom)
+          .map((field) => {
+            const derivedValue = getDerivedValue(field, current, relationOptions);
+
+            if (derivedValue !== undefined) {
+              return [field.key, derivedValue];
+            }
+
+            if (field.type !== "relation") {
+              return [field.key, current[field.key]];
+            }
+
+            if (!relationOptions[field.key]) {
+              return [field.key, current[field.key]];
+            }
+
+            const options = getFieldOptions(field, current, relationOptions);
+            const currentValue = current[field.key];
+            const optionValues = new Set(options.map((option) => option.value));
+
+            if (field.multiple && Array.isArray(currentValue)) {
+              return [field.key, currentValue.filter((value) => optionValues.has(String(value)))];
+            }
+
+            if (!field.multiple && currentValue && !optionValues.has(String(currentValue))) {
+              return [field.key, ""];
+            }
+
+            if (
+              field.autoSelectSingleOption &&
+              !field.multiple &&
+              !currentValue &&
+              options.length === 1
+            ) {
+              return [field.key, options[0].value];
+            }
+
+            return [field.key, currentValue];
+          }),
+      ) as Record<string, RecordValue>;
+
+      const changed = Object.entries(updates).some(
+        ([key, value]) => !isRecordValueEqual(current[key], value),
+      );
+      return changed ? { ...current, ...updates } : current;
+    });
+  }, [fieldsSignature, fields, relationOptions]);
 
   async function saveRecord() {
     const method = editingId ? "PUT" : "POST";
@@ -249,6 +318,7 @@ export function ResourcePage({
                           ? Array.from(event.target.selectedOptions, (option) => option.value)
                           : event.target.value,
                         ...clearHiddenDependentValues(fields, field.key, event.target.value),
+                        ...clearFilteredDependentValues(fields, field.key),
                       }))
                     }
                     value={
@@ -260,7 +330,7 @@ export function ResourcePage({
                     {field.multiple ? null : <option value="">Select {field.label}</option>}
                     {(
                       field.type === "relation"
-                        ? relationOptions[field.key] ?? []
+                        ? getFieldOptions(field, draft, relationOptions)
                         : field.options ?? []
                     ).map((option) => (
                       <option key={option.value} value={option.value}>
@@ -418,6 +488,81 @@ function clearHiddenDependentValues(
   );
 }
 
+function isRecordValueEqual(left: RecordValue | undefined, right: RecordValue | undefined) {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    const leftArray = Array.isArray(left) ? left.map(String) : [String(left ?? "")];
+    const rightArray = Array.isArray(right) ? right.map(String) : [String(right ?? "")];
+
+    return (
+      leftArray.length === rightArray.length &&
+      leftArray.every((value, index) => value === rightArray[index])
+    );
+  }
+
+  return left === right;
+}
+
+function clearFilteredDependentValues(fields: FieldConfig[], changedField: string) {
+  return Object.fromEntries(
+    fields
+      .filter((field) => field.relationFilter?.sourceField === changedField)
+      .map((field) => [field.key, field.multiple ? [] : ""]),
+  );
+}
+
+function getFieldOptions(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  const options = relationOptions[field.key] ?? [];
+
+  if (!field.relationFilter) return options;
+
+  const sourceValue = draft[field.relationFilter.sourceField];
+  if (!sourceValue) return options;
+
+  const sourceOptions = relationOptions[field.relationFilter.sourceField] ?? [];
+  const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
+  const expectedValue = field.relationFilter.sourceOptionField
+    ? sourceRecord?.[field.relationFilter.sourceOptionField]
+    : sourceValue;
+
+  if (!expectedValue) return options;
+
+  return options.filter((option) => {
+    const optionValue = option.record[field.relationFilter!.optionField];
+
+    if (field.relationFilter!.mode === "includes") {
+      return Array.isArray(optionValue)
+        ? optionValue.map(String).includes(String(expectedValue))
+        : String(optionValue || "")
+            .split(",")
+            .map((item) => item.trim())
+            .includes(String(expectedValue));
+    }
+
+    return String(optionValue) === String(expectedValue);
+  });
+}
+
+function getDerivedValue(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  if (!field.deriveFrom) return undefined;
+
+  const sourceValue = draft[field.deriveFrom.sourceField];
+  if (!sourceValue) return undefined;
+
+  const sourceOptions = relationOptions[field.deriveFrom.sourceField] ?? [];
+  const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
+  const derivedValue = sourceRecord?.[field.deriveFrom.sourceOptionField];
+
+  return Array.isArray(derivedValue) ? derivedValue.map(String) : String(derivedValue ?? "");
+}
+
 function toMultiSelectValue(value: RecordValue | undefined) {
   if (Array.isArray(value)) return value.map(String);
 
@@ -429,7 +574,7 @@ function toMultiSelectValue(value: RecordValue | undefined) {
 function formatValue(
   value: unknown,
   field?: FieldConfig,
-  relationOptions?: Record<string, { label: string; value: string }[]>,
+  relationOptions?: Record<string, RelationOption[]>,
 ) {
   if (field?.type === "relation" && relationOptions) {
     const options = relationOptions[field.key] ?? [];

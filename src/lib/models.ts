@@ -27,9 +27,7 @@ export type Instrument = BaseRecord & {
 
 export type Guardian = BaseRecord & {
   guardianName: string;
-  emailAddress: string;
   mobileNumber: string;
-  user: string;
 };
 
 export type Student = BaseRecord & {
@@ -82,8 +80,9 @@ export type CourseSchedule = BaseRecord & {
   homeVisitAddress: string;
   travelNotes: string;
   privateLesson: boolean;
-  recurringPattern: "None" | "Weekly" | "Biweekly" | "Monthly";
-  recurrenceEndDate: string;
+  scheduleMonth: string;
+  lessonDays: string[];
+  lessonCount: number;
   scheduleStatus: "Scheduled" | "Completed" | "Cancelled" | "Rescheduled";
   originalScheduleId: string;
   rescheduleReason: string;
@@ -94,7 +93,7 @@ export type StudentAttendance = BaseRecord & {
   courseScheduleId: string;
   instrumentId: string;
   date: string;
-  status: "Present" | "Absent" | "Sick" | "Permission" | "Late" | "Rescheduled";
+  status: "Pending" | "Present" | "Absent" | "Sick" | "Permission" | "Late" | "Rescheduled";
   absenceReason: string;
   makeupRequired: boolean;
   makeupScheduleId: string;
@@ -107,7 +106,7 @@ export type InstructorAttendance = BaseRecord & {
   courseScheduleId: string;
   attendanceDate: string;
   instrumentId: string;
-  status: "Present" | "Absent" | "Substitute" | "Cancelled";
+  status: "Pending" | "Present" | "Absent" | "Substitute" | "Cancelled";
   substituteInstructorId: string;
   notes: string;
 };

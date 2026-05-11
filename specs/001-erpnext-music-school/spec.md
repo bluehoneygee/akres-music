@@ -115,7 +115,7 @@ Acceptance criteria:
 - Jadwal memiliki `lesson_mode`: Studio atau Home Visit.
 - Jadwal studio terhubung ke Studio Room.
 - Jadwal home visit menyimpan alamat dan catatan perjalanan.
-- Staff dapat membuat jadwal berulang mingguan, dua mingguan, atau bulanan sampai tanggal akhir.
+- Staff dapat membuat jadwal bulanan berdasarkan hari les dalam minggu dan jumlah sesi paket.
 - Jadwal memiliki status: Scheduled, Completed, Cancelled, Rescheduled.
 - Jadwal dapat menunjuk jadwal asal jika merupakan reschedule.
 
@@ -126,7 +126,8 @@ Guru atau staff harus bisa mencatat absensi murid per jadwal.
 Acceptance criteria:
 
 - Guru dapat membuka jadwal miliknya.
-- Guru dapat memilih status absensi: Present, Absent, Sick, Permission, Late, Rescheduled.
+- Sistem membuat draft absensi otomatis dari Course Schedule.
+- Guru dapat memilih status absensi: Pending, Present, Absent, Sick, Permission, Late, Rescheduled.
 - Staff dapat melihat riwayat absensi per murid.
 - Jika absen membutuhkan makeup lesson, sistem dapat menandai `makeup_required`.
 
@@ -136,7 +137,8 @@ Sistem harus bisa mencatat kehadiran guru per jadwal mengajar.
 
 Acceptance criteria:
 
-- Guru atau staff dapat mencatat status guru: Present, Absent, Substitute, Cancelled.
+- Sistem membuat draft absensi guru otomatis dari Course Schedule.
+- Guru atau staff dapat mencatat status guru: Pending, Present, Absent, Substitute, Cancelled.
 - Jika memakai guru pengganti, sistem menyimpan `substitute_instructor`.
 - Absensi guru terhubung ke Course Schedule.
 
@@ -180,7 +182,7 @@ Orang tua harus bisa melihat informasi anak yang terhubung.
 Acceptance criteria:
 
 - Orang tua login memakai User dengan role `Parent Portal User`.
-- User orang tua harus terhubung ke DocType `Guardian` melalui field `Guardian.user`.
+- User orang tua harus terhubung ke Guardian melalui field `User.guardianId`.
 - Student harus terhubung ke Guardian melalui child table `guardians`.
 - Orang tua dapat melihat daftar anak.
 - Orang tua dapat melihat jadwal anak.

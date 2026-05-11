@@ -44,29 +44,6 @@ export async function ensureSeedData() {
 async function seed() {
   const db = await getMongoDb();
   const marker = db.collection("_meta");
-  const seeded = await marker.findOne({ key: "seeded" });
-
-  if (seeded) {
-    await ensureDefaultUsers();
-    return;
-  }
-
-  for (const resource of resources) {
-    await Promise.all(
-      seedDatabase[resource].map((record) =>
-        db.collection(resource).updateOne(
-          { _id: record.id } as unknown as Filter<Document>,
-          {
-            $setOnInsert: {
-              _id: record.id,
-              ...record,
-            },
-          },
-          { upsert: true },
-        ),
-      ),
-    );
-  }
 
   await ensureDefaultUsers();
 
@@ -146,6 +123,7 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
     const scheduleRecords = buildScheduleRecords(payload, now);
     const records = await collection(resource);
     await records.insertMany(scheduleRecords as Document[]);
+    await ensureAttendanceForSchedules(scheduleRecords, now);
     return fromMongo(scheduleRecords[0] as Document);
   }
 
@@ -163,11 +141,15 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
 }
 
 function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
-  const pattern = String(payload.recurringPattern || "None");
-  const startDate = String(payload.scheduleDate || "");
-  const endDate = String(payload.recurrenceEndDate || "");
-  const dates =
-    pattern === "None" || !endDate ? [startDate] : expandScheduleDates(startDate, endDate, pattern);
+  const scheduleMonth = String(payload.scheduleMonth || "");
+  const lessonDays = toStringArray(payload.lessonDays);
+  const lessonCount = Number(payload.lessonCount || 4);
+  const singleDate = String(payload.scheduleDate || "");
+  const monthlyDates =
+    scheduleMonth && lessonDays.length > 0
+      ? expandMonthlyLessonDates(scheduleMonth, lessonDays, lessonCount)
+      : [];
+  const dates = monthlyDates.length > 0 ? monthlyDates : [singleDate];
   const baseId = String(payload.id || `schedules-${crypto.randomUUID()}`);
 
   return dates.map((scheduleDate, index) => {
@@ -178,40 +160,115 @@ function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
       ...payload,
       id,
       scheduleDate,
-      recurringPattern: pattern,
-      recurrenceEndDate: endDate,
+      scheduleMonth,
+      lessonDays,
+      lessonCount,
+      privateLesson: true,
+      scheduleStatus: String(payload.scheduleStatus || "Scheduled"),
+      originalScheduleId: String(payload.originalScheduleId || ""),
+      rescheduleReason: String(payload.rescheduleReason || ""),
       createdAt: now,
       updatedAt: now,
     };
   });
 }
 
-function expandScheduleDates(startDate: string, endDate: string, pattern: string) {
-  const stepDays = pattern === "Weekly" ? 7 : pattern === "Biweekly" ? 14 : 0;
+async function ensureAttendanceForSchedules(
+  schedules: Record<string, unknown>[],
+  now: string,
+) {
+  const db = await getMongoDb();
+
+  await Promise.all(
+    schedules.flatMap((schedule) => {
+      const scheduleId = String(schedule.id || "");
+      const studentAttendanceId = `student-attendance-${scheduleId}`;
+      const instructorAttendanceId = `instructor-attendance-${scheduleId}`;
+
+      return [
+        db.collection("student-attendance").updateOne(
+          { _id: studentAttendanceId } as unknown as Filter<Document>,
+          {
+            $setOnInsert: {
+              _id: studentAttendanceId,
+              id: studentAttendanceId,
+              studentId: String(schedule.studentId || ""),
+              courseScheduleId: scheduleId,
+              instrumentId: String(schedule.instrumentId || ""),
+              date: String(schedule.scheduleDate || ""),
+              status: "Pending",
+              absenceReason: "",
+              makeupRequired: false,
+              makeupScheduleId: "",
+              parentNotified: false,
+              absenceAlertKey: "",
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        ),
+        db.collection("instructor-attendance").updateOne(
+          { _id: instructorAttendanceId } as unknown as Filter<Document>,
+          {
+            $setOnInsert: {
+              _id: instructorAttendanceId,
+              id: instructorAttendanceId,
+              instructorId: String(schedule.instructorId || ""),
+              courseScheduleId: scheduleId,
+              attendanceDate: String(schedule.scheduleDate || ""),
+              instrumentId: String(schedule.instrumentId || ""),
+              status: "Pending",
+              substituteInstructorId: "",
+              notes: "",
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        ),
+      ];
+    }),
+  );
+}
+
+function toStringArray(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function expandMonthlyLessonDates(
+  scheduleMonth: string,
+  lessonDays: string[],
+  lessonCount: number,
+) {
+  if (!/^\d{4}-\d{2}$/.test(scheduleMonth)) return [];
+
+  const [year, month] = scheduleMonth.split("-").map(Number);
+  const selectedDays = new Set(lessonDays.map(Number));
+  const maxDates = Number.isFinite(lessonCount) && lessonCount > 0 ? lessonCount : 4;
   const dates: string[] = [];
-  const current = parseDate(startDate);
-  const end = parseDate(endDate);
 
-  if (!current || !end || current > end) return [startDate];
+  for (let day = 1; day <= 31; day += 1) {
+    const current = new Date(Date.UTC(year, month - 1, day));
 
-  while (current <= end) {
-    dates.push(formatDate(current));
-
-    if (pattern === "Monthly") {
-      current.setUTCMonth(current.getUTCMonth() + 1);
-    } else if (stepDays > 0) {
-      current.setUTCDate(current.getUTCDate() + stepDays);
-    } else {
+    if (current.getUTCMonth() !== month - 1) {
       break;
+    }
+
+    if (selectedDays.has(current.getUTCDay())) {
+      dates.push(formatDate(current));
+
+      if (dates.length >= maxDates) {
+        break;
+      }
     }
   }
 
   return dates;
-}
-
-function parseDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function formatDate(value: Date) {

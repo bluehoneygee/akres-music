@@ -39,22 +39,20 @@ Relationships:
 
 Mewakili orang tua atau wali murid.
 
-ERPNext Education memakai `Guardian` sebagai penghubung antara user orang tua dan data murid. Parent Portal tidak langsung membaca semua Student dari user login, tetapi mencari Guardian dengan `user = frappe.session.user`, lalu mencari Student yang terhubung ke Guardian tersebut.
+Guardian menjadi penghubung antara akun Parent Portal dan data murid. Email login disimpan di User, lalu User menunjuk Guardian lewat `guardianId`.
 
 Core fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `guardian_name` | Data | Yes | Nama orang tua/wali |
-| `email_address` | Data | No | Email kontak |
 | `mobile_number` | Data | No | Nomor telepon |
-| `user` | Link: User | No | User login orang tua/wali |
 
 Relationships:
 
 - Guardian can belong to many Students.
 - Student can have many Guardians.
-- Parent Portal User must be linked through `Guardian.user`.
+- Parent Portal User must be linked through `User.guardianId`.
 
 ### Instructor
 
@@ -131,8 +129,9 @@ Custom fields:
 | `home_visit_address` | Small Text | No | Alamat rumah jika lesson_mode = Home Visit |
 | `travel_notes` | Small Text | No | Catatan akses/perjalanan untuk home visit |
 | `private_lesson` | Check | Yes | Selalu aktif |
-| `recurring_pattern` | Select | No | None, Weekly, Biweekly, Monthly |
-| `recurrence_end_date` | Date | No | Tanggal akhir pembuatan jadwal berulang |
+| `schedule_month` | Month | No | Bulan jadwal/paket, contoh 2026-05 |
+| `lesson_days` | Multi Select | No | Hari les dalam minggu, contoh Monday dan Wednesday |
+| `lesson_count` | Int | No | Jumlah sesi paket dalam bulan, default 4 |
 | `schedule_status` | Select | Yes | Scheduled, Completed, Cancelled, Rescheduled |
 | `original_schedule` | Link: Course Schedule | No | Jadwal asal jika reschedule |
 | `reschedule_reason` | Small Text | No | Alasan reschedule |
@@ -156,7 +155,7 @@ Custom fields:
 | --- | --- | --- | --- |
 | `course_schedule` | Link: Course Schedule | Yes | Jadwal terkait |
 | `instrument` | Link: Instrument | Yes | Instrumen sesi |
-| `attendance_status_detail` | Select | Yes | Present, Absent, Sick, Permission, Late, Rescheduled |
+| `attendance_status_detail` | Select | Yes | Pending, Present, Absent, Sick, Permission, Late, Rescheduled |
 | `absence_reason` | Small Text | No | Alasan absen |
 | `makeup_required` | Check | No | Perlu kelas pengganti |
 | `makeup_schedule` | Link: Course Schedule | No | Jadwal pengganti |
@@ -283,7 +282,7 @@ Fields:
 | `course_schedule` | Link: Course Schedule | Yes | Jadwal mengajar |
 | `attendance_date` | Date | Yes | Tanggal |
 | `instrument` | Link: Instrument | Yes | Instrumen |
-| `status` | Select | Yes | Present, Absent, Substitute, Cancelled |
+| `status` | Select | Yes | Pending, Present, Absent, Substitute, Cancelled |
 | `substitute_instructor` | Link: Instructor | No | Guru pengganti |
 | `notes` | Small Text | No | Catatan |
 

@@ -54,7 +54,19 @@ Resource: `instructors`
 }
 ```
 
-### 3. Student
+### 3. Guardian
+
+Resource: `guardians`
+
+```json
+{
+  "id": "guardian-dewi",
+  "guardianName": "Dewi Hartono",
+  "mobileNumber": "081234567891"
+}
+```
+
+### 4. Student
 
 Resource: `students`
 
@@ -67,12 +79,13 @@ Resource: `students`
   "skillLevel": "Beginner",
   "learningGoal": "Performance",
   "preferredLessonMode": "Studio",
+  "guardianIds": ["guardian-dewi"],
   "portalEnabled": true,
   "musicNotes": "Mulai dari postur bowing dasar."
 }
 ```
 
-### 4. Course
+### 5. Course
 
 Resource: `courses`
 
@@ -88,7 +101,7 @@ Resource: `courses`
 }
 ```
 
-### 5. Studio Room
+### 6. Studio Room
 
 Resource: `rooms`
 
@@ -102,7 +115,7 @@ Resource: `rooms`
 }
 ```
 
-### 6. Schedule Studio
+### 7. Schedule Studio
 
 Resource: `schedules`
 
@@ -113,11 +126,12 @@ Resource: `schedules`
   "studentId": "student-luna",
   "instructorId": "instructor-sari",
   "instrumentId": "inst-violin",
-  "scheduleDate": "2026-05-18",
+  "scheduleMonth": "2026-05",
+  "lessonDays": ["1", "3"],
+  "lessonCount": 4,
+  "scheduleDate": "",
   "fromTime": "15:00",
   "toTime": "16:00",
-  "recurringPattern": "Weekly",
-  "recurrenceEndDate": "2026-06-18",
   "lessonMode": "Studio",
   "studioRoomId": "room-strings-1",
   "homeVisitAddress": "",
@@ -129,9 +143,9 @@ Resource: `schedules`
 }
 ```
 
-Catatan: payload di atas membuat jadwal setiap Senin dari `2026-05-18` sampai `2026-06-18`.
+Catatan: payload di atas membuat 4 jadwal pertama yang jatuh pada Senin/Rabu selama Mei 2026.
 
-### 7. Schedule Home Visit
+### 8. Schedule Home Visit
 
 Resource: `schedules`
 
@@ -142,11 +156,12 @@ Resource: `schedules`
   "studentId": "student-luna",
   "instructorId": "instructor-sari",
   "instrumentId": "inst-violin",
-  "scheduleDate": "2026-05-25",
+  "scheduleMonth": "2026-05",
+  "lessonDays": ["1"],
+  "lessonCount": 4,
+  "scheduleDate": "",
   "fromTime": "15:00",
   "toTime": "16:00",
-  "recurringPattern": "None",
-  "recurrenceEndDate": "",
   "lessonMode": "Home Visit",
   "studioRoomId": "",
   "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
@@ -158,7 +173,7 @@ Resource: `schedules`
 }
 ```
 
-### 7A. Schedule Reschedule
+### 8A. Schedule Reschedule
 
 Resource: `schedules`
 
@@ -169,11 +184,12 @@ Resource: `schedules`
   "studentId": "student-luna",
   "instructorId": "instructor-sari",
   "instrumentId": "inst-violin",
+  "scheduleMonth": "",
+  "lessonDays": [],
+  "lessonCount": 1,
   "scheduleDate": "2026-05-20",
   "fromTime": "15:00",
   "toTime": "16:00",
-  "recurringPattern": "None",
-  "recurrenceEndDate": "",
   "lessonMode": "Studio",
   "studioRoomId": "room-strings-1",
   "homeVisitAddress": "",
@@ -185,7 +201,7 @@ Resource: `schedules`
 }
 ```
 
-### 8. Student Attendance
+### 9. Student Attendance
 
 Resource: `student-attendance`
 
@@ -202,7 +218,7 @@ Resource: `student-attendance`
 }
 ```
 
-### 9. Instructor Attendance
+### 10. Instructor Attendance
 
 Resource: `instructor-attendance`
 
@@ -219,7 +235,7 @@ Resource: `instructor-attendance`
 }
 ```
 
-### 10. Repertoire
+### 11. Repertoire
 
 Resource: `repertoires`
 
@@ -236,7 +252,7 @@ Resource: `repertoires`
 }
 ```
 
-### 11. Lesson Journal
+### 12. Lesson Journal
 
 Resource: `journals`
 
@@ -257,7 +273,7 @@ Resource: `journals`
 }
 ```
 
-### 12. Billing
+### 13. Billing
 
 Resource: `invoices`
 
@@ -274,13 +290,12 @@ Resource: `invoices`
 }
 ```
 
-### 13. User Murid
+### 14. User Murid
 
 Resource: `users`
 
 ```json
 {
-  "name": "Luna Hartono",
   "email": "luna.student@akres.test",
   "password": "admin123",
   "role": "Student Portal User",
@@ -290,13 +305,27 @@ Resource: `users`
 }
 ```
 
-### 14. User Instructor
+### 15. User Parent
 
 Resource: `users`
 
 ```json
 {
-  "name": "Sari Wijaya",
+  "email": "dewi.parent@akres.test",
+  "password": "admin123",
+  "role": "Parent Portal User",
+  "studentId": "",
+  "guardianId": "guardian-dewi",
+  "instructorId": ""
+}
+```
+
+### 16. User Instructor
+
+Resource: `users`
+
+```json
+{
   "email": "sari.teacher@akres.test",
   "password": "admin123",
   "role": "Music Instructor",
