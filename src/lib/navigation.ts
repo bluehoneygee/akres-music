@@ -42,6 +42,12 @@ export const appNavigation = [
     roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
   },
   {
+    label: "Guardians",
+    href: "/guardians",
+    icon: Users,
+    roles: ["System Manager", "Academic Staff"],
+  },
+  {
     label: "Instructors",
     href: "/instructors",
     icon: Users,

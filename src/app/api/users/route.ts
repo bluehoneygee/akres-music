@@ -5,6 +5,11 @@ import { auth } from "@/auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { canAccessResource } from "@/lib/roles";
 import { sessionRole } from "@/lib/session";
+import {
+  normalizeUserLinks,
+  resolveUserDisplayName,
+  validateUserLink,
+} from "@/lib/user-profile";
 
 function serializeUser(user: {
   _id: unknown;
@@ -50,7 +55,6 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = (await request.json()) as {
-    name?: string;
     email?: string;
     password?: string;
     role?: string;
@@ -64,6 +68,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
 
+  const linkError = validateUserLink(payload);
+
+  if (linkError) {
+    return NextResponse.json({ error: linkError }, { status: 400 });
+  }
+
   const db = await getMongoDb();
   const existing = await db.collection("users").findOne({ email });
 
@@ -72,15 +82,14 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await bcrypt.hash(payload.password, 12);
+  const links = normalizeUserLinks(payload);
+  const name = await resolveUserDisplayName(db, { ...links, email });
   const result = await db.collection("users").insertOne({
-    name: payload.name ?? email,
+    name,
     email,
     emailVerified: null,
     passwordHash,
-    role: payload.role ?? "Academic Staff",
-    studentId: payload.studentId ?? "",
-    guardianId: payload.guardianId ?? "",
-    instructorId: payload.instructorId ?? "",
+    ...links,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });

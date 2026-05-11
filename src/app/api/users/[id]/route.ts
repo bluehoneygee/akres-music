@@ -6,6 +6,11 @@ import { auth } from "@/auth";
 import { getMongoDb } from "@/lib/mongodb";
 import { canAccessResource } from "@/lib/roles";
 import { sessionRole } from "@/lib/session";
+import {
+  normalizeUserLinks,
+  resolveUserDisplayName,
+  validateUserLink,
+} from "@/lib/user-profile";
 
 function userQuery(id: string) {
   return (ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id }) as Filter<Document>;
@@ -46,17 +51,22 @@ export async function PUT(
 
   const payload = (await request.json()) as Record<string, string>;
   const db = await getMongoDb();
+  const linkError = validateUserLink(payload);
+
+  if (linkError) {
+    return NextResponse.json({ error: linkError }, { status: 400 });
+  }
+
+  const links = normalizeUserLinks(payload);
+  const email = payload.email?.trim().toLowerCase();
   const update: Record<string, unknown> = {
-    name: payload.name ?? "",
-    role: payload.role ?? "Academic Staff",
-    studentId: payload.studentId ?? "",
-    guardianId: payload.guardianId ?? "",
-    instructorId: payload.instructorId ?? "",
+    name: await resolveUserDisplayName(db, { ...links, email }),
+    ...links,
     updatedAt: new Date().toISOString(),
   };
 
-  if (payload.email) {
-    update.email = payload.email.trim().toLowerCase();
+  if (email) {
+    update.email = email;
   }
 
   if (payload.password) {

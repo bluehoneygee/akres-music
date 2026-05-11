@@ -8,13 +8,30 @@ export default function UsersPage() {
       <ResourcePage
         description="Kelola akun login seperti ERPNext: staff, guru, murid, dan orang tua."
         fields={[
-          { key: "name", label: "Name", required: true },
           { key: "email", label: "Email", required: true },
           { key: "password", label: "Password", writeOnly: true },
           { key: "role", label: "Role", type: "select", options: roleOptions, required: true },
-          { key: "studentId", label: "Student ID" },
-          { key: "guardianId", label: "Guardian ID" },
-          { key: "instructorId", label: "Instructor ID" },
+          {
+            key: "studentId",
+            label: "Student",
+            type: "relation",
+            relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+            visibleWhen: { field: "role", value: "Student Portal User" },
+          },
+          {
+            key: "guardianId",
+            label: "Guardian",
+            type: "relation",
+            relation: { resource: "guardians", labelFields: ["guardianName"] },
+            visibleWhen: { field: "role", value: "Parent Portal User" },
+          },
+          {
+            key: "instructorId",
+            label: "Instructor",
+            type: "relation",
+            relation: { resource: "instructors", labelFields: ["instructorName"] },
+            visibleWhen: { field: "role", value: "Music Instructor" },
+          },
         ]}
         resource="users"
         title="Users"
