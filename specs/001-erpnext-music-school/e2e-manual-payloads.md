@@ -47,8 +47,7 @@ Resource: `instructors`
 {
   "id": "instructor-sari",
   "instructorName": "Sari Wijaya",
-  "employeeName": "Sari Wijaya",
-  "instrumentIds": "inst-violin",
+  "instrumentIds": ["inst-violin"],
   "levelFrom": "Beginner",
   "levelTo": "Advanced",
   "portalEnabled": true

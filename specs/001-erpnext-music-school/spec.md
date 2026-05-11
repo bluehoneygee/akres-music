@@ -89,7 +89,7 @@ Sistem harus menyimpan instrumen dan level yang bisa diajarkan oleh guru.
 
 Acceptance criteria:
 
-- Staff dapat menghubungkan Instructor dengan Employee.
+- Staff dapat mengisi nama instruktur.
 - Staff dapat mengisi daftar instrumen yang diajarkan.
 - Staff dapat mengisi rentang level yang dapat diajarkan.
 

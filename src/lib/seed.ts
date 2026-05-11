@@ -63,7 +63,6 @@ export const seedDatabase: Database = {
       createdAt: now,
       updatedAt: now,
       instructorName: "Budi Santoso",
-      employeeName: "Budi Santoso",
       instrumentIds: ["inst-piano", "inst-guitar"],
       levelFrom: "Beginner",
       levelTo: "Advanced",

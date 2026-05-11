@@ -61,7 +61,6 @@ akres_music/
 - Fees
 - Sales Invoice
 - Payment Entry
-- Employee
 - Customer
 - User
 

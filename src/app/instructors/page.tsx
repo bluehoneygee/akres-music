@@ -9,8 +9,13 @@ export default function InstructorsPage() {
         description="Data guru, instrumen yang diajarkan, rentang level, dan akses portal instruktur."
         fields={[
           { key: "instructorName", label: "Instructor name", required: true },
-          { key: "employeeName", label: "Employee name" },
-          { key: "instrumentIds", label: "Instrument IDs" },
+          {
+            key: "instrumentIds",
+            label: "Instruments",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            multiple: true,
+          },
           { key: "levelFrom", label: "Level from", type: "select", options: levelOptions },
           { key: "levelTo", label: "Level to", type: "select", options: levelOptions },
           { key: "portalEnabled", label: "Portal enabled", type: "checkbox" },

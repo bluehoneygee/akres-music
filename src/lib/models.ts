@@ -47,7 +47,6 @@ export type Student = BaseRecord & {
 
 export type Instructor = BaseRecord & {
   instructorName: string;
-  employeeName: string;
   instrumentIds: string[];
   levelFrom: "Beginner" | "Intermediate" | "Advanced";
   levelTo: "Beginner" | "Intermediate" | "Advanced";

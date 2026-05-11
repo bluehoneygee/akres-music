@@ -64,7 +64,6 @@ Custom fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `employee` | Link: Employee | No | Karyawan terkait |
 | `instruments_taught` | Table: Instructor Instrument | Yes | Instrumen yang diajarkan |
 | `default_hourly_rate` | Currency | No | Tarif internal default |
 | `portal_enabled` | Check | No | Akses portal guru aktif |
@@ -279,7 +278,6 @@ Fields:
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `instructor` | Link: Instructor | Yes | Guru |
-| `employee` | Link: Employee | No | Karyawan terkait |
 | `course_schedule` | Link: Course Schedule | Yes | Jadwal mengajar |
 | `attendance_date` | Date | Yes | Tanggal |
 | `instrument` | Link: Instrument | Yes | Instrumen |
