@@ -2,6 +2,7 @@
 
 import { Edit3, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ export function ResourcePage({
   const [rows, setRows] = useState<UiRecord[]>([]);
   const [draft, setDraft] = useState<Record<string, RecordValue>>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UiRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const tableFields = fields.filter((field) => !field.writeOnly);
@@ -56,6 +58,7 @@ export function ResourcePage({
       if (!response.ok) {
         setRows([]);
         setError(json.error ?? "Unable to load records");
+        toast.error(json.error ?? "Unable to load records");
         return;
       }
 
@@ -63,6 +66,7 @@ export function ResourcePage({
     } catch {
       setRows([]);
       setError("Unable to connect to the server");
+      toast.error("Unable to connect to the server");
     } finally {
       setLoading(false);
     }
@@ -84,9 +88,11 @@ export function ResourcePage({
     if (!response.ok) {
       const json = (await response.json()) as { error?: string };
       setError(json.error ?? "Unable to save record");
+      toast.error(json.error ?? "Unable to save record");
       return;
     }
 
+    toast.success(editingId ? "Record updated" : "Record created");
     setEditingId(null);
     setDraft(emptyDraft);
     await loadRows();
@@ -98,9 +104,12 @@ export function ResourcePage({
     if (!response.ok) {
       const json = (await response.json()) as { error?: string };
       setError(json.error ?? "Unable to delete record");
+      toast.error(json.error ?? "Unable to delete record");
       return;
     }
 
+    toast.success("Record deleted");
+    setPendingDelete(null);
     await loadRows();
   }
 
@@ -251,7 +260,11 @@ export function ResourcePage({
                           <Button onClick={() => editRow(row)} size="icon" variant="glass">
                             <Edit3 className="size-4" />
                           </Button>
-                          <Button onClick={() => deleteRow(row.id)} size="icon" variant="glass">
+                          <Button
+                            onClick={() => setPendingDelete(row)}
+                            size="icon"
+                            variant="glass"
+                          >
                             <Trash2 className="size-4" />
                           </Button>
                         </div>
@@ -264,6 +277,37 @@ export function ResourcePage({
           </CardContent>
         </Card>
       </div>
+
+      {pendingDelete ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/30 p-4 backdrop-blur-sm">
+          <Card className="liquid-glass w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Delete record?</CardTitle>
+              <p className="mt-1 text-sm text-zinc-500">
+                This action cannot be undone. The selected record will be removed from
+                {` ${title}`}.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-2xl border border-white/45 bg-white/42 p-3 text-sm text-zinc-600">
+                {tableFields
+                  .slice(0, 3)
+                  .map((field) => `${field.label}: ${formatValue(pendingDelete[field.key])}`)
+                  .join(" | ")}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => setPendingDelete(null)} variant="glass">
+                  Cancel
+                </Button>
+                <Button onClick={() => deleteRow(pendingDelete.id)}>
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
