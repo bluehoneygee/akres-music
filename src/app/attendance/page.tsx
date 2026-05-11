@@ -12,9 +12,27 @@ export default function AttendancePage() {
         <ResourcePage
           description="Absensi murid per jadwal, termasuk status detail, alasan absen, dan makeup lesson."
           fields={[
-            { key: "studentId", label: "Student ID", required: true },
-            { key: "courseScheduleId", label: "Schedule ID", required: true },
-            { key: "instrumentId", label: "Instrument ID", required: true },
+            {
+              key: "studentId",
+              label: "Student",
+              type: "relation",
+              relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+              required: true,
+            },
+            {
+              key: "courseScheduleId",
+              label: "Schedule",
+              type: "relation",
+              relation: { resource: "schedules", labelFields: ["scheduleDate", "fromTime"] },
+              required: true,
+            },
+            {
+              key: "instrumentId",
+              label: "Instrument",
+              type: "relation",
+              relation: { resource: "instruments", labelFields: ["instrumentName"] },
+              required: true,
+            },
             { key: "date", label: "Date", type: "date", required: true },
             {
               key: "status",
@@ -32,10 +50,28 @@ export default function AttendancePage() {
         <ResourcePage
           description="Absensi guru per jadwal, termasuk substitute instructor bila status Substitute."
           fields={[
-            { key: "instructorId", label: "Instructor ID", required: true },
-            { key: "courseScheduleId", label: "Schedule ID", required: true },
+            {
+              key: "instructorId",
+              label: "Instructor",
+              type: "relation",
+              relation: { resource: "instructors", labelFields: ["instructorName"] },
+              required: true,
+            },
+            {
+              key: "courseScheduleId",
+              label: "Schedule",
+              type: "relation",
+              relation: { resource: "schedules", labelFields: ["scheduleDate", "fromTime"] },
+              required: true,
+            },
             { key: "attendanceDate", label: "Date", type: "date", required: true },
-            { key: "instrumentId", label: "Instrument ID", required: true },
+            {
+              key: "instrumentId",
+              label: "Instrument",
+              type: "relation",
+              relation: { resource: "instruments", labelFields: ["instrumentName"] },
+              required: true,
+            },
             {
               key: "status",
               label: "Status",
@@ -43,7 +79,12 @@ export default function AttendancePage() {
               options: instructorAttendanceStatusOptions,
               required: true,
             },
-            { key: "substituteInstructorId", label: "Substitute instructor ID" },
+            {
+              key: "substituteInstructorId",
+              label: "Substitute Instructor",
+              type: "relation",
+              relation: { resource: "instructors", labelFields: ["instructorName"] },
+            },
             { key: "notes", label: "Notes", type: "textarea" },
           ]}
           resource="instructor-attendance"

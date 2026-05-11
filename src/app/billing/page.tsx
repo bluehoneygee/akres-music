@@ -8,8 +8,19 @@ export default function BillingPage() {
       <ResourcePage
         description="Tagihan les pengganti Fees/Sales Invoice ERPNext: student, billing period, package, due date, dan status."
         fields={[
-          { key: "studentId", label: "Student ID", required: true },
-          { key: "instrumentId", label: "Instrument ID" },
+          {
+            key: "studentId",
+            label: "Student",
+            type: "relation",
+            relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+            required: true,
+          },
+          {
+            key: "instrumentId",
+            label: "Instrument",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+          },
           { key: "billingPeriod", label: "Billing period", required: true },
           { key: "lessonPackage", label: "Lesson package" },
           { key: "amount", label: "Amount", type: "number", required: true },

@@ -12,8 +12,26 @@ import type { ResourceName } from "@/lib/models";
 export type FieldConfig = {
   key: string;
   label: string;
-  type?: "text" | "number" | "date" | "time" | "checkbox" | "textarea" | "select";
+  type?:
+    | "text"
+    | "number"
+    | "date"
+    | "time"
+    | "checkbox"
+    | "textarea"
+    | "select"
+    | "relation";
   options?: { label: string; value: string }[];
+  relation?: {
+    resource: ResourceName | "users";
+    labelFields: string[];
+    valueField?: string;
+  };
+  multiple?: boolean;
+  visibleWhen?: {
+    field: string;
+    value: string;
+  };
   required?: boolean;
   writeOnly?: boolean;
 };
@@ -35,7 +53,10 @@ export function ResourcePage({
   const emptyDraft = useMemo(
     () =>
       Object.fromEntries(
-        fields.map((field) => [field.key, field.type === "checkbox" ? false : ""]),
+        fields.map((field) => [
+          field.key,
+          field.type === "checkbox" ? false : field.multiple ? [] : "",
+        ]),
       ) as Record<string, RecordValue>,
     [fields],
   );
@@ -45,6 +66,10 @@ export function ResourcePage({
   const [pendingDelete, setPendingDelete] = useState<UiRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [relationOptions, setRelationOptions] = useState<
+    Record<string, { label: string; value: string }[]>
+  >({});
+  const formFields = fields.filter((field) => isFieldVisible(field, draft));
   const tableFields = fields.filter((field) => !field.writeOnly);
 
   async function loadRows() {
@@ -75,6 +100,48 @@ export function ResourcePage({
   useEffect(() => {
     void loadRows();
   }, [resource]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRelationOptions() {
+      const relationFields = fields.filter((field) => field.type === "relation" && field.relation);
+      const entries = await Promise.all(
+        relationFields.map(async (field) => {
+          try {
+            const response = await fetch(`/api/${field.relation!.resource}`, { cache: "no-store" });
+            const json = (await response.json()) as { data?: UiRecord[] };
+            const records = Array.isArray(json.data) ? json.data : [];
+            const valueField = field.relation!.valueField ?? "id";
+
+            return [
+              field.key,
+              records.map((record) => ({
+                value: String(record[valueField] ?? record.id),
+                label:
+                  field.relation!.labelFields
+                    .map((labelField) => record[labelField])
+                    .filter(Boolean)
+                    .join(" ") || String(record[valueField] ?? record.id),
+              })),
+            ] as const;
+          } catch {
+            return [field.key, []] as const;
+          }
+        }),
+      );
+
+      if (mounted) {
+        setRelationOptions(Object.fromEntries(entries));
+      }
+    }
+
+    void loadRelationOptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, [fields]);
 
   async function saveRecord() {
     const method = editingId ? "PUT" : "POST";
@@ -149,7 +216,7 @@ export function ResourcePage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {fields.map((field) => (
+            {formFields.map((field) => (
               <label className="block" key={field.key}>
                 <span className="mb-1.5 block text-xs font-medium text-zinc-500">
                   {field.label}
@@ -171,16 +238,31 @@ export function ResourcePage({
                     }
                     type="checkbox"
                   />
-                ) : field.type === "select" ? (
+                ) : field.type === "select" || field.type === "relation" ? (
                   <select
-                    className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                    className={`${field.multiple ? "min-h-28 py-2" : "h-11"} w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200`}
+                    multiple={field.multiple}
                     onChange={(event) =>
-                      setDraft((current) => ({ ...current, [field.key]: event.target.value }))
+                      setDraft((current) => ({
+                        ...current,
+                        [field.key]: field.multiple
+                          ? Array.from(event.target.selectedOptions, (option) => option.value)
+                          : event.target.value,
+                        ...clearHiddenDependentValues(fields, field.key, event.target.value),
+                      }))
                     }
-                    value={String(draft[field.key] ?? "")}
+                    value={
+                      field.multiple
+                        ? toMultiSelectValue(draft[field.key])
+                        : String(draft[field.key] ?? "")
+                    }
                   >
-                    <option value="">Select {field.label}</option>
-                    {(field.options ?? []).map((option) => (
+                    {field.multiple ? null : <option value="">Select {field.label}</option>}
+                    {(
+                      field.type === "relation"
+                        ? relationOptions[field.key] ?? []
+                        : field.options ?? []
+                    ).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -252,7 +334,7 @@ export function ResourcePage({
                           className={`px-3 py-3 text-zinc-700 ${index === 0 ? "rounded-l-2xl font-medium text-zinc-950" : ""}`}
                           key={field.key}
                         >
-                          {formatValue(row[field.key])}
+                          {formatValue(row[field.key], field, relationOptions)}
                         </td>
                       ))}
                       <td className="rounded-r-2xl px-3 py-3">
@@ -292,7 +374,10 @@ export function ResourcePage({
               <div className="rounded-2xl border border-white/45 bg-white/42 p-3 text-sm text-zinc-600">
                 {tableFields
                   .slice(0, 3)
-                  .map((field) => `${field.label}: ${formatValue(pendingDelete[field.key])}`)
+                  .map(
+                    (field) =>
+                      `${field.label}: ${formatValue(pendingDelete[field.key], field, relationOptions)}`,
+                  )
                   .join(" | ")}
               </div>
               <div className="flex justify-end gap-2">
@@ -312,7 +397,56 @@ export function ResourcePage({
   );
 }
 
-function formatValue(value: unknown) {
+function isFieldVisible(field: FieldConfig, draft: Record<string, RecordValue>) {
+  if (!field.visibleWhen) return true;
+
+  return String(draft[field.visibleWhen.field] ?? "") === field.visibleWhen.value;
+}
+
+function clearHiddenDependentValues(
+  fields: FieldConfig[],
+  changedField: string,
+  changedValue: string,
+) {
+  return Object.fromEntries(
+    fields
+      .filter(
+        (field) =>
+          field.visibleWhen?.field === changedField && field.visibleWhen.value !== changedValue,
+      )
+      .map((field) => [field.key, field.multiple ? [] : ""]),
+  );
+}
+
+function toMultiSelectValue(value: RecordValue | undefined) {
+  if (Array.isArray(value)) return value.map(String);
+
+  return String(value ?? "")
+    .split(",")
+    .filter(Boolean);
+}
+
+function formatValue(
+  value: unknown,
+  field?: FieldConfig,
+  relationOptions?: Record<string, { label: string; value: string }[]>,
+) {
+  if (field?.type === "relation" && relationOptions) {
+    const options = relationOptions[field.key] ?? [];
+
+    if (Array.isArray(value)) {
+      return (
+        value
+          .map((item) => options.find((option) => option.value === String(item))?.label ?? String(item))
+          .join(", ") || "-"
+      );
+    }
+
+    if (value === null || value === undefined || value === "") return "-";
+
+    return options.find((option) => option.value === String(value))?.label ?? String(value);
+  }
+
   if (Array.isArray(value)) return value.join(", ") || "-";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "-";

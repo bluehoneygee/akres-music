@@ -8,11 +8,35 @@ export default function JournalsPage() {
       <ResourcePage
         description="Jurnal perkembangan per sesi, termasuk materi, teknik, homework, rating, dan parent visibility."
         fields={[
-          { key: "studentId", label: "Student ID", required: true },
-          { key: "instructorId", label: "Instructor ID", required: true },
-          { key: "courseScheduleId", label: "Schedule ID", required: true },
+          {
+            key: "studentId",
+            label: "Student",
+            type: "relation",
+            relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+            required: true,
+          },
+          {
+            key: "instructorId",
+            label: "Instructor",
+            type: "relation",
+            relation: { resource: "instructors", labelFields: ["instructorName"] },
+            required: true,
+          },
+          {
+            key: "courseScheduleId",
+            label: "Schedule",
+            type: "relation",
+            relation: { resource: "schedules", labelFields: ["scheduleDate", "fromTime"] },
+            required: true,
+          },
           { key: "lessonDate", label: "Lesson date", type: "date", required: true },
-          { key: "instrumentId", label: "Instrument ID", required: true },
+          {
+            key: "instrumentId",
+            label: "Instrument",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            required: true,
+          },
           { key: "level", label: "Level", type: "select", options: levelOptions },
           { key: "materialCovered", label: "Material covered", type: "textarea" },
           { key: "techniqueFocus", label: "Technique focus" },

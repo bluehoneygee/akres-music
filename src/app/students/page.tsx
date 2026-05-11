@@ -10,7 +10,13 @@ export default function StudentsPage() {
         fields={[
           { key: "firstName", label: "First name", required: true },
           { key: "lastName", label: "Last name", required: true },
-          { key: "primaryInstrumentId", label: "Primary instrument ID", required: true },
+          {
+            key: "primaryInstrumentId",
+            label: "Primary Instrument",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            required: true,
+          },
           { key: "skillLevel", label: "Skill level", type: "select", options: levelOptions, required: true },
           { key: "learningGoal", label: "Learning goal" },
           {
@@ -18,6 +24,13 @@ export default function StudentsPage() {
             label: "Preferred mode",
             type: "select",
             options: lessonModeOptions,
+          },
+          {
+            key: "guardianIds",
+            label: "Guardians",
+            type: "relation",
+            relation: { resource: "guardians", labelFields: ["guardianName"] },
+            multiple: true,
           },
           { key: "portalEnabled", label: "Portal enabled", type: "checkbox" },
           { key: "musicNotes", label: "Music notes", type: "textarea" },

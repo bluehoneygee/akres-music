@@ -9,7 +9,13 @@ export default function CoursesPage() {
         description="Program les musik privat berdasarkan instrumen, level, durasi, dan fee default."
         fields={[
           { key: "courseName", label: "Course name", required: true },
-          { key: "instrumentId", label: "Instrument ID", required: true },
+          {
+            key: "instrumentId",
+            label: "Instrument",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            required: true,
+          },
           { key: "courseLevel", label: "Course level", type: "select", options: levelOptions, required: true },
           {
             key: "lessonType",

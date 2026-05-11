@@ -10,7 +10,13 @@ export default function RepertoiresPage() {
         fields={[
           { key: "title", label: "Title", required: true },
           { key: "composerArtist", label: "Composer/artist" },
-          { key: "instrumentId", label: "Instrument ID", required: true },
+          {
+            key: "instrumentId",
+            label: "Instrument",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            required: true,
+          },
           { key: "level", label: "Level", type: "select", options: levelOptions, required: true },
           { key: "genre", label: "Genre" },
           { key: "notes", label: "Notes", type: "textarea" },

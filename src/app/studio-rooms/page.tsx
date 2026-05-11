@@ -9,7 +9,13 @@ export default function StudioRoomsPage() {
         fields={[
           { key: "roomName", label: "Room name", required: true },
           { key: "capacity", label: "Capacity", type: "number" },
-          { key: "instrumentIds", label: "Instrument IDs" },
+          {
+            key: "instrumentIds",
+            label: "Instruments",
+            type: "relation",
+            relation: { resource: "instruments", labelFields: ["instrumentName"] },
+            multiple: true,
+          },
           { key: "isActive", label: "Active", type: "checkbox" },
         ]}
         resource="rooms"
