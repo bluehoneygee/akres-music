@@ -1,0 +1,31 @@
+import {
+  Banknote,
+  BookOpenCheck,
+  CalendarDays,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  Music2,
+  Piano,
+  ShieldCheck,
+  SquareLibrary,
+  UserCog,
+  Users,
+} from "lucide-react";
+
+export const appNavigation = [
+  { label: "Overview", href: "/", icon: LayoutDashboard },
+  { label: "Users", href: "/users", icon: UserCog },
+  { label: "Instruments", href: "/instruments", icon: Music2 },
+  { label: "Students", href: "/students", icon: GraduationCap },
+  { label: "Instructors", href: "/instructors", icon: Users },
+  { label: "Courses", href: "/courses", icon: SquareLibrary },
+  { label: "Rooms", href: "/rooms", icon: Piano },
+  { label: "Schedules", href: "/schedules", icon: CalendarDays },
+  { label: "Attendance", href: "/attendance", icon: BookOpenCheck },
+  { label: "Journals", href: "/journals", icon: FileText },
+  { label: "Repertoire", href: "/repertoires", icon: Music2 },
+  { label: "Portal", href: "/portal", icon: Users },
+  { label: "Billing", href: "/billing", icon: Banknote },
+  { label: "Reports", href: "/reports", icon: ShieldCheck },
+];
