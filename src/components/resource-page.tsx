@@ -11,8 +11,10 @@ import type { ResourceName } from "@/lib/models";
 export type FieldConfig = {
   key: string;
   label: string;
-  type?: "text" | "number" | "date" | "time" | "checkbox" | "textarea";
+  type?: "text" | "number" | "date" | "time" | "checkbox" | "textarea" | "select";
+  options?: { label: string; value: string }[];
   required?: boolean;
+  writeOnly?: boolean;
 };
 
 type RecordValue = string | number | boolean | string[];
@@ -40,13 +42,30 @@ export function ResourcePage({
   const [draft, setDraft] = useState<Record<string, RecordValue>>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const tableFields = fields.filter((field) => !field.writeOnly);
 
   async function loadRows() {
     setLoading(true);
-    const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-    const json = (await response.json()) as { data: UiRecord[] };
-    setRows(json.data);
-    setLoading(false);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/${resource}`, { cache: "no-store" });
+      const json = (await response.json()) as { data?: UiRecord[]; error?: string };
+
+      if (!response.ok) {
+        setRows([]);
+        setError(json.error ?? "Unable to load records");
+        return;
+      }
+
+      setRows(Array.isArray(json.data) ? json.data : []);
+    } catch {
+      setRows([]);
+      setError("Unable to connect to the server");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -56,18 +75,32 @@ export function ResourcePage({
   async function saveRecord() {
     const method = editingId ? "PUT" : "POST";
     const url = editingId ? `/api/${resource}/${editingId}` : `/api/${resource}`;
-    await fetch(url, {
+    const response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(draft),
     });
+
+    if (!response.ok) {
+      const json = (await response.json()) as { error?: string };
+      setError(json.error ?? "Unable to save record");
+      return;
+    }
+
     setEditingId(null);
     setDraft(emptyDraft);
     await loadRows();
   }
 
   async function deleteRow(id: string) {
-    await fetch(`/api/${resource}/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/${resource}/${id}`, { method: "DELETE" });
+
+    if (!response.ok) {
+      const json = (await response.json()) as { error?: string };
+      setError(json.error ?? "Unable to delete record");
+      return;
+    }
+
     await loadRows();
   }
 
@@ -129,6 +162,21 @@ export function ResourcePage({
                     }
                     type="checkbox"
                   />
+                ) : field.type === "select" ? (
+                  <select
+                    className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, [field.key]: event.target.value }))
+                    }
+                    value={String(draft[field.key] ?? "")}
+                  >
+                    <option value="">Select {field.label}</option>
+                    {(field.options ?? []).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <input
                     className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
@@ -165,14 +213,21 @@ export function ResourcePage({
 
         <Card className="liquid-glass">
           <CardHeader>
-            <CardTitle className="text-base">{loading ? "Loading..." : `${rows.length} records`}</CardTitle>
+            <CardTitle className="text-base">
+              {loading ? "Loading..." : `${rows.length} records`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
+            {error ? (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {error}
+              </div>
+            ) : null}
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full min-w-[820px] border-separate border-spacing-y-2 text-left text-sm">
                 <thead className="text-xs uppercase text-zinc-500">
                   <tr>
-                    {fields.map((field) => (
+                    {tableFields.map((field) => (
                       <th className="px-3 py-2 font-medium" key={field.key}>
                         {field.label}
                       </th>
@@ -183,7 +238,7 @@ export function ResourcePage({
                 <tbody>
                   {rows.map((row) => (
                     <tr className="bg-white/42" key={row.id}>
-                      {fields.map((field, index) => (
+                      {tableFields.map((field, index) => (
                         <td
                           className={`px-3 py-3 text-zinc-700 ${index === 0 ? "rounded-l-2xl font-medium text-zinc-950" : ""}`}
                           key={field.key}
