@@ -39,3 +39,33 @@
 - [ ] Student portal can show own progress.
 - [ ] Absence notification works.
 - [ ] Basic reports work.
+
+## Current Next.js Backend Implementation Status
+
+Catatan: checklist asli di atas masih mengacu ke ERPNext/Frappe. Karena arah implementasi
+berubah ke backend sendiri, status aktual MVP Next.js dicatat terpisah di bawah ini.
+
+- [x] Next.js app shell dibuat dengan route per menu utama.
+- [x] Backend API sendiri dibuat dengan route handler Next.js.
+- [x] File-backed local persistence dibuat di `data/db.json`.
+- [x] Seed data dibuat dari payload/demo Akres.
+- [x] Master Instrument API dan page tersedia.
+- [x] Student API dan page tersedia.
+- [x] Instructor API dan page tersedia.
+- [x] Course API dan page tersedia.
+- [x] Studio Room API dan page tersedia.
+- [x] Schedule API dan page tersedia untuk Studio/Home Visit fields.
+- [x] Student Attendance API dan page tersedia.
+- [x] Instructor Attendance API dan page tersedia.
+- [x] Lesson Journal API dan page tersedia.
+- [x] Repertoire API dan page tersedia.
+- [x] Billing/Invoice API dan page tersedia.
+- [x] Portal preview page tersedia dengan aturan Guardian -> Student dan `parentVisible`.
+- [x] Basic reports page tersedia.
+- [ ] Authentication/session backend.
+- [ ] Role-based authorization untuk Admin, Staff, Instructor, Student, Parent.
+- [ ] Validasi relasi antar record di API.
+- [ ] Permission query agar instructor/student/parent hanya melihat data terkait.
+- [ ] Scheduler notifikasi absensi berulang.
+- [ ] Scheduler reminder invoice.
+- [ ] Production database adapter.
