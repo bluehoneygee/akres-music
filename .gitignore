@@ -30,3 +30,6 @@ next-env.d.ts
 
 # Misc
 coverage/
+
+# Local file-backed API data
+data/db.json

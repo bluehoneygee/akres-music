@@ -4,6 +4,8 @@
   "description": "Dashboard akademik Akres Music berbasis Next.js dan shadcn/ui.",
   "private": true,
   "scripts": {
+    "db:up": "docker compose up -d mongo",
+    "db:down": "docker compose down",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -15,6 +17,7 @@
   "type": "module",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -24,10 +27,14 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
+    "@auth/mongodb-adapter": "^3.11.2",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
+    "mongodb": "^7.2.0",
     "next": "^16.2.6",
+    "next-auth": "^5.0.0-beta.31",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tailwind-merge": "^3.5.0"
