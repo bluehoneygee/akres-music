@@ -11,6 +11,7 @@ Spec kit ini adalah paket dokumen implementasi untuk membangun sistem sekolah mu
 - [quickstart.md](./quickstart.md): langkah awal membuat custom app dan smoke test.
 - [research.md](./research.md): catatan keputusan teknis dan tradeoff.
 - [checklists.md](./checklists.md): checklist kualitas spec, data model, security, dan MVP.
+- [e2e-manual-payloads.md](./e2e-manual-payloads.md): payload manual untuk mencoba flow Next.js + MongoDB.
 
 ## Recommended Build Order
 
@@ -26,4 +27,3 @@ Spec kit ini adalah paket dokumen implementasi untuk membangun sistem sekolah mu
 Fondasi awal ada di:
 
 - [ERPNext-Music-School-Foundation.md](../../ERPNext-Music-School-Foundation.md)
-

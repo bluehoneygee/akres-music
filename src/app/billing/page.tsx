@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
+import { invoiceStatusOptions } from "@/lib/options";
 
 export default function BillingPage() {
   return (
@@ -13,7 +14,7 @@ export default function BillingPage() {
           { key: "lessonPackage", label: "Lesson package" },
           { key: "amount", label: "Amount", type: "number", required: true },
           { key: "dueDate", label: "Due date", type: "date", required: true },
-          { key: "status", label: "Status", required: true },
+          { key: "status", label: "Status", type: "select", options: invoiceStatusOptions, required: true },
         ]}
         resource="invoices"
         title="Billing"

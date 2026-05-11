@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
+import { levelOptions } from "@/lib/options";
 
 export default function InstructorsPage() {
   return (
@@ -10,8 +11,8 @@ export default function InstructorsPage() {
           { key: "instructorName", label: "Instructor name", required: true },
           { key: "employeeName", label: "Employee name" },
           { key: "instrumentIds", label: "Instrument IDs" },
-          { key: "levelFrom", label: "Level from" },
-          { key: "levelTo", label: "Level to" },
+          { key: "levelFrom", label: "Level from", type: "select", options: levelOptions },
+          { key: "levelTo", label: "Level to", type: "select", options: levelOptions },
           { key: "portalEnabled", label: "Portal enabled", type: "checkbox" },
         ]}
         resource="instructors"

@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
+import { lessonModeOptions, scheduleStatusOptions } from "@/lib/options";
 
 export default function SchedulesPage() {
   return (
@@ -14,10 +15,10 @@ export default function SchedulesPage() {
           { key: "scheduleDate", label: "Date", type: "date", required: true },
           { key: "fromTime", label: "From", type: "time", required: true },
           { key: "toTime", label: "To", type: "time", required: true },
-          { key: "lessonMode", label: "Lesson mode" },
+          { key: "lessonMode", label: "Lesson mode", type: "select", options: lessonModeOptions },
           { key: "studioRoomId", label: "Studio room ID" },
           { key: "homeVisitAddress", label: "Home visit address" },
-          { key: "scheduleStatus", label: "Status" },
+          { key: "scheduleStatus", label: "Status", type: "select", options: scheduleStatusOptions },
         ]}
         resource="schedules"
         title="Course Schedules"

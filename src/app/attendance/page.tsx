@@ -1,5 +1,9 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
+import {
+  instructorAttendanceStatusOptions,
+  studentAttendanceStatusOptions,
+} from "@/lib/options";
 
 export default function AttendancePage() {
   return (
@@ -12,7 +16,13 @@ export default function AttendancePage() {
             { key: "courseScheduleId", label: "Schedule ID", required: true },
             { key: "instrumentId", label: "Instrument ID", required: true },
             { key: "date", label: "Date", type: "date", required: true },
-            { key: "status", label: "Status", required: true },
+            {
+              key: "status",
+              label: "Status",
+              type: "select",
+              options: studentAttendanceStatusOptions,
+              required: true,
+            },
             { key: "absenceReason", label: "Absence reason" },
             { key: "makeupRequired", label: "Makeup required", type: "checkbox" },
           ]}
@@ -26,7 +36,13 @@ export default function AttendancePage() {
             { key: "courseScheduleId", label: "Schedule ID", required: true },
             { key: "attendanceDate", label: "Date", type: "date", required: true },
             { key: "instrumentId", label: "Instrument ID", required: true },
-            { key: "status", label: "Status", required: true },
+            {
+              key: "status",
+              label: "Status",
+              type: "select",
+              options: instructorAttendanceStatusOptions,
+              required: true,
+            },
             { key: "substituteInstructorId", label: "Substitute instructor ID" },
             { key: "notes", label: "Notes", type: "textarea" },
           ]}
