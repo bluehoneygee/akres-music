@@ -2,7 +2,10 @@ import bcrypt from "bcryptjs";
 import { Filter, ObjectId, type Document } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { canAccessResource } from "@/lib/roles";
+import { sessionRole } from "@/lib/session";
 
 function userQuery(id: string) {
   return (ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id }) as Filter<Document>;
@@ -33,6 +36,14 @@ export async function PUT(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource: "users", action: "update" })) {
+    return NextResponse.json({ error: "Only System Manager can update users" }, { status: 403 });
+  }
+
   const payload = (await request.json()) as Record<string, string>;
   const db = await getMongoDb();
   const update: Record<string, unknown> = {
@@ -68,6 +79,14 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource: "users", action: "delete" })) {
+    return NextResponse.json({ error: "Only System Manager can delete users" }, { status: 403 });
+  }
+
   const db = await getMongoDb();
   const result = await db.collection("users").deleteOne(userQuery(id));
 

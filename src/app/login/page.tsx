@@ -44,7 +44,7 @@ export default function LoginPage({
               <span className="mb-1.5 block text-xs font-medium text-zinc-500">Email</span>
               <input
                 className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
-                defaultValue="staff@akres.test"
+                defaultValue="admin@akres.test"
                 name="email"
                 type="email"
               />

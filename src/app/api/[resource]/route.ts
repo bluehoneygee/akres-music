@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { createRecord, isResourceName, listRecords } from "@/lib/db";
+import { canAccessResource } from "@/lib/roles";
+import { sessionRole } from "@/lib/session";
+import { filterRecordsForSession } from "@/lib/visibility";
 
 export async function GET(
   _request: NextRequest,
@@ -12,7 +16,16 @@ export async function GET(
     return NextResponse.json({ error: "Unknown resource" }, { status: 404 });
   }
 
-  const data = await listRecords(resource);
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource, action: "read" })) {
+    return NextResponse.json({ error: "You do not have access to this menu" }, { status: 403 });
+  }
+
+  const records = await listRecords(resource);
+  const data = await filterRecordsForSession(resource, records, session);
   return NextResponse.json({ data });
 }
 
@@ -24,6 +37,14 @@ export async function POST(
 
   if (!isResourceName(resource)) {
     return NextResponse.json({ error: "Unknown resource" }, { status: 404 });
+  }
+
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource, action: "create" })) {
+    return NextResponse.json({ error: "You do not have permission to create records here" }, { status: 403 });
   }
 
   const payload = (await request.json()) as Record<string, unknown>;

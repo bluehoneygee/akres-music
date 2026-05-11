@@ -1,7 +1,10 @@
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { getMongoDb } from "@/lib/mongodb";
+import { canAccessResource } from "@/lib/roles";
+import { sessionRole } from "@/lib/session";
 
 function serializeUser(user: {
   _id: unknown;
@@ -24,12 +27,28 @@ function serializeUser(user: {
 }
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource: "users", action: "read" })) {
+    return NextResponse.json({ error: "Only System Manager can manage users" }, { status: 403 });
+  }
+
   const db = await getMongoDb();
   const users = await db.collection("users").find({}).sort({ email: 1 }).toArray();
   return NextResponse.json({ data: users.map(serializeUser) });
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canAccessResource({ role: sessionRole(session), resource: "users", action: "create" })) {
+    return NextResponse.json({ error: "Only System Manager can create users" }, { status: 403 });
+  }
+
   const payload = (await request.json()) as {
     name?: string;
     email?: string;

@@ -46,7 +46,10 @@ async function seed() {
   const marker = db.collection("_meta");
   const seeded = await marker.findOne({ key: "seeded" });
 
-  if (seeded) return;
+  if (seeded) {
+    await ensureDefaultUsers();
+    return;
+  }
 
   for (const resource of resources) {
     const docs = seedDatabase[resource].map((record) => ({
@@ -61,37 +64,68 @@ async function seed() {
     }
   }
 
-  const passwordHash = await bcrypt.hash("admin123", 12);
-  await db.collection("users").insertMany(
-    [
-      {
-        email: "staff@akres.test",
-        emailVerified: null,
-        name: "Staff Akres",
-        role: "Academic Staff",
-        passwordHash,
-      },
-      {
-        email: "budi.teacher@akres.test",
-        emailVerified: null,
-        name: "Budi Santoso",
-        role: "Music Instructor",
-        instructorId: "instructor-budi",
-        passwordHash,
-      },
-      {
-        email: "rina.parent@akres.test",
-        emailVerified: null,
-        name: "Rina Prameswari",
-        role: "Parent Portal User",
-        guardianId: "guardian-rina",
-        passwordHash,
-      },
-    ],
-    { ordered: false },
-  );
+  await ensureDefaultUsers();
 
   await marker.insertOne({ key: "seeded", value: true, seededAt: new Date() });
+}
+
+async function ensureDefaultUsers() {
+  const db = await getMongoDb();
+  const passwordHash = await bcrypt.hash("admin123", 12);
+  const users = [
+    {
+      email: "admin@akres.test",
+      emailVerified: null,
+      name: "Administrator Akres",
+      role: "System Manager",
+      passwordHash,
+    },
+    {
+      email: "staff@akres.test",
+      emailVerified: null,
+      name: "Staff Akres",
+      role: "Academic Staff",
+      passwordHash,
+    },
+    {
+      email: "budi.teacher@akres.test",
+      emailVerified: null,
+      name: "Budi Santoso",
+      role: "Music Instructor",
+      instructorId: "instructor-budi",
+      passwordHash,
+    },
+    {
+      email: "rina.parent@akres.test",
+      emailVerified: null,
+      name: "Rina Prameswari",
+      role: "Parent Portal User",
+      guardianId: "guardian-rina",
+      passwordHash,
+    },
+  ];
+
+  await Promise.all(
+    users.map((user) => {
+      const { name, role, ...insertOnly } = user;
+
+      return db.collection("users").updateOne(
+        { email: user.email },
+        {
+          $setOnInsert: {
+            ...insertOnly,
+            createdAt: new Date().toISOString(),
+          },
+          $set: {
+            name,
+            role,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        { upsert: true },
+      );
+    }),
+  );
 }
 
 function fromMongo<T extends Document>(record: T): Omit<T, "_id"> & { id: string } {

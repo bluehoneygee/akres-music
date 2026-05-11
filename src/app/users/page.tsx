@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
+import { roleOptions } from "@/lib/roles";
 
 export default function UsersPage() {
   return (
@@ -9,8 +10,8 @@ export default function UsersPage() {
         fields={[
           { key: "name", label: "Name", required: true },
           { key: "email", label: "Email", required: true },
-          { key: "password", label: "Password" },
-          { key: "role", label: "Role", required: true },
+          { key: "password", label: "Password", writeOnly: true },
+          { key: "role", label: "Role", type: "select", options: roleOptions, required: true },
           { key: "studentId", label: "Student ID" },
           { key: "guardianId", label: "Guardian ID" },
           { key: "instructorId", label: "Instructor ID" },
