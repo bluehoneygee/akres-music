@@ -47,7 +47,7 @@ berubah ke backend sendiri, status aktual MVP Next.js dicatat terpisah di bawah 
 
 - [x] Next.js app shell dibuat dengan route per menu utama.
 - [x] Backend API sendiri dibuat dengan route handler Next.js.
-- [x] File-backed local persistence dibuat di `data/db.json`.
+- [x] MongoDB persistence dibuat dengan Docker Compose.
 - [x] Seed data dibuat dari payload/demo Akres.
 - [x] Master Instrument API dan page tersedia.
 - [x] Student API dan page tersedia.
@@ -62,10 +62,11 @@ berubah ke backend sendiri, status aktual MVP Next.js dicatat terpisah di bawah 
 - [x] Billing/Invoice API dan page tersedia.
 - [x] Portal preview page tersedia dengan aturan Guardian -> Student dan `parentVisible`.
 - [x] Basic reports page tersedia.
-- [ ] Authentication/session backend.
-- [ ] Role-based authorization untuk Admin, Staff, Instructor, Student, Parent.
+- [x] Authentication/session backend.
+- [x] Role options tersedia untuk System Manager, Staff, Instructor, Student, Parent.
+- [x] Role-based authorization dasar untuk Admin, Staff, Instructor, Student, Parent.
 - [ ] Validasi relasi antar record di API.
-- [ ] Permission query agar instructor/student/parent hanya melihat data terkait.
+- [x] Permission query dasar agar instructor/student/parent hanya melihat data terkait.
 - [ ] Scheduler notifikasi absensi berulang.
 - [ ] Scheduler reminder invoice.
-- [ ] Production database adapter.
+- [x] Production database adapter baseline memakai MongoDB.
