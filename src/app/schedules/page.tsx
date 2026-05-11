@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
-import { lessonModeOptions, scheduleStatusOptions } from "@/lib/options";
+import { lessonModeOptions, recurringPatternOptions, scheduleStatusOptions } from "@/lib/options";
 
 export default function SchedulesPage() {
   return (
@@ -39,6 +39,13 @@ export default function SchedulesPage() {
           { key: "scheduleDate", label: "Date", type: "date", required: true },
           { key: "fromTime", label: "From", type: "time", required: true },
           { key: "toTime", label: "To", type: "time", required: true },
+          {
+            key: "recurringPattern",
+            label: "Recurring pattern",
+            type: "select",
+            options: recurringPatternOptions,
+          },
+          { key: "recurrenceEndDate", label: "Recurring until", type: "date" },
           { key: "lessonMode", label: "Lesson mode", type: "select", options: lessonModeOptions },
           {
             key: "studioRoomId",
@@ -47,7 +54,16 @@ export default function SchedulesPage() {
             relation: { resource: "rooms", labelFields: ["roomName"] },
           },
           { key: "homeVisitAddress", label: "Home visit address" },
+          { key: "travelNotes", label: "Travel notes", type: "textarea" },
+          { key: "privateLesson", label: "Private lesson", type: "checkbox" },
           { key: "scheduleStatus", label: "Status", type: "select", options: scheduleStatusOptions },
+          {
+            key: "originalScheduleId",
+            label: "Original schedule",
+            type: "relation",
+            relation: { resource: "schedules", labelFields: ["scheduleDate", "fromTime"] },
+          },
+          { key: "rescheduleReason", label: "Reschedule reason", type: "textarea" },
         ]}
         resource="schedules"
         title="Course Schedules"

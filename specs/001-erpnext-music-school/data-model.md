@@ -132,8 +132,10 @@ Custom fields:
 | `travel_notes` | Small Text | No | Catatan akses/perjalanan untuk home visit |
 | `private_lesson` | Check | Yes | Selalu aktif |
 | `recurring_pattern` | Select | No | None, Weekly, Biweekly, Monthly |
+| `recurrence_end_date` | Date | No | Tanggal akhir pembuatan jadwal berulang |
 | `schedule_status` | Select | Yes | Scheduled, Completed, Cancelled, Rescheduled |
 | `original_schedule` | Link: Course Schedule | No | Jadwal asal jika reschedule |
+| `reschedule_reason` | Small Text | No | Alasan reschedule |
 
 Relationships:
 

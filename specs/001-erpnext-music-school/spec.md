@@ -115,6 +115,7 @@ Acceptance criteria:
 - Jadwal memiliki `lesson_mode`: Studio atau Home Visit.
 - Jadwal studio terhubung ke Studio Room.
 - Jadwal home visit menyimpan alamat dan catatan perjalanan.
+- Staff dapat membuat jadwal berulang mingguan, dua mingguan, atau bulanan sampai tanggal akhir.
 - Jadwal memiliki status: Scheduled, Completed, Cancelled, Rescheduled.
 - Jadwal dapat menunjuk jadwal asal jika merupakan reschedule.
 

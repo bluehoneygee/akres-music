@@ -111,8 +111,10 @@ export const seedDatabase: Database = {
       travelNotes: "",
       privateLesson: true,
       recurringPattern: "Weekly",
+      recurrenceEndDate: "2026-06-14",
       scheduleStatus: "Scheduled",
       originalScheduleId: "",
+      rescheduleReason: "",
     },
   ],
   "student-attendance": [

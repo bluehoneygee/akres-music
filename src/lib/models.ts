@@ -83,8 +83,10 @@ export type CourseSchedule = BaseRecord & {
   travelNotes: string;
   privateLesson: boolean;
   recurringPattern: "None" | "Weekly" | "Biweekly" | "Monthly";
+  recurrenceEndDate: string;
   scheduleStatus: "Scheduled" | "Completed" | "Cancelled" | "Rescheduled";
   originalScheduleId: string;
+  rescheduleReason: string;
 };
 
 export type StudentAttendance = BaseRecord & {

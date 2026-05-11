@@ -116,12 +116,20 @@ Resource: `schedules`
   "scheduleDate": "2026-05-18",
   "fromTime": "15:00",
   "toTime": "16:00",
+  "recurringPattern": "Weekly",
+  "recurrenceEndDate": "2026-06-18",
   "lessonMode": "Studio",
   "studioRoomId": "room-strings-1",
   "homeVisitAddress": "",
+  "travelNotes": "",
+  "privateLesson": true,
+  "originalScheduleId": "",
+  "rescheduleReason": "",
   "scheduleStatus": "Scheduled"
 }
 ```
+
+Catatan: payload di atas membuat jadwal setiap Senin dari `2026-05-18` sampai `2026-06-18`.
 
 ### 7. Schedule Home Visit
 
@@ -137,10 +145,43 @@ Resource: `schedules`
   "scheduleDate": "2026-05-25",
   "fromTime": "15:00",
   "toTime": "16:00",
+  "recurringPattern": "None",
+  "recurrenceEndDate": "",
   "lessonMode": "Home Visit",
   "studioRoomId": "",
   "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
+  "travelNotes": "Parkir di depan rumah.",
+  "privateLesson": true,
+  "originalScheduleId": "",
+  "rescheduleReason": "",
   "scheduleStatus": "Scheduled"
+}
+```
+
+### 7A. Schedule Reschedule
+
+Resource: `schedules`
+
+```json
+{
+  "id": "schedule-luna-studio-1-reschedule",
+  "courseId": "course-violin-beginner",
+  "studentId": "student-luna",
+  "instructorId": "instructor-sari",
+  "instrumentId": "inst-violin",
+  "scheduleDate": "2026-05-20",
+  "fromTime": "15:00",
+  "toTime": "16:00",
+  "recurringPattern": "None",
+  "recurrenceEndDate": "",
+  "lessonMode": "Studio",
+  "studioRoomId": "room-strings-1",
+  "homeVisitAddress": "",
+  "travelNotes": "",
+  "privateLesson": true,
+  "scheduleStatus": "Rescheduled",
+  "originalScheduleId": "schedule-luna-studio-1",
+  "rescheduleReason": "Student sick"
 }
 ```
 

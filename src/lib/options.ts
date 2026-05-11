@@ -20,6 +20,11 @@ export const lessonModeOptions = ["Studio", "Home Visit"].map((value) => ({
   value,
 }));
 
+export const recurringPatternOptions = ["None", "Weekly", "Biweekly", "Monthly"].map((value) => ({
+  label: value,
+  value,
+}));
+
 export const scheduleStatusOptions = [
   "Scheduled",
   "Completed",
