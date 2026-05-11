@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { readDatabase } from "@/lib/db";
+import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -29,36 +31,52 @@ function statusVariant(status: string) {
 }
 
 export default async function HomePage() {
+  const session = await auth();
   const db = await readDatabase();
-  const schedules = db.schedules.slice(0, 3);
-  const journals = db.journals.slice(0, 3);
-  const attendance = db["student-attendance"].slice(0, 4);
+  const scopedSchedules = session
+    ? await filterTypedRecordsForSession("schedules", db.schedules, session)
+    : db.schedules;
+  const scopedJournals = session
+    ? await filterTypedRecordsForSession("journals", db.journals, session)
+    : db.journals;
+  const scopedAttendance = session
+    ? await filterTypedRecordsForSession("student-attendance", db["student-attendance"], session)
+    : db["student-attendance"];
+  const scopedStudents = session
+    ? await filterTypedRecordsForSession("students", db.students, session)
+    : db.students;
+  const scopedInvoices = session
+    ? await filterTypedRecordsForSession("invoices", db.invoices, session)
+    : db.invoices;
+  const schedules = scopedSchedules.slice(0, 3);
+  const journals = scopedJournals.slice(0, 3);
+  const attendance = scopedAttendance.slice(0, 4);
 
   const metrics = [
     {
       label: "Murid aktif",
-      value: String(db.students.filter((student) => student.portalEnabled).length),
+      value: String(scopedStudents.length),
       delta: "portal enabled",
       icon: GraduationCap,
       tint: "bg-sky-100 text-sky-700",
     },
     {
       label: "Sesi terjadwal",
-      value: String(db.schedules.length),
+      value: String(scopedSchedules.length),
       delta: "private lessons",
       icon: CalendarDays,
       tint: "bg-emerald-100 text-emerald-700",
     },
     {
       label: "Jurnal visible",
-      value: String(db.journals.filter((journal) => journal.parentVisible).length),
+      value: String(scopedJournals.length),
       delta: "untuk portal",
       icon: BookOpenCheck,
       tint: "bg-violet-100 text-violet-700",
     },
     {
       label: "Tagihan terbuka",
-      value: String(db.invoices.filter((invoice) => invoice.status !== "Paid").length),
+      value: String(scopedInvoices.filter((invoice) => invoice.status !== "Paid").length),
       delta: "invoice unpaid/overdue",
       icon: WalletCards,
       tint: "bg-amber-100 text-amber-700",
@@ -68,17 +86,17 @@ export default async function HomePage() {
   const alerts = [
     {
       title: "Review absensi minggu ini",
-      meta: `${db["student-attendance"].filter((row) => ["Absent", "Sick", "Permission"].includes(row.status)).length} catatan absen perlu dicek untuk makeup lesson.`,
+      meta: `${scopedAttendance.filter((row) => ["Absent", "Sick", "Permission"].includes(row.status)).length} catatan absen perlu dicek untuk makeup lesson.`,
       variant: "secondary" as const,
     },
     {
       title: "Publish jurnal ke portal",
-      meta: `${db.journals.filter((journal) => !journal.parentVisible).length} jurnal belum tampil untuk orang tua.`,
+      meta: `${scopedJournals.filter((journal) => !journal.parentVisible).length} jurnal belum tampil untuk orang tua.`,
       variant: "warning" as const,
     },
     {
       title: "Follow up tagihan",
-      meta: `${db.invoices.filter((invoice) => invoice.status !== "Paid").length} invoice masih menunggu pembayaran.`,
+      meta: `${scopedInvoices.filter((invoice) => invoice.status !== "Paid").length} invoice masih menunggu pembayaran.`,
       variant: "danger" as const,
     },
   ];
@@ -245,9 +263,9 @@ export default async function HomePage() {
               {[
                 `${db.instruments.filter((instrument) => instrument.isActive).length} instrumen aktif`,
                 `${db.instructors.filter((instructor) => instructor.portalEnabled).length} guru portal aktif`,
-                `${db.schedules.filter((schedule) => schedule.lessonMode === "Studio").length} jadwal studio`,
-                `${db.schedules.filter((schedule) => schedule.lessonMode === "Home Visit").length} jadwal home visit`,
-                `${db.journals.filter((journal) => journal.parentVisible).length} jurnal tampil di portal`,
+                `${scopedSchedules.filter((schedule) => schedule.lessonMode === "Studio").length} jadwal studio`,
+                `${scopedSchedules.filter((schedule) => schedule.lessonMode === "Home Visit").length} jadwal home visit`,
+                `${scopedJournals.filter((journal) => journal.parentVisible).length} jurnal tampil di portal`,
                 `${db.rooms.filter((room) => room.isActive).length} studio room aktif`,
               ].map((item) => (
                 <div className="rounded-2xl border border-white/45 bg-white/42 p-3" key={item}>
@@ -266,13 +284,13 @@ export default async function HomePage() {
             <div className="rounded-[22px] border border-white/45 bg-zinc-950 p-5 text-white shadow-xl">
               <p className="text-sm text-white/65">Open invoices</p>
               <p className="mt-2 text-2xl font-semibold">
-                {db.invoices.filter((invoice) => invoice.status !== "Paid").length}
+                {scopedInvoices.filter((invoice) => invoice.status !== "Paid").length}
               </p>
               <div className="mt-5 flex items-center justify-between gap-3">
                 <span className="text-sm text-white/70">Unpaid total</span>
                 <span className="text-lg font-semibold">
                   Rp
-                  {db.invoices
+                  {scopedInvoices
                     .filter((invoice) => invoice.status !== "Paid")
                     .reduce((sum, invoice) => sum + invoice.amount, 0)
                     .toLocaleString("id-ID")}
@@ -288,7 +306,7 @@ export default async function HomePage() {
               <div className="rounded-[20px] border border-white/45 bg-white/42 p-4">
                 <CheckCircle2 className="mb-3 size-5 text-emerald-600" />
                 <p className="text-2xl font-semibold">
-                  {db.invoices.filter((invoice) => invoice.status === "Paid").length}
+                  {scopedInvoices.filter((invoice) => invoice.status === "Paid").length}
                 </p>
                 <p className="text-xs text-zinc-500">invoice lunas</p>
               </div>

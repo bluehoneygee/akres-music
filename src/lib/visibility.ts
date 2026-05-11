@@ -65,6 +65,14 @@ export async function filterRecordsForSession(
   return [];
 }
 
+export async function filterTypedRecordsForSession<T extends AnyRow>(
+  resource: ResourceName,
+  records: T[],
+  session: Session,
+) {
+  return (await filterRecordsForSession(resource, records, session)) as T[];
+}
+
 function filterStudentScoped(resource: ResourceName, records: AnyRow[], studentIds: Set<unknown>) {
   if (resource === "students") return records.filter((row) => studentIds.has(row.id));
   if (resource === "journals") {

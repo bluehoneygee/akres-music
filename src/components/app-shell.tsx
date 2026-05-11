@@ -4,21 +4,43 @@ import { Menu, Music2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { appNavigation } from "@/lib/navigation";
+import { getNavigationForRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [role, setRole] = useState<string>();
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSessionRole() {
+      const response = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = (await response.json()) as { user?: { role?: string } };
+
+      if (mounted) {
+        setRole(session.user?.role ?? "Academic Staff");
+      }
+    }
+
+    void loadSessionRole();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const navigation = getNavigationForRole(role);
 
   const nav = (
     <nav className="space-y-1">
-      {appNavigation.map((item) => {
+      {navigation.map((item) => {
         const active = pathname === item.href;
 
         return (
@@ -66,6 +88,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Brand />
           </div>
           {nav}
+          {role ? (
+            <div className="mt-4 rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-600">
+              <span className="block font-medium uppercase text-zinc-400">Role</span>
+              <span className="mt-0.5 block font-semibold text-zinc-700">{role}</span>
+            </div>
+          ) : null}
           <Card className="liquid-glass mt-8 rounded-[24px] bg-white/36">
             <CardHeader>
               <CardTitle className="text-sm">MVP Readiness</CardTitle>
