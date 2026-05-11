@@ -20,7 +20,7 @@ export const appNavigation = [
   { label: "Students", href: "/students", icon: GraduationCap },
   { label: "Instructors", href: "/instructors", icon: Users },
   { label: "Courses", href: "/courses", icon: SquareLibrary },
-  { label: "Rooms", href: "/rooms", icon: Piano },
+  { label: "Studio Rooms", href: "/studio-rooms", icon: Piano },
   { label: "Schedules", href: "/schedules", icon: CalendarDays },
   { label: "Attendance", href: "/attendance", icon: BookOpenCheck },
   { label: "Journals", href: "/journals", icon: FileText },

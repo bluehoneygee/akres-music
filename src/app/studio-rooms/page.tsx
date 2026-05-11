@@ -1,11 +1,11 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
 
-export default function RoomsPage() {
+export default function StudioRoomsPage() {
   return (
     <AppShell>
       <ResourcePage
-        description="Master studio room untuk jadwal studio dan pemakaian ruang."
+        description="Master ruang studio Akres untuk lesson mode Studio."
         fields={[
           { key: "roomName", label: "Room name", required: true },
           { key: "capacity", label: "Capacity", type: "number" },
