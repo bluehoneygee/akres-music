@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getNavigationForRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +114,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             Logout
           </Button>
+          <ThemeToggle className="mt-3 w-full" showLabel />
         </aside>
 
         <section className="min-w-0 space-y-4">
@@ -126,9 +128,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu className="size-5" />
               </Button>
-              <Button onClick={() => signOut({ callbackUrl: "/login" })} variant="glass">
-                Logout
-              </Button>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <Button onClick={() => signOut({ callbackUrl: "/login" })} variant="glass">
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
           {children}
