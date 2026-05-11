@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import type { Collection, Document } from "mongodb";
+import type { Collection, Document, Filter } from "mongodb";
 
 import type { AnyRecord, Database, ResourceName } from "@/lib/models";
 import { getMongoDb } from "@/lib/mongodb";
@@ -52,21 +52,29 @@ async function seed() {
   }
 
   for (const resource of resources) {
-    const docs = seedDatabase[resource].map((record) => ({
-      _id: record.id,
-      ...record,
-    }));
-
-    if (docs.length > 0) {
-      await db.collection(resource).insertMany(docs as unknown as Document[], {
-        ordered: false,
-      });
-    }
+    await Promise.all(
+      seedDatabase[resource].map((record) =>
+        db.collection(resource).updateOne(
+          { _id: record.id } as unknown as Filter<Document>,
+          {
+            $setOnInsert: {
+              _id: record.id,
+              ...record,
+            },
+          },
+          { upsert: true },
+        ),
+      ),
+    );
   }
 
   await ensureDefaultUsers();
 
-  await marker.insertOne({ key: "seeded", value: true, seededAt: new Date() });
+  await marker.updateOne(
+    { key: "seeded" },
+    { $set: { value: true, seededAt: new Date() } },
+    { upsert: true },
+  );
 }
 
 async function ensureDefaultUsers() {
