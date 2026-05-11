@@ -3,7 +3,6 @@ import type { Collection, Document, Filter } from "mongodb";
 
 import type { AnyRecord, Database, ResourceName } from "@/lib/models";
 import { getMongoDb } from "@/lib/mongodb";
-import { seedDatabase } from "@/lib/seed";
 
 export const resources: ResourceName[] = [
   "instruments",

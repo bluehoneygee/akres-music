@@ -140,7 +140,7 @@ Deliverables:
 Validation:
 
 - Murid hanya melihat data miliknya.
-- Orang tua hanya melihat data anak yang terhubung melalui `Guardian.user`.
+- Orang tua hanya melihat data anak yang terhubung melalui `User.guardianId`.
 - Relasi parent wajib mengikuti alur `User -> Guardian -> Student`.
 - Jurnal yang tidak `parent_visible` tidak tampil di portal.
 
