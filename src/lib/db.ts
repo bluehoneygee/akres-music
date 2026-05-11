@@ -88,29 +88,6 @@ async function ensureDefaultUsers() {
       role: "System Manager",
       passwordHash,
     },
-    {
-      email: "staff@akres.test",
-      emailVerified: null,
-      name: "Staff Akres",
-      role: "Academic Staff",
-      passwordHash,
-    },
-    {
-      email: "budi.teacher@akres.test",
-      emailVerified: null,
-      name: "Budi Santoso",
-      role: "Music Instructor",
-      instructorId: "instructor-budi",
-      passwordHash,
-    },
-    {
-      email: "rina.parent@akres.test",
-      emailVerified: null,
-      name: "Rina Prameswari",
-      role: "Parent Portal User",
-      guardianId: "guardian-rina",
-      passwordHash,
-    },
   ];
 
   await Promise.all(
