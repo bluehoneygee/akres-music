@@ -1,7 +1,7 @@
 "use client";
 
 import { Edit3, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,11 @@ export type FieldConfig = {
   writeOnly?: boolean;
   hidden?: boolean;
   hideOnCreate?: boolean;
+  quickCreate?: {
+    title: string;
+    resource: ResourceName;
+    fields: FieldConfig[];
+  };
 };
 
 type RecordValue = string | number | boolean | string[];
@@ -59,11 +64,13 @@ export function ResourcePage({
   description,
   resource,
   fields,
+  allowCreate = true,
 }: {
   title: string;
   description: string;
   resource: ResourceName | "users";
   fields: FieldConfig[];
+  allowCreate?: boolean;
 }) {
   const emptyDraft = useMemo(
     () =>
@@ -79,6 +86,8 @@ export function ResourcePage({
   const [draft, setDraft] = useState<Record<string, RecordValue>>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<UiRecord | null>(null);
+  const [quickCreateField, setQuickCreateField] = useState<FieldConfig | null>(null);
+  const [quickCreateDraft, setQuickCreateDraft] = useState<Record<string, RecordValue>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
@@ -87,6 +96,30 @@ export function ResourcePage({
     (field) => !field.hidden && (!field.hideOnCreate || editingId) && isFieldVisible(field, draft),
   );
   const tableFields = fields.filter((field) => !field.writeOnly);
+
+  const fetchRelationOptions = useCallback(async (field: FieldConfig): Promise<
+    readonly [string, RelationOption[]]
+  > => {
+    if (!field.relation) return [field.key, []];
+
+    const response = await fetch(`/api/${field.relation.resource}`, { cache: "no-store" });
+    const json = (await response.json()) as { data?: UiRecord[] };
+    const records = Array.isArray(json.data) ? json.data : [];
+    const valueField = field.relation.valueField ?? "id";
+
+    return [
+      field.key,
+      records.map((record) => ({
+        value: String(record[valueField] ?? record.id),
+        label:
+          field.relation!.labelFields
+            .map((labelField) => record[labelField])
+            .filter(Boolean)
+            .join(" ") || String(record[valueField] ?? record.id),
+        record,
+      })),
+    ] as const;
+  }, []);
 
   async function loadRows() {
     setLoading(true);
@@ -125,23 +158,7 @@ export function ResourcePage({
       const entries = await Promise.all(
         relationFields.map(async (field) => {
           try {
-            const response = await fetch(`/api/${field.relation!.resource}`, { cache: "no-store" });
-            const json = (await response.json()) as { data?: UiRecord[] };
-            const records = Array.isArray(json.data) ? json.data : [];
-            const valueField = field.relation!.valueField ?? "id";
-
-            return [
-              field.key,
-              records.map((record) => ({
-                value: String(record[valueField] ?? record.id),
-                label:
-                  field.relation!.labelFields
-                    .map((labelField) => record[labelField])
-                    .filter(Boolean)
-                    .join(" ") || String(record[valueField] ?? record.id),
-                record,
-              })),
-            ] as const;
+            return await fetchRelationOptions(field);
           } catch {
             return [field.key, []] as const;
           }
@@ -158,7 +175,7 @@ export function ResourcePage({
     return () => {
       mounted = false;
     };
-  }, [fieldsSignature, fields]);
+  }, [fieldsSignature, fields, fetchRelationOptions]);
 
   useEffect(() => {
     setDraft((current) => {
@@ -258,6 +275,49 @@ export function ResourcePage({
     );
   }
 
+  function openQuickCreate(field: FieldConfig) {
+    if (!field.quickCreate) return;
+
+    setQuickCreateField(field);
+    setQuickCreateDraft(
+      Object.fromEntries(
+        field.quickCreate.fields.map((quickField) => [
+          quickField.key,
+          quickField.type === "checkbox" ? false : quickField.multiple ? [] : "",
+        ]),
+      ) as Record<string, RecordValue>,
+    );
+  }
+
+  async function saveQuickCreate() {
+    if (!quickCreateField?.quickCreate) return;
+
+    const response = await fetch(`/api/${quickCreateField.quickCreate.resource}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(quickCreateDraft),
+    });
+
+    const json = (await response.json()) as { data?: UiRecord; error?: string };
+
+    if (!response.ok || !json.data) {
+      toast.error(json.error ?? "Unable to create related record");
+      return;
+    }
+
+    const [fieldKey, options] = await fetchRelationOptions(quickCreateField);
+    setRelationOptions((current) => ({ ...current, [fieldKey]: options }));
+    setDraft((current) => ({
+      ...current,
+      [quickCreateField.key]: quickCreateField.multiple
+        ? [...toMultiSelectValue(current[quickCreateField.key]), json.data!.id]
+        : json.data!.id,
+    }));
+    setQuickCreateField(null);
+    setQuickCreateDraft({});
+    toast.success(`${quickCreateField.quickCreate.title} created`);
+  }
+
   return (
     <div className="space-y-4">
       <Card className="liquid-glass">
@@ -276,101 +336,119 @@ export function ResourcePage({
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <Card className="liquid-glass">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Plus className="size-4" />
-              {editingId ? "Edit record" : "Create record"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {formFields.map((field) => (
-              <label className="block" key={field.key}>
-                <span className="mb-1.5 block text-xs font-medium text-zinc-500">
-                  {field.label}
-                </span>
-                {field.type === "textarea" ? (
-                  <textarea
-                    className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, [field.key]: event.target.value }))
-                    }
-                    value={String(draft[field.key] ?? "")}
-                  />
-                ) : field.type === "checkbox" ? (
-                  <input
-                    checked={Boolean(draft[field.key])}
-                    className="size-5 accent-zinc-950"
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, [field.key]: event.target.checked }))
-                    }
-                    type="checkbox"
-                  />
-                ) : field.type === "select" || field.type === "relation" ? (
-                  <select
-                    className={`${field.multiple ? "min-h-28 py-2" : "h-11"} w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200`}
-                    multiple={field.multiple}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        [field.key]: field.multiple
-                          ? Array.from(event.target.selectedOptions, (option) => option.value)
-                          : event.target.value,
-                        ...clearHiddenDependentValues(fields, field.key, event.target.value),
-                        ...clearFilteredDependentValues(fields, field.key),
-                      }))
-                    }
-                    value={
-                      field.multiple
-                        ? toMultiSelectValue(draft[field.key])
-                        : String(draft[field.key] ?? "")
-                    }
-                  >
-                    {field.multiple ? null : <option value="">Select {field.label}</option>}
-                    {(
-                      field.type === "relation"
-                        ? getFieldOptions(field, draft, relationOptions)
-                        : field.options ?? []
-                    ).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        [field.key]:
-                          field.type === "number" ? Number(event.target.value) : event.target.value,
-                      }))
-                    }
-                    type={field.type ?? "text"}
-                    value={String(draft[field.key] ?? "")}
-                  />
-                )}
-              </label>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <Button className="flex-1" onClick={saveRecord}>
-                <Save className="size-4" />
-                Save
-              </Button>
-              <Button
-                onClick={() => {
-                  setEditingId(null);
-                  setDraft(emptyDraft);
-                }}
-                variant="glass"
-              >
-                Reset
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className={`grid gap-4 ${allowCreate || editingId ? "xl:grid-cols-[380px_minmax(0,1fr)]" : ""}`}>
+        {allowCreate || editingId ? (
+          <Card className="liquid-glass">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Plus className="size-4" />
+                {editingId ? "Edit record" : "Create record"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {formFields.map((field) => (
+                <label className="block" key={field.key}>
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">
+                    {field.label}
+                  </span>
+                  {field.type === "textarea" ? (
+                    <textarea
+                      className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, [field.key]: event.target.value }))
+                      }
+                      value={String(draft[field.key] ?? "")}
+                    />
+                  ) : field.type === "checkbox" ? (
+                    <input
+                      checked={Boolean(draft[field.key])}
+                      className="size-5 accent-zinc-950"
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, [field.key]: event.target.checked }))
+                      }
+                      type="checkbox"
+                    />
+                  ) : field.type === "select" || field.type === "relation" ? (
+                    <div className="space-y-2">
+                      <select
+                        className={`${field.multiple ? "min-h-28 py-2" : "h-11"} w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200`}
+                        multiple={field.multiple}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            [field.key]: field.multiple
+                              ? Array.from(event.target.selectedOptions, (option) => option.value)
+                              : event.target.value,
+                            ...clearHiddenDependentValues(fields, field.key, event.target.value),
+                            ...clearFilteredDependentValues(fields, field.key),
+                          }))
+                        }
+                        value={
+                          field.multiple
+                            ? toMultiSelectValue(draft[field.key])
+                            : String(draft[field.key] ?? "")
+                        }
+                      >
+                        {field.multiple ? null : <option value="">Select {field.label}</option>}
+                        {(
+                          field.type === "relation"
+                            ? getFieldOptions(field, draft, relationOptions)
+                            : field.options ?? []
+                        ).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {field.quickCreate ? (
+                        <Button
+                          onClick={(event) => {
+                            event.preventDefault();
+                            openQuickCreate(field);
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="glass"
+                        >
+                          <Plus className="size-3.5" />
+                          Add {field.quickCreate.title}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <input
+                      className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          [field.key]:
+                            field.type === "number" ? Number(event.target.value) : event.target.value,
+                        }))
+                      }
+                      type={field.type ?? "text"}
+                      value={String(draft[field.key] ?? "")}
+                    />
+                  )}
+                </label>
+              ))}
+              <div className="flex gap-2 pt-2">
+                <Button className="flex-1" onClick={saveRecord}>
+                  <Save className="size-4" />
+                  Save
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingId(null);
+                    setDraft(emptyDraft);
+                  }}
+                  variant="glass"
+                >
+                  Reset
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="liquid-glass">
           <CardHeader>
@@ -457,6 +535,69 @@ export function ResourcePage({
                 <Button onClick={() => deleteRow(pendingDelete.id)}>
                   <Trash2 className="size-4" />
                   Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {quickCreateField?.quickCreate ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/30 p-4 backdrop-blur-sm">
+          <Card className="liquid-glass w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Add {quickCreateField.quickCreate.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {quickCreateField.quickCreate.fields.map((field) => (
+                <label className="block" key={field.key}>
+                  <span className="mb-1.5 block text-xs font-medium text-zinc-500">
+                    {field.label}
+                  </span>
+                  {field.type === "checkbox" ? (
+                    <input
+                      checked={Boolean(quickCreateDraft[field.key])}
+                      className="size-5 accent-zinc-950"
+                      onChange={(event) =>
+                        setQuickCreateDraft((current) => ({
+                          ...current,
+                          [field.key]: event.target.checked,
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                  ) : (
+                    <input
+                      className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                      onChange={(event) =>
+                        setQuickCreateDraft((current) => ({
+                          ...current,
+                          [field.key]:
+                            field.type === "number"
+                              ? Number(event.target.value)
+                              : event.target.value,
+                        }))
+                      }
+                      type={field.type ?? "text"}
+                      value={String(quickCreateDraft[field.key] ?? "")}
+                    />
+                  )}
+                </label>
+              ))}
+              <div className="flex justify-end gap-2">
+                <Button
+                  onClick={() => {
+                    setQuickCreateField(null);
+                    setQuickCreateDraft({});
+                  }}
+                  type="button"
+                  variant="glass"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={saveQuickCreate} type="button">
+                  <Save className="size-4" />
+                  Save
                 </Button>
               </div>
             </CardContent>
