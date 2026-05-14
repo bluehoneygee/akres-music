@@ -122,6 +122,7 @@ export default function SchedulesPage() {
             hideOnCreate: true,
           },
         ]}
+        allowCreate={false}
         resource="schedules"
         title="Course Schedules"
       />

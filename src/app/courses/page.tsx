@@ -17,13 +17,6 @@ export default function CoursesPage() {
             required: true,
           },
           { key: "courseLevel", label: "Course level", type: "select", options: levelOptions, required: true },
-          {
-            key: "lessonType",
-            label: "Lesson type",
-            type: "select",
-            options: [{ label: "Private", value: "Private" }],
-            required: true,
-          },
           { key: "durationMinutes", label: "Duration minutes", type: "number", required: true },
           { key: "defaultFee", label: "Default fee", type: "number" },
         ]}

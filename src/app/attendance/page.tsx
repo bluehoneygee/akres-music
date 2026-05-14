@@ -44,6 +44,7 @@ export default function AttendancePage() {
             { key: "absenceReason", label: "Absence reason" },
             { key: "makeupRequired", label: "Makeup required", type: "checkbox" },
           ]}
+          allowCreate={false}
           resource="student-attendance"
           title="Student Attendance"
         />
@@ -87,6 +88,7 @@ export default function AttendancePage() {
             },
             { key: "notes", label: "Notes", type: "textarea" },
           ]}
+          allowCreate={false}
           resource="instructor-attendance"
           title="Instructor Attendance"
         />

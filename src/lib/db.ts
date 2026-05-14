@@ -126,10 +126,15 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
     return fromMongo(scheduleRecords[0] as Document);
   }
 
+  if (resource === "students") {
+    return createStudentWithOptionalSchedule(payload, now);
+  }
+
   const id = String(payload.id || `${resource}-${crypto.randomUUID()}`);
   const record = {
     _id: id,
     ...payload,
+    ...(resource === "courses" ? { lessonType: "Private" } : {}),
     id,
     createdAt: now,
     updatedAt: now,
@@ -137,6 +142,82 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
 
   await (await collection(resource)).insertOne(record as Document);
   return fromMongo(record);
+}
+
+async function createStudentWithOptionalSchedule(
+  payload: Record<string, unknown>,
+  now: string,
+) {
+  const id = String(payload.id || `students-${crypto.randomUUID()}`);
+  const studentPayload = { ...payload };
+  const schedulePayload = pickStudentSchedulePayload(studentPayload, id);
+
+  for (const key of studentSchedulePayloadKeys) {
+    delete studentPayload[key];
+  }
+
+  const record = {
+    _id: id,
+    ...studentPayload,
+    id,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await (await collection("students")).insertOne(record as Document);
+
+  if (schedulePayload) {
+    const scheduleRecords = buildScheduleRecords(schedulePayload, now);
+    const db = await getMongoDb();
+    await db.collection("schedules").insertMany(scheduleRecords as Document[]);
+    await ensureAttendanceForSchedules(scheduleRecords, now);
+  }
+
+  return fromMongo(record as Document);
+}
+
+const studentSchedulePayloadKeys = [
+  "onboardingCourseId",
+  "onboardingInstructorId",
+  "scheduleMonth",
+  "lessonDays",
+  "lessonCount",
+  "fromTime",
+  "toTime",
+  "studioRoomId",
+  "homeVisitAddress",
+  "travelNotes",
+];
+
+function pickStudentSchedulePayload(payload: Record<string, unknown>, studentId: string) {
+  const courseId = String(payload.onboardingCourseId || "");
+  const instructorId = String(payload.onboardingInstructorId || "");
+  const scheduleMonth = String(payload.scheduleMonth || "");
+  const fromTime = String(payload.fromTime || "");
+  const toTime = String(payload.toTime || "");
+
+  if (!courseId || !instructorId || !scheduleMonth || !fromTime || !toTime) {
+    return null;
+  }
+
+  return {
+    courseId,
+    studentId,
+    instructorId,
+    instrumentId: String(payload.primaryInstrumentId || ""),
+    scheduleMonth,
+    lessonDays: payload.lessonDays,
+    lessonCount: payload.lessonCount || 4,
+    fromTime,
+    toTime,
+    lessonMode: String(payload.preferredLessonMode || "Studio"),
+    studioRoomId: String(payload.studioRoomId || ""),
+    homeVisitAddress: String(payload.homeVisitAddress || ""),
+    travelNotes: String(payload.travelNotes || ""),
+    scheduleStatus: "Scheduled",
+    originalScheduleId: "",
+    rescheduleReason: "",
+  };
 }
 
 function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
@@ -287,7 +368,45 @@ export async function updateRecord(
     { returnDocument: "after" },
   );
 
+  if (result) {
+    await syncScheduleStatusFromAttendance(resource, result, updatedAt);
+  }
+
   return result ? (fromMongo(result) as AnyRecord) : null;
+}
+
+async function syncScheduleStatusFromAttendance(
+  resource: ResourceName,
+  attendance: Document,
+  updatedAt: string,
+) {
+  if (resource !== "student-attendance" && resource !== "instructor-attendance") return;
+
+  const scheduleId = String(attendance.courseScheduleId || "");
+  const attendanceStatus = String(attendance.status || "");
+  let scheduleStatus = "";
+
+  if (resource === "student-attendance") {
+    if (attendanceStatus === "Present") scheduleStatus = "Completed";
+    if (attendanceStatus === "Rescheduled") scheduleStatus = "Rescheduled";
+  }
+
+  if (resource === "instructor-attendance" && attendanceStatus === "Cancelled") {
+    scheduleStatus = "Cancelled";
+  }
+
+  if (!scheduleId || !scheduleStatus) return;
+
+  const db = await getMongoDb();
+  await db.collection("schedules").updateOne(
+    { id: scheduleId },
+    {
+      $set: {
+        scheduleStatus,
+        updatedAt,
+      },
+    },
+  );
 }
 
 export async function deleteRecord(resource: ResourceName, id: string) {

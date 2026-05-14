@@ -95,7 +95,6 @@ Resource: `courses`
   "courseName": "Violin Beginner Private",
   "instrumentId": "inst-violin",
   "courseLevel": "Beginner",
-  "lessonType": "Private",
   "durationMinutes": 60,
   "defaultFee": 900000
 }
