@@ -115,8 +115,15 @@ export type StudentAttendance = BaseRecord & {
   absenceReason: string;
   makeupRequired: boolean;
   makeupScheduleId: string;
+  pendingRescheduleDate: string;
+  pendingRescheduleFromTime: string;
+  pendingRescheduleToTime: string;
   parentNotified: boolean;
   absenceAlertKey: string;
+  confirmed: boolean;
+  confirmedByUserId: string;
+  confirmedByName: string;
+  confirmedAt: string;
 };
 
 export type InstructorAttendance = BaseRecord & {
@@ -128,6 +135,10 @@ export type InstructorAttendance = BaseRecord & {
   status: "Pending" | "Present" | "Absent" | "Substitute" | "Cancelled";
   substituteInstructorId: string;
   notes: string;
+  confirmed: boolean;
+  confirmedByUserId: string;
+  confirmedByName: string;
+  confirmedAt: string;
 };
 
 export type LessonJournal = BaseRecord & {

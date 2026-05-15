@@ -237,6 +237,9 @@ export function AttendanceBoard() {
       }
 
       setInstructorAttendance((current) => current.map((row) => (row.id === id ? json.data! : row)));
+      if ("confirmed" in payload || "status" in payload) {
+        await loadData();
+      }
       toast.success("Instructor attendance updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update instructor attendance");
@@ -249,13 +252,11 @@ export function AttendanceBoard() {
     attendanceRow,
     fromTime,
     rescheduleDate,
-    schedule,
     toTime,
   }: {
     attendanceRow: Row;
     fromTime: string;
     rescheduleDate: string;
-    schedule: Row;
     toTime: string;
   }) {
     if (!rescheduleDate || !fromTime || !toTime) {
@@ -266,47 +267,17 @@ export function AttendanceBoard() {
     setSavingId(attendanceRow.id);
 
     try {
-      const response = await fetch("/api/schedules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: `reschedule-${schedule.id}`,
-          lessonPackageId: schedule.lessonPackageId,
-          courseId: schedule.courseId,
-          studentId: schedule.studentId,
-          instructorId: schedule.instructorId,
-          instrumentId: schedule.instrumentId,
-          scheduleMonth: schedule.scheduleMonth,
-          lessonStartDate: "",
-          lessonDays: [],
-          lessonCount: 1,
-          scheduleDate: rescheduleDate,
-          fromTime,
-          toTime,
-          lessonMode: schedule.lessonMode,
-          studioRoomId: schedule.studioRoomId,
-          homeVisitAddress: schedule.homeVisitAddress,
-          travelNotes: schedule.travelNotes,
-          scheduleStatus: "Scheduled",
-          originalScheduleId: schedule.id,
-          rescheduleReason: `Rescheduled from ${String(schedule.scheduleDate ?? "")}`,
-        }),
-      });
-      const json = (await response.json()) as { data?: Row; error?: string };
-
-      if (!response.ok || !json.data) {
-        throw new Error(json.error ?? "Unable to create reschedule session");
-      }
-
       await updateAttendance(attendanceRow.id, {
         ...attendanceRow,
         makeupRequired: true,
-        makeupScheduleId: json.data.id,
+        pendingRescheduleDate: rescheduleDate,
+        pendingRescheduleFromTime: fromTime,
+        pendingRescheduleToTime: toTime,
       });
       await loadData();
-      toast.success("Reschedule session created");
+      toast.success("Draft reschedule saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to create reschedule session");
+      toast.error(error instanceof Error ? error.message : "Unable to save draft reschedule");
     } finally {
       setSavingId("");
     }
@@ -405,7 +376,7 @@ export function AttendanceBoard() {
                   <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
                     label="Progress"
-                    value={`${completedCount(group.sessions)}/${group.sessions.length} done`}
+                    value={studentProgressLabel(group.sessions)}
                   />
                 </div>
               </div>
@@ -469,7 +440,7 @@ export function AttendanceBoard() {
                   <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
                     label="Progress"
-                    value={`${instructorPresentCount(group.sessions)}/${group.sessions.length} present`}
+                    value={instructorProgressLabel(group.sessions)}
                   />
                 </div>
               </div>
@@ -553,7 +524,6 @@ function SessionCard({
     attendanceRow: Row;
     fromTime: string;
     rescheduleDate: string;
-    schedule: Row;
     toTime: string;
   }) => Promise<void>;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
@@ -562,7 +532,15 @@ function SessionCard({
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
+  const isDraftReschedule = Boolean(schedule.isDraftReschedule);
   const needsReason = status !== "Present" && status !== "Pending";
+  const confirmed = Boolean(attendance?.confirmed);
+  const requiresReschedule = ["Absent", "Sick", "Permission", "Rescheduled"].includes(status);
+  const pendingReschedule = pendingRescheduleLabel(attendance);
+  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
+    !requiresReschedule || Boolean(attendance?.makeupScheduleId || pendingReschedule)
+  );
+  const controlDisabled = disabled || confirmed;
   const linkedReschedule = schedulesById.get(String(attendance?.makeupScheduleId ?? ""));
   const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
   const [rescheduleDate, setRescheduleDate] = useState("");
@@ -582,11 +560,23 @@ function SessionCard({
         <Badge variant={statusVariant(status)}>{formatDisplayText(status)}</Badge>
       </div>
 
-      {attendance ? (
+      {isDraftReschedule ? (
+        <div className="mt-3 space-y-2">
+          {schedule.originalScheduleId ? (
+            <RescheduleBadge
+              label="From"
+              value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
+            />
+          ) : null}
+          <p className="text-xs italic text-zinc-500">
+            Draft reschedule. It will appear in Schedules after attendance is confirmed.
+          </p>
+        </div>
+      ) : attendance ? (
         <div className="mt-3 space-y-2">
           <select
             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-            disabled={disabled}
+            disabled={controlDisabled}
             onChange={(event) => {
               const nextStatus = event.target.value;
               const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
@@ -607,6 +597,8 @@ function SessionCard({
             ))}
           </select>
 
+          {confirmed ? <ConfirmedBadge attendance={attendance} /> : null}
+
           {schedule.originalScheduleId ? (
             <RescheduleBadge
               label="From"
@@ -618,7 +610,7 @@ function SessionCard({
             <>
               <input
                 className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                disabled={disabled}
+                disabled={controlDisabled}
                 onBlur={(event) =>
                   void onUpdate(attendance.id, {
                     ...attendance,
@@ -632,7 +624,7 @@ function SessionCard({
                 <input
                   checked={Boolean(attendance.makeupRequired)}
                   className="size-4 accent-zinc-950"
-                  disabled={disabled}
+                  disabled={controlDisabled}
                   onChange={(event) =>
                     void onUpdate(attendance.id, {
                       ...attendance,
@@ -652,11 +644,13 @@ function SessionCard({
                       : "Replacement session created"
                   }
                 />
+              ) : pendingReschedule ? (
+                <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
               ) : (
                 <div className="grid gap-2">
                   <input
                     className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                    disabled={disabled}
+                    disabled={controlDisabled}
                     onChange={(event) => setRescheduleDate(event.target.value)}
                     type="date"
                     value={rescheduleDate}
@@ -664,27 +658,26 @@ function SessionCard({
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                      disabled={disabled}
+                      disabled={controlDisabled}
                       onChange={(event) => setRescheduleFromTime(event.target.value)}
                       type="time"
                       value={rescheduleFromTime}
                     />
                     <input
                       className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                      disabled={disabled}
+                      disabled={controlDisabled}
                       onChange={(event) => setRescheduleToTime(event.target.value)}
                       type="time"
                       value={rescheduleToTime}
                     />
                   </div>
                   <Button
-                    disabled={disabled}
+                    disabled={controlDisabled}
                     onClick={() =>
                       void onCreateRescheduleSession({
                         attendanceRow: attendance,
                         fromTime: rescheduleFromTime,
                         rescheduleDate,
-                        schedule,
                         toTime: rescheduleToTime,
                       })
                     }
@@ -697,6 +690,18 @@ function SessionCard({
                 </div>
               )}
             </>
+          ) : null}
+          {canConfirm ? (
+            <Button
+              className="w-full"
+              disabled={disabled}
+              onClick={() => void onUpdate(attendance.id, { ...attendance, confirmed: true })}
+              size="sm"
+              type="button"
+              variant="default"
+            >
+              Confirm Attendance
+            </Button>
           ) : null}
         </div>
       ) : (
@@ -717,6 +722,15 @@ function RescheduleBadge({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ConfirmedBadge({ attendance }: { attendance: Row }) {
+  return (
+    <p className="text-xs italic text-zinc-500">
+      Confirmed by {formatDisplayText(attendance.confirmedByName) || "Unknown User"}
+      {formatDateTime(attendance.confirmedAt) ? ` at ${formatDateTime(attendance.confirmedAt)}` : ""}
+    </p>
+  );
+}
+
 function InstructorSessionCard({
   attendance,
   disabled,
@@ -734,6 +748,9 @@ function InstructorSessionCard({
 }) {
   const status = String(attendance?.status ?? "Pending");
   const needsSubstitute = status === "Substitute";
+  const confirmed = Boolean(attendance?.confirmed);
+  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending";
+  const controlDisabled = disabled || confirmed;
 
   return (
     <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
@@ -752,7 +769,7 @@ function InstructorSessionCard({
         <div className="mt-3 space-y-2">
           <select
             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-            disabled={disabled}
+            disabled={controlDisabled}
             onChange={(event) => {
               const nextStatus = event.target.value;
               void onUpdate(attendance.id, {
@@ -771,10 +788,12 @@ function InstructorSessionCard({
             ))}
           </select>
 
+          {confirmed ? <ConfirmedBadge attendance={attendance} /> : null}
+
           {needsSubstitute ? (
             <select
               className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              disabled={disabled}
+              disabled={controlDisabled}
               onChange={(event) =>
                 void onUpdate(attendance.id, {
                   ...attendance,
@@ -797,7 +816,7 @@ function InstructorSessionCard({
 
           <input
             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-            disabled={disabled}
+            disabled={controlDisabled}
             onBlur={(event) =>
               void onUpdate(attendance.id, {
                 ...attendance,
@@ -807,6 +826,18 @@ function InstructorSessionCard({
             placeholder="Notes"
             defaultValue={String(attendance.notes ?? "")}
           />
+          {canConfirm ? (
+            <Button
+              className="w-full"
+              disabled={disabled}
+              onClick={() => void onUpdate(attendance.id, { ...attendance, confirmed: true })}
+              size="sm"
+              type="button"
+              variant="default"
+            >
+              Confirm Attendance
+            </Button>
+          ) : null}
         </div>
       ) : (
         <p className="mt-3 text-xs text-zinc-500">Instructor attendance belum tersedia.</p>
@@ -848,18 +879,42 @@ function buildGroup({
   const courseId = String(lessonPackage?.courseId ?? firstSchedule?.courseId ?? "");
   const instructorId = String(lessonPackage?.instructorId ?? firstSchedule?.instructorId ?? "");
 
+  const sessions = [...packageSchedules]
+    .map((schedule) => ({
+      schedule,
+      attendance: attendanceByScheduleId.get(schedule.id) ?? null,
+    }))
+    .flatMap((session) => {
+      const pendingDate = String(session.attendance?.pendingRescheduleDate ?? "");
+
+      if (!pendingDate || session.attendance?.makeupScheduleId) return [session];
+
+      return [
+        session,
+        {
+          schedule: {
+            ...session.schedule,
+            id: `draft-reschedule-${session.schedule.id}`,
+            scheduleDate: pendingDate,
+            fromTime: String(session.attendance?.pendingRescheduleFromTime ?? session.schedule.fromTime ?? ""),
+            toTime: String(session.attendance?.pendingRescheduleToTime ?? session.schedule.toTime ?? ""),
+            originalScheduleId: session.schedule.id,
+            isDraftReschedule: true,
+            scheduleStatus: "Rescheduled",
+          },
+          attendance: null,
+        },
+      ];
+    })
+    .sort((left, right) => compareScheduleRows(left.schedule, right.schedule));
+
   return {
     id,
     package: lessonPackage,
     student: studentsById.get(studentId) ?? null,
     course: coursesById.get(courseId) ?? null,
     instructor: instructorsById.get(instructorId) ?? null,
-    sessions: [...packageSchedules]
-      .sort(compareScheduleRows)
-      .map((schedule) => ({
-        schedule,
-        attendance: attendanceByScheduleId.get(schedule.id) ?? null,
-      })),
+    sessions,
   };
 }
 
@@ -929,6 +984,24 @@ function scheduleDateTime(schedule: Row) {
   return `${date}, ${fromTime} - ${toTime}`;
 }
 
+function pendingRescheduleLabel(attendance: Row | null) {
+  if (!attendance?.pendingRescheduleDate) return "";
+  const date = String(attendance.pendingRescheduleDate);
+  const fromTime = String(attendance.pendingRescheduleFromTime || "-");
+  const toTime = String(attendance.pendingRescheduleToTime || "-");
+  return `${date}, ${fromTime} - ${toTime}`;
+}
+
+function formatDateTime(value: unknown) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 function compareScheduleRows(left: Row, right: Row) {
   return scheduleSortKey(left).localeCompare(scheduleSortKey(right));
 }
@@ -942,12 +1015,28 @@ function scheduleSortKey(schedule: Row) {
   ].join("|");
 }
 
-function completedCount(sessions: SessionRow[]) {
-  return sessions.filter(({ attendance }) => attendance?.status === "Present").length;
+function studentProgressLabel(sessions: SessionRow[]) {
+  const total = originalSessionCount(sessions);
+  const done = Math.min(
+    total,
+    sessions.filter(({ attendance }) => attendance?.status === "Present").length,
+  );
+
+  return `${done}/${total} done`;
 }
 
-function instructorPresentCount(sessions: SessionRow[]) {
-  return sessions.filter(({ attendance }) => attendance?.status === "Present").length;
+function instructorProgressLabel(sessions: SessionRow[]) {
+  const total = originalSessionCount(sessions);
+  const present = Math.min(
+    total,
+    sessions.filter(({ attendance }) => attendance?.status === "Present").length,
+  );
+
+  return `${present}/${total} present`;
+}
+
+function originalSessionCount(sessions: SessionRow[]) {
+  return sessions.filter(({ schedule }) => !schedule.originalScheduleId).length || sessions.length;
 }
 
 function statusVariant(status: string) {

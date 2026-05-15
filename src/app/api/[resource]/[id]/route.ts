@@ -24,7 +24,18 @@ export async function PUT(
   }
 
   const payload = (await request.json()) as Record<string, unknown>;
-  const record = await updateRecord(resource, id, payload);
+  const record = await updateRecord(resource, id, payload, {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+  }).catch((error: unknown) => {
+    if (error instanceof Error) return { error: error.message };
+    return { error: "Unable to update record" };
+  });
+
+  if (record && "error" in record) {
+    return NextResponse.json({ error: record.error }, { status: 400 });
+  }
 
   if (!record) {
     return NextResponse.json({ error: "Record not found" }, { status: 404 });
