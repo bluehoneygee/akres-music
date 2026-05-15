@@ -356,7 +356,7 @@ export function AttendanceBoard() {
 
           return (
           <Card className="liquid-glass" key={combinedGroup.id}>
-            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[240px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
                   <h2 className="truncate text-base font-semibold text-zinc-950 sm:text-lg">
@@ -368,13 +368,14 @@ export function AttendanceBoard() {
                 </div>
                 {combinedGroup.groups.length > 1 ? (
                   <select
-                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                    className="h-8 w-full rounded-2xl border border-white/50 bg-white/58 px-2 text-zinc-900 outline-none backdrop-blur-xl"
                     onChange={(event) =>
                       setSelectedPackageByGroup((current) => ({
                         ...current,
                         [combinedGroup.id]: event.target.value,
                       }))
                     }
+                    style={{ fontSize: 10 }}
                     value={group.id}
                   >
                     {combinedGroup.groups.map((packageGroup) => (
@@ -395,7 +396,7 @@ export function AttendanceBoard() {
                 </div>
               </div>
 
-              <SessionRail>
+              <SessionRail sessionCount={group.sessions.length}>
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <SessionCard
                     attendance={attendanceRow}
@@ -423,7 +424,7 @@ export function AttendanceBoard() {
 
           return (
           <Card className="liquid-glass" key={combinedGroup.id}>
-            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[240px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
                   <h2 className="truncate text-base font-semibold text-zinc-950 sm:text-lg">
@@ -435,13 +436,14 @@ export function AttendanceBoard() {
                 </div>
                 {combinedGroup.groups.length > 1 ? (
                   <select
-                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                    className="h-8 w-full rounded-2xl border border-white/50 bg-white/58 px-2 text-zinc-900 outline-none backdrop-blur-xl"
                     onChange={(event) =>
                       setSelectedPackageByGroup((current) => ({
                         ...current,
                         [combinedGroup.id]: event.target.value,
                       }))
                     }
+                    style={{ fontSize: 10 }}
                     value={group.id}
                   >
                     {combinedGroup.groups.map((packageGroup) => (
@@ -462,7 +464,7 @@ export function AttendanceBoard() {
                 </div>
               </div>
 
-              <SessionRail>
+              <SessionRail sessionCount={group.sessions.length}>
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <InstructorSessionCard
                     attendance={attendanceRow}
@@ -512,8 +514,9 @@ export function AttendanceBoard() {
   );
 }
 
-function SessionRail({ children }: { children: ReactNode }) {
+function SessionRail({ children, sessionCount }: { children: ReactNode; sessionCount: number }) {
   const railRef = useRef<HTMLDivElement>(null);
+  const showControls = sessionCount > 4;
 
   function scrollByCard(direction: "left" | "right") {
     railRef.current?.scrollBy({
@@ -524,11 +527,11 @@ function SessionRail({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-w-0 space-y-2">
-      <div className="flex items-center justify-between gap-2 sm:justify-end">
+      <div className={`flex items-center justify-between gap-2 sm:justify-end ${showControls ? "" : "sm:hidden"}`}>
         <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-500 sm:hidden">
           Sessions
         </p>
-        <div className="flex gap-2">
+        <div className={`${showControls ? "flex" : "hidden"} gap-2`}>
           <Button
             aria-label="Previous sessions"
             className="size-8 sm:size-10"
@@ -552,7 +555,7 @@ function SessionRail({ children }: { children: ReactNode }) {
         </div>
       </div>
       <div
-        className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1"
+        className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 xl:gap-2"
         ref={railRef}
       >
         {children}
@@ -578,7 +581,7 @@ function SessionCard({
 
   return (
     <button
-      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px]"
+      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] xl:w-[150px] xl:p-2.5"
       onClick={onOpen}
       type="button"
     >
@@ -606,10 +609,10 @@ function SessionCard({
               {formatDisplayText(status)}
             </Badge>
             {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
+            {shouldShowFinalityWarning(status, confirmed) ? (
+              <FinalityIndicator confirmed={false} />
+            ) : null}
           </div>
-          {shouldShowFinalityWarning(status, confirmed) ? (
-            <FinalityIndicator confirmed={false} />
-          ) : null}
         </div>
       )}
     </button>
@@ -1077,7 +1080,7 @@ function InstructorSessionCard({
 
   return (
     <button
-      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px]"
+      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] xl:w-[150px] xl:p-2.5"
       onClick={onOpen}
       type="button"
     >
@@ -1097,10 +1100,10 @@ function InstructorSessionCard({
             {formatDisplayText(status)}
           </Badge>
           {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
+          {shouldShowFinalityWarning(status, confirmed) ? (
+            <FinalityIndicator confirmed={false} />
+          ) : null}
         </div>
-        {shouldShowFinalityWarning(status, confirmed) ? (
-          <FinalityIndicator confirmed={false} />
-        ) : null}
       </div>
     </button>
   );
