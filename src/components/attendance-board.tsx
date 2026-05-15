@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, Clock3, RefreshCw, UserRound } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -377,13 +377,13 @@ export function AttendanceBoard() {
 
           return (
           <Card className="liquid-glass" key={combinedGroup.id}>
-            <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-zinc-950">
+                  <h2 className="truncate text-base font-semibold text-zinc-950 sm:text-lg">
                     {studentName(combinedGroup.student)}
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-500">
+                  <p className="mt-1 truncate text-sm text-zinc-500">
                     {stringField(combinedGroup.course, "courseName")}
                   </p>
                 </div>
@@ -405,11 +405,12 @@ export function AttendanceBoard() {
                     ))}
                   </select>
                 ) : null}
-                <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
-                  <Info label="Instructor" value={stringField(group.instructor, "instructorName")} />
-                  <Info label="Period" value={stringField(group.package, "billingPeriod")} />
-                  <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
+                <div className="no-scrollbar flex gap-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:grid sm:grid-cols-2 sm:gap-1.5 sm:overflow-visible sm:whitespace-normal">
+                  <Info icon={<UserRound className="size-3.5" />} label="Instructor" value={stringField(group.instructor, "instructorName")} />
+                  <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
+                  <Info mobileHidden icon={<Clock3 className="size-3.5" />} label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
+                    icon={<CalendarCheck className="size-3.5" />}
                     label="Progress"
                     value={studentProgressLabel(group.sessions)}
                   />
@@ -441,13 +442,13 @@ export function AttendanceBoard() {
 
           return (
           <Card className="liquid-glass" key={combinedGroup.id}>
-            <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <CardContent className="grid gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-zinc-950">
+                  <h2 className="truncate text-base font-semibold text-zinc-950 sm:text-lg">
                     {stringField(group.instructor, "instructorName")}
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-500">
+                  <p className="mt-1 truncate text-sm text-zinc-500">
                     {stringField(combinedGroup.course, "courseName")}
                   </p>
                 </div>
@@ -469,11 +470,12 @@ export function AttendanceBoard() {
                     ))}
                   </select>
                 ) : null}
-                <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
-                  <Info label="Student" value={studentName(combinedGroup.student)} />
-                  <Info label="Period" value={stringField(group.package, "billingPeriod")} />
-                  <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
+                <div className="no-scrollbar flex gap-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:grid sm:grid-cols-2 sm:gap-1.5 sm:overflow-visible sm:whitespace-normal">
+                  <Info icon={<UserRound className="size-3.5" />} label="Student" value={studentName(combinedGroup.student)} />
+                  <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
+                  <Info mobileHidden icon={<Clock3 className="size-3.5" />} label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
+                    icon={<CalendarCheck className="size-3.5" />}
                     label="Progress"
                     value={instructorProgressLabel(group.sessions)}
                   />
@@ -516,25 +518,32 @@ function SessionRail({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-w-0 space-y-2">
-      <div className="flex justify-end gap-2">
-        <Button
-          aria-label="Previous sessions"
-          onClick={() => scrollByCard("left")}
-          size="icon"
-          type="button"
-          variant="glass"
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button
-          aria-label="Next sessions"
-          onClick={() => scrollByCard("right")}
-          size="icon"
-          type="button"
-          variant="glass"
-        >
-          <ChevronRight className="size-4" />
-        </Button>
+      <div className="flex items-center justify-between gap-2 sm:justify-end">
+        <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-500 sm:hidden">
+          Sessions
+        </p>
+        <div className="flex gap-2">
+          <Button
+            aria-label="Previous sessions"
+            className="size-8 sm:size-10"
+            onClick={() => scrollByCard("left")}
+            size="icon"
+            type="button"
+            variant="glass"
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button
+            aria-label="Next sessions"
+            className="size-8 sm:size-10"
+            onClick={() => scrollByCard("right")}
+            size="icon"
+            type="button"
+            variant="glass"
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
       <div
         className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1"
@@ -585,16 +594,16 @@ function SessionCard({
   const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
-    <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
+    <div className="min-h-[220px] w-[245px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 sm:w-[280px]">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
           <p className="text-xs text-zinc-500">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <Badge variant={statusVariant(status)}>{formatDisplayText(status)}</Badge>
+        <Badge className="shrink-0" variant={statusVariant(status)}>{formatDisplayText(status)}</Badge>
       </div>
 
       {isDraftReschedule ? (
@@ -807,16 +816,16 @@ function InstructorSessionCard({
   const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
-    <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
+    <div className="min-h-[220px] w-[245px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 sm:w-[280px]">
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
           <p className="text-xs text-zinc-500">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <Badge variant={instructorStatusVariant(status)}>{formatDisplayText(status)}</Badge>
+        <Badge className="shrink-0" variant={instructorStatusVariant(status)}>{formatDisplayText(status)}</Badge>
       </div>
 
       {attendance ? (
@@ -1170,11 +1179,24 @@ function instructorStatusVariant(status: string) {
   return "danger";
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({
+  icon,
+  label,
+  mobileHidden = false,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  mobileHidden?: boolean;
+  value: string;
+}) {
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/36 px-3 py-2">
-      <p className="uppercase tracking-[0.08em] text-zinc-400">{label}</p>
-      <p className="mt-1 font-medium text-zinc-800">{value || "-"}</p>
-    </div>
+    <span className={`${mobileHidden ? "hidden sm:block" : "inline-flex"} min-w-0 shrink-0 items-center gap-1.5 sm:block sm:rounded-2xl sm:border sm:border-white/40 sm:bg-white/36 sm:px-3 sm:py-2`}>
+      <span className="shrink-0 text-zinc-500 sm:hidden">{icon}</span>
+      <span className="hidden truncate text-[10px] uppercase tracking-[0.08em] text-zinc-400 sm:block sm:text-xs">
+        {label}
+      </span>
+      <span className="truncate sm:mt-1 sm:block sm:text-sm sm:font-medium sm:text-zinc-800">{value || "-"}</span>
+    </span>
   );
 }
