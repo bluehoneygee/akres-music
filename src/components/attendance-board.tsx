@@ -283,6 +283,41 @@ export function AttendanceBoard() {
     }
   }
 
+  async function createInstructorRescheduleSession({
+    attendanceRow,
+    fromTime,
+    rescheduleDate,
+    toTime,
+  }: {
+    attendanceRow: Row;
+    fromTime: string;
+    rescheduleDate: string;
+    toTime: string;
+  }) {
+    if (!rescheduleDate || !fromTime || !toTime) {
+      toast.error("Pilih tanggal dan jam reschedule dulu");
+      return;
+    }
+
+    setSavingId(attendanceRow.id);
+
+    try {
+      await updateInstructorAttendance(attendanceRow.id, {
+        ...attendanceRow,
+        rescheduleRequired: true,
+        pendingRescheduleDate: rescheduleDate,
+        pendingRescheduleFromTime: fromTime,
+        pendingRescheduleToTime: toTime,
+      });
+      await loadData();
+      toast.success("Draft instructor reschedule saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save draft reschedule");
+    } finally {
+      setSavingId("");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card className="liquid-glass">
@@ -452,8 +487,10 @@ export function AttendanceBoard() {
                     disabled={savingId === attendanceRow?.id}
                     instructors={instructors}
                     key={String(schedule.id)}
+                    onCreateRescheduleSession={createInstructorRescheduleSession}
                     onUpdate={updateInstructorAttendance}
                     schedule={schedule}
+                    schedulesById={schedulesById}
                     sessionNumber={index + 1}
                   />
                 ))}
@@ -735,22 +772,39 @@ function InstructorSessionCard({
   attendance,
   disabled,
   instructors,
+  onCreateRescheduleSession,
   onUpdate,
   schedule,
+  schedulesById,
   sessionNumber,
 }: {
   attendance: Row | null;
   disabled: boolean;
   instructors: Row[];
+  onCreateRescheduleSession: (payload: {
+    attendanceRow: Row;
+    fromTime: string;
+    rescheduleDate: string;
+    toTime: string;
+  }) => Promise<void>;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
   schedule: Row;
+  schedulesById: Map<string, Row>;
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
   const needsSubstitute = status === "Substitute";
   const confirmed = Boolean(attendance?.confirmed);
-  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending";
+  const requiresReschedule = ["Absent", "Cancelled"].includes(status);
+  const pendingReschedule = pendingRescheduleLabel(attendance);
+  const linkedReschedule = schedulesById.get(String(attendance?.rescheduleScheduleId ?? ""));
+  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
+    !requiresReschedule || Boolean(attendance?.rescheduleScheduleId || pendingReschedule)
+  );
   const controlDisabled = disabled || confirmed;
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
+  const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
     <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
@@ -772,11 +826,15 @@ function InstructorSessionCard({
             disabled={controlDisabled}
             onChange={(event) => {
               const nextStatus = event.target.value;
+              const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
+              const needsReschedule = ["Absent", "Cancelled"].includes(nextStatus);
               void onUpdate(attendance.id, {
                 ...attendance,
                 status: nextStatus,
                 substituteInstructorId:
                   nextStatus === "Substitute" ? attendance.substituteInstructorId : "",
+                rescheduleRequired: clearsReschedule ? false : needsReschedule || attendance.rescheduleRequired,
+                rescheduleScheduleId: clearsReschedule ? "" : attendance.rescheduleScheduleId,
               });
             }}
             value={status}
@@ -789,6 +847,65 @@ function InstructorSessionCard({
           </select>
 
           {confirmed ? <ConfirmedBadge attendance={attendance} /> : null}
+
+          {attendance.rescheduleScheduleId ? (
+            <RescheduleBadge
+              label="To"
+              value={
+                linkedReschedule
+                  ? scheduleDateTime(linkedReschedule)
+                  : "Replacement session created"
+              }
+            />
+          ) : pendingReschedule ? (
+            <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
+          ) : attendance.rescheduleRequired ? (
+            <div className="grid gap-2">
+              <input
+                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                disabled={controlDisabled}
+                onChange={(event) => setRescheduleDate(event.target.value)}
+                type="date"
+                value={rescheduleDate}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                  disabled={controlDisabled}
+                  onChange={(event) => setRescheduleFromTime(event.target.value)}
+                  type="time"
+                  value={rescheduleFromTime}
+                />
+                <input
+                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                  disabled={controlDisabled}
+                  onChange={(event) => setRescheduleToTime(event.target.value)}
+                  type="time"
+                  value={rescheduleToTime}
+                />
+              </div>
+              <Button
+                disabled={controlDisabled}
+                onClick={() =>
+                  void onCreateRescheduleSession({
+                    attendanceRow: attendance,
+                    fromTime: rescheduleFromTime,
+                    rescheduleDate,
+                    toTime: rescheduleToTime,
+                  })
+                }
+                size="sm"
+                type="button"
+                variant="glass"
+              >
+                Add reschedule session
+              </Button>
+            </div>
+          ) : requiresReschedule ? (
+            <p className="text-xs italic text-zinc-500">
+              Set reschedule required to add a replacement session.
+            </p>
+          ) : null}
 
           {needsSubstitute ? (
             <select
@@ -1049,7 +1166,7 @@ function statusVariant(status: string) {
 function instructorStatusVariant(status: string) {
   if (status === "Present") return "success";
   if (status === "Pending") return "outline";
-  if (status === "Substitute") return "warning";
+  if (status === "Substitute" || status === "Rescheduled") return "warning";
   return "danger";
 }
 

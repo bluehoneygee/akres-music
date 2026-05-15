@@ -132,8 +132,13 @@ export type InstructorAttendance = BaseRecord & {
   courseScheduleId: string;
   attendanceDate: string;
   instrumentId: string;
-  status: "Pending" | "Present" | "Absent" | "Substitute" | "Cancelled";
+  status: "Pending" | "Present" | "Absent" | "Rescheduled" | "Substitute" | "Cancelled";
   substituteInstructorId: string;
+  rescheduleRequired: boolean;
+  rescheduleScheduleId: string;
+  pendingRescheduleDate: string;
+  pendingRescheduleFromTime: string;
+  pendingRescheduleToTime: string;
   notes: string;
   confirmed: boolean;
   confirmedByUserId: string;

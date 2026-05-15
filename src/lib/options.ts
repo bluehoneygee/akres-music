@@ -56,6 +56,7 @@ export const instructorAttendanceStatusOptions = [
   "Pending",
   "Present",
   "Absent",
+  "Rescheduled",
   "Substitute",
   "Cancelled",
 ].map((value) => ({ label: value, value }));

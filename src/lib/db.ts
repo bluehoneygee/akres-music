@@ -434,6 +434,11 @@ async function ensureAttendanceForSchedules(
               instrumentId: String(schedule.instrumentId || ""),
               status: "Pending",
               substituteInstructorId: "",
+              rescheduleRequired: false,
+              rescheduleScheduleId: "",
+              pendingRescheduleDate: "",
+              pendingRescheduleFromTime: "",
+              pendingRescheduleToTime: "",
               notes: "",
               confirmed: false,
               confirmedByUserId: "",
@@ -597,6 +602,38 @@ async function syncScheduleStatusFromAttendance(
     );
   }
 
+  if (
+    resource === "instructor-attendance" &&
+    (attendanceStatus === "Pending" || attendanceStatus === "Present")
+  ) {
+    const linkedRescheduleId = String(
+      previous?.rescheduleScheduleId || attendance.rescheduleScheduleId || "",
+    );
+
+    if (linkedRescheduleId) {
+      await Promise.all([
+        db.collection("schedules").deleteOne({ id: linkedRescheduleId }),
+        db.collection("student-attendance").deleteMany({ courseScheduleId: linkedRescheduleId }),
+        db.collection("instructor-attendance").deleteMany({ courseScheduleId: linkedRescheduleId }),
+      ]);
+    }
+
+    await db.collection("instructor-attendance").updateOne(
+      { id: String(attendance.id || "") },
+      {
+        $set: {
+          substituteInstructorId: "",
+          rescheduleRequired: false,
+          rescheduleScheduleId: "",
+          pendingRescheduleDate: "",
+          pendingRescheduleFromTime: "",
+          pendingRescheduleToTime: "",
+          updatedAt,
+        },
+      },
+    );
+  }
+
   if (!attendance.confirmed) return;
 
   if (
@@ -605,8 +642,18 @@ async function syncScheduleStatusFromAttendance(
     !attendance.makeupScheduleId &&
     attendance.pendingRescheduleDate
   ) {
-    const rescheduleId = await createConfirmedRescheduleSchedule(attendance, updatedAt);
+    const rescheduleId = await createConfirmedRescheduleSchedule(resource, attendance, updatedAt);
     attendance.makeupScheduleId = rescheduleId;
+  }
+
+  if (
+    resource === "instructor-attendance" &&
+    ["Absent", "Cancelled"].includes(attendanceStatus) &&
+    !attendance.rescheduleScheduleId &&
+    attendance.pendingRescheduleDate
+  ) {
+    const rescheduleId = await createConfirmedRescheduleSchedule(resource, attendance, updatedAt);
+    attendance.rescheduleScheduleId = rescheduleId;
   }
 
   let scheduleStatus = "";
@@ -620,7 +667,7 @@ async function syncScheduleStatusFromAttendance(
   }
 
   if (resource === "instructor-attendance") {
-    if (attendanceStatus === "Cancelled" || attendanceStatus === "Absent") {
+    if (["Cancelled", "Absent", "Rescheduled"].includes(attendanceStatus)) {
       scheduleStatus = "Rescheduled";
     }
   }
@@ -647,6 +694,7 @@ async function syncScheduleStatusFromAttendance(
         $set: {
           status: "Rescheduled",
           makeupRequired: true,
+          makeupScheduleId: String(attendance.rescheduleScheduleId || ""),
           absenceReason:
             attendanceStatus === "Absent" ? "Instructor Absent" : "Instructor Cancelled",
           updatedAt,
@@ -657,7 +705,11 @@ async function syncScheduleStatusFromAttendance(
 
 }
 
-async function createConfirmedRescheduleSchedule(attendance: Document, now: string) {
+async function createConfirmedRescheduleSchedule(
+  resource: ResourceName,
+  attendance: Document,
+  now: string,
+) {
   const db = await getMongoDb();
   const originalSchedule = await db
     .collection("schedules")
@@ -689,19 +741,50 @@ async function createConfirmedRescheduleSchedule(attendance: Document, now: stri
     { upsert: true },
   );
   await ensureAttendanceForSchedules([scheduleRecord], now);
-  await db.collection("student-attendance").updateOne(
-    { id: String(attendance.id || "") },
-    {
-      $set: {
-        makeupRequired: true,
-        makeupScheduleId: scheduleId,
-        pendingRescheduleDate: "",
-        pendingRescheduleFromTime: "",
-        pendingRescheduleToTime: "",
-        updatedAt: now,
+  if (resource === "student-attendance") {
+    await Promise.all([
+      db.collection("student-attendance").updateOne(
+        { id: String(attendance.id || "") },
+        {
+          $set: {
+            makeupRequired: true,
+            makeupScheduleId: scheduleId,
+            pendingRescheduleDate: "",
+            pendingRescheduleFromTime: "",
+            pendingRescheduleToTime: "",
+            updatedAt: now,
+          },
+        },
+      ),
+      db.collection("instructor-attendance").updateOne(
+        { courseScheduleId: String(originalSchedule.id || ""), confirmed: { $ne: true } },
+        {
+          $set: {
+            status: "Rescheduled",
+            rescheduleRequired: true,
+            rescheduleScheduleId: scheduleId,
+            updatedAt: now,
+          },
+        },
+      ),
+    ]);
+  }
+
+  if (resource === "instructor-attendance") {
+    await db.collection("instructor-attendance").updateOne(
+      { id: String(attendance.id || "") },
+      {
+        $set: {
+          rescheduleRequired: true,
+          rescheduleScheduleId: scheduleId,
+          pendingRescheduleDate: "",
+          pendingRescheduleFromTime: "",
+          pendingRescheduleToTime: "",
+          updatedAt: now,
+        },
       },
-    },
-  );
+    );
+  }
 
   return scheduleId;
 }
