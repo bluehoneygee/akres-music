@@ -31,8 +31,8 @@ Flow normal sekarang:
 3. Buat Lesson Package: student, course, instructor, billing period, lesson start date, hari, dan jam.
 4. Sistem otomatis generate 4 sesi sejak `lessonStartDate` sesuai `lessonDays`.
 5. Sistem otomatis generate Student Attendance dan Instructor Attendance dengan status `Pending`.
-6. Menu Schedules dipakai sebagai kalender read-only per package.
-7. Menu Attendance dipakai untuk update status, alasan absen, dan membuat makeup session.
+6. Menu Schedules dipakai sebagai kalender read-only. Tampilan digroup per `Student + Course`; package/bulan dipilih dari dropdown di dalam card.
+7. Menu Attendance dipakai untuk update status, alasan absen, dan membuat makeup session. Tampilan juga digroup per `Student + Course`.
 
 Catatan pemakaian manual:
 
@@ -46,6 +46,7 @@ Catatan:
 - `billingPeriod` dipakai sebagai billing period.
 - `lessonStartDate` dipakai sebagai tanggal mulai paket 4x les.
 - Jadwal boleh lanjut ke bulan berikutnya kalau 4 sesi belum selesai di billing period yang sama.
+- Jika student ambil 2 bulan sekaligus, buat 2 Lesson Package terpisah. UI Schedules dan Attendance tetap menampilkan 1 card untuk student + course yang sama, lalu user memilih bulan/package dari dropdown.
 - ID schedule dari Lesson Package dibuat deterministik:
 
 ```text
@@ -319,7 +320,36 @@ student-attendance-schedule-package-luna-2026-05
 instructor-attendance-schedule-package-luna-2026-05
 ```
 
-Schedules yang dibuat dari Lesson Package tampil read-only di menu Schedules. Status schedule mengikuti update Attendance.
+Schedules yang dibuat dari Lesson Package tampil read-only di menu Schedules.
+
+Contoh kalau student ambil course yang sama untuk 2 bulan, buat package tambahan seperti ini. Setelah dibuat, menu Schedules dan Attendance tetap menampilkan 1 card `Ayu Prameswari - Piano Beginner Private`, lalu package `2026-05` dan `2026-06` bisa dipilih dari dropdown.
+
+Resource: `lesson-packages`
+
+```json
+{
+  "id": "package-ayu-2026-06",
+  "studentId": "student-ayu",
+  "courseId": "course-piano-beginner",
+  "instructorId": "instructor-budi",
+  "instrumentId": "inst-piano",
+  "billingPeriod": "2026-06",
+  "lessonStartDate": "2026-06-01",
+  "lessonDays": ["1"],
+  "lessonCount": 4,
+  "fromTime": "15:00",
+  "toTime": "16:00",
+  "lessonMode": "Studio",
+  "studioRoomId": "room-piano-1",
+  "status": "Active"
+}
+```
+
+Schedule otomatis untuk package kedua:
+
+```text
+package-ayu-2026-06 -> 2026-06-01, 2026-06-08, 2026-06-15, 2026-06-22
+```
 
 ## 8. Repertoires
 
@@ -414,6 +444,12 @@ Resource: `instructor-attendance`
   }
 ]
 ```
+
+Catatan instructor attendance:
+
+- Jika instructor `Present`, status student attendance tidak berubah.
+- Jika instructor `Substitute`, jadwal tetap berjalan dan student attendance tidak berubah.
+- Jika instructor `Absent` atau `Cancelled`, schedule menjadi `Rescheduled`, student attendance otomatis menjadi `Rescheduled`, dan `makeupRequired` otomatis `true`.
 
 ## 10. Makeup Session
 
