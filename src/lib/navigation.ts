@@ -105,7 +105,7 @@ export const appNavigation = [
     label: "Reports",
     href: "/reports",
     icon: ShieldCheck,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
   },
 ];
 
