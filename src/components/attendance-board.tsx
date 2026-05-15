@@ -29,6 +29,13 @@ type AttendanceGroup = {
   sessions: SessionRow[];
 };
 
+type CombinedAttendanceGroup = {
+  id: string;
+  groups: AttendanceGroup[];
+  student: Row | null;
+  course: Row | null;
+};
+
 export function AttendanceBoard() {
   const [packages, setPackages] = useState<Row[]>([]);
   const [students, setStudents] = useState<Row[]>([]);
@@ -38,6 +45,7 @@ export function AttendanceBoard() {
   const [attendance, setAttendance] = useState<Row[]>([]);
   const [instructorAttendance, setInstructorAttendance] = useState<Row[]>([]);
   const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
+  const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
 
@@ -81,7 +89,7 @@ export function AttendanceBoard() {
     void loadData();
   }, []);
 
-  const studentGroups = useMemo(() => {
+  const studentPackageGroups = useMemo(() => {
     const studentsById = mapById(students);
     const coursesById = mapById(courses);
     const instructorsById = mapById(instructors);
@@ -130,7 +138,7 @@ export function AttendanceBoard() {
     return [...packageGroups, ...orphanGroups].filter((group) => group.sessions.length > 0);
   }, [attendance, courses, instructors, packages, schedules, students]);
 
-  const instructorGroups = useMemo(() => {
+  const instructorPackageGroups = useMemo(() => {
     const studentsById = mapById(students);
     const coursesById = mapById(courses);
     const instructorsById = mapById(instructors);
@@ -175,6 +183,15 @@ export function AttendanceBoard() {
 
     return [...packageGroups, ...orphanGroups].filter((group) => group.sessions.length > 0);
   }, [courses, instructorAttendance, instructors, packages, schedules, students]);
+
+  const studentGroups = useMemo(
+    () => combineAttendanceGroups(studentPackageGroups),
+    [studentPackageGroups],
+  );
+  const instructorGroups = useMemo(
+    () => combineAttendanceGroups(instructorPackageGroups),
+    [instructorPackageGroups],
+  );
 
   async function updateAttendance(id: string, payload: Record<string, unknown>) {
     setSavingId(id);
@@ -301,9 +318,6 @@ export function AttendanceBoard() {
               <CalendarCheck className="size-6" />
               Attendance
             </CardTitle>
-            <p className="mt-2 text-sm text-zinc-500">
-              Absensi murid dan instruktur digroup per paket les dengan detail sesi di kanan.
-            </p>
           </div>
           <Button onClick={loadData} size="icon" variant="glass" aria-label="Refresh">
             <RefreshCw className="size-4" />
@@ -345,16 +359,42 @@ export function AttendanceBoard() {
           </Card>
         ) : null}
 
-        {activeTab === "students" ? studentGroups.map((group) => (
-          <Card className="liquid-glass" key={group.id}>
+        {activeTab === "students" ? studentGroups.map((combinedGroup) => {
+          const group = selectedAttendanceGroup(
+            combinedGroup,
+            selectedPackageByGroup[combinedGroup.id],
+          );
+
+          return (
+          <Card className="liquid-glass" key={combinedGroup.id}>
             <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
                   <h2 className="text-lg font-semibold text-zinc-950">
-                    {studentName(group.student)}
+                    {studentName(combinedGroup.student)}
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-500">{stringField(group.course, "courseName")}</p>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {stringField(combinedGroup.course, "courseName")}
+                  </p>
                 </div>
+                {combinedGroup.groups.length > 1 ? (
+                  <select
+                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                    onChange={(event) =>
+                      setSelectedPackageByGroup((current) => ({
+                        ...current,
+                        [combinedGroup.id]: event.target.value,
+                      }))
+                    }
+                    value={group.id}
+                  >
+                    {combinedGroup.groups.map((packageGroup) => (
+                      <option key={packageGroup.id} value={packageGroup.id}>
+                        {packageLabel(packageGroup)}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
                   <Info label="Instructor" value={stringField(group.instructor, "instructorName")} />
                   <Info label="Period" value={stringField(group.package, "billingPeriod")} />
@@ -381,18 +421,45 @@ export function AttendanceBoard() {
               </div>
             </CardContent>
           </Card>
-        )) : instructorGroups.map((group) => (
-          <Card className="liquid-glass" key={group.id}>
+          );
+        }) : instructorGroups.map((combinedGroup) => {
+          const group = selectedAttendanceGroup(
+            combinedGroup,
+            selectedPackageByGroup[combinedGroup.id],
+          );
+
+          return (
+          <Card className="liquid-glass" key={combinedGroup.id}>
             <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div>
                   <h2 className="text-lg font-semibold text-zinc-950">
                     {stringField(group.instructor, "instructorName")}
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-500">{stringField(group.course, "courseName")}</p>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {stringField(combinedGroup.course, "courseName")}
+                  </p>
                 </div>
+                {combinedGroup.groups.length > 1 ? (
+                  <select
+                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                    onChange={(event) =>
+                      setSelectedPackageByGroup((current) => ({
+                        ...current,
+                        [combinedGroup.id]: event.target.value,
+                      }))
+                    }
+                    value={group.id}
+                  >
+                    {combinedGroup.groups.map((packageGroup) => (
+                      <option key={packageGroup.id} value={packageGroup.id}>
+                        {packageLabel(packageGroup)}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
-                  <Info label="Student" value={studentName(group.student)} />
+                  <Info label="Student" value={studentName(combinedGroup.student)} />
                   <Info label="Period" value={stringField(group.package, "billingPeriod")} />
                   <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
@@ -417,7 +484,8 @@ export function AttendanceBoard() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -727,6 +795,52 @@ function buildGroup({
 
 function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+function combineAttendanceGroups(groups: AttendanceGroup[]) {
+  const combined = new Map<string, CombinedAttendanceGroup>();
+
+  groups.forEach((group) => {
+    const studentId = String(
+      group.package?.studentId ?? group.sessions[0]?.schedule.studentId ?? group.student?.id ?? "",
+    );
+    const courseId = String(
+      group.package?.courseId ?? group.sessions[0]?.schedule.courseId ?? group.course?.id ?? "",
+    );
+    const id = studentId && courseId ? `${studentId}-${courseId}` : group.id;
+    const current = combined.get(id);
+
+    if (current) {
+      current.groups.push(group);
+      return;
+    }
+
+    combined.set(id, {
+      id,
+      groups: [group],
+      student: group.student,
+      course: group.course,
+    });
+  });
+
+  return [...combined.values()].map((group) => ({
+    ...group,
+    groups: group.groups.sort((left, right) => packageSortKey(left).localeCompare(packageSortKey(right))),
+  }));
+}
+
+function selectedAttendanceGroup(group: CombinedAttendanceGroup, selectedId?: string) {
+  return group.groups.find((packageGroup) => packageGroup.id === selectedId) ?? group.groups[0];
+}
+
+function packageSortKey(group: AttendanceGroup) {
+  return String(group.package?.billingPeriod ?? group.package?.lessonStartDate ?? group.id);
+}
+
+function packageLabel(group: AttendanceGroup) {
+  const period = stringField(group.package, "billingPeriod");
+  const start = stringField(group.package, "lessonStartDate");
+  return [period, start ? `Start ${start}` : ""].filter(Boolean).join(" | ") || formatDisplayText(group.id);
 }
 
 function stringField(row: Row | null, key: string) {
