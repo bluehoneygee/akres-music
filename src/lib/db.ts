@@ -215,6 +215,14 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
     _id: id,
     ...payload,
     ...(resource === "courses" ? { lessonType: "Private" } : {}),
+    ...(resource === "journals"
+      ? {
+          confirmed: false,
+          confirmedByUserId: "",
+          confirmedByName: "",
+          confirmedAt: "",
+        }
+      : {}),
     id,
     createdAt: now,
     updatedAt: now,
@@ -554,7 +562,7 @@ export async function updateRecord(
   const previous = await records.findOne({ id });
 
   if (isLockableResource(resource) && previous?.confirmed) {
-    throw new Error(resource === "invoices" ? "Payment already confirmed" : "Attendance already confirmed");
+    throw new Error(confirmedRecordMessage(resource));
   }
 
   const updatePayload = normalizeConfirmationPayload(resource, payload, actor, updatedAt);
@@ -576,7 +584,13 @@ function isAttendanceResource(resource: ResourceName) {
 }
 
 function isLockableResource(resource: ResourceName) {
-  return isAttendanceResource(resource) || resource === "invoices";
+  return isAttendanceResource(resource) || resource === "invoices" || resource === "journals";
+}
+
+function confirmedRecordMessage(resource: ResourceName) {
+  if (resource === "invoices") return "Payment already confirmed";
+  if (resource === "journals") return "Journal already confirmed";
+  return "Attendance already confirmed";
 }
 
 function normalizeConfirmationPayload(

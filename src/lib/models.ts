@@ -162,6 +162,10 @@ export type LessonJournal = BaseRecord & {
   progressRating: "Needs Work" | "Improving" | "Good" | "Excellent";
   parentVisible: boolean;
   submittedAt: string;
+  confirmed: boolean;
+  confirmedByUserId: string;
+  confirmedByName: string;
+  confirmedAt: string;
 };
 
 export type Repertoire = BaseRecord & {

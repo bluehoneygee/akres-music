@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpenCheck, RefreshCw, Save } from "lucide-react";
+import { BookOpenCheck, CheckCircle2, RefreshCw, Save } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -150,24 +151,7 @@ export function JournalBoard() {
     setSavingId(attendanceId);
 
     try {
-      const payload = {
-        id: existingJournal?.id ?? `journal-${attendanceId}`,
-        studentId: line.attendance.studentId,
-        instructorId: schedule.instructorId,
-        courseScheduleId: schedule.id,
-        lessonDate: schedule.scheduleDate,
-        instrumentId: line.attendance.instrumentId || schedule.instrumentId,
-        level: String(line.student?.skillLevel ?? "Beginner"),
-        attendanceId,
-        materialCovered: draft.materialCovered,
-        techniqueFocus: draft.techniqueFocus,
-        repertoireIds: draft.repertoireIds,
-        homework: draft.homework,
-        teacherNotes: draft.teacherNotes,
-        progressRating: draft.progressRating,
-        parentVisible: draft.parentVisible,
-        submittedAt: new Date().toISOString(),
-      };
+      const payload = buildJournalPayload(line, draft);
       const response = await fetch(
         existingJournal ? `/api/journals/${existingJournal.id}` : "/api/journals",
         {
@@ -186,6 +170,42 @@ export function JournalBoard() {
       toast.success("Journal saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save journal");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function confirmJournal(line: JournalLine) {
+    const attendanceId = line.attendance.id;
+    const draft = drafts[attendanceId] ?? emptyDraft;
+    const existingJournal = line.journal;
+
+    if (!existingJournal) {
+      toast.error("Save journal dulu sebelum confirm");
+      return;
+    }
+
+    setSavingId(attendanceId);
+
+    try {
+      const response = await fetch(`/api/journals/${existingJournal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...buildJournalPayload(line, draft),
+          confirmed: true,
+        }),
+      });
+      const json = (await response.json()) as { data?: Row; error?: string };
+
+      if (!response.ok || !json.data) {
+        throw new Error(json.error ?? "Unable to confirm journal");
+      }
+
+      await loadData();
+      toast.success("Journal confirmed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to confirm journal");
     } finally {
       setSavingId("");
     }
@@ -239,6 +259,7 @@ export function JournalBoard() {
                 <tbody>
                   {lines.map((line) => {
                     const draft = drafts[line.attendance.id] ?? emptyDraft;
+                    const isConfirmed = Boolean(line.journal?.confirmed);
                     const repertoireOptions = repertoires.filter(
                       (repertoire) =>
                         repertoire.isActive !== false &&
@@ -255,7 +276,7 @@ export function JournalBoard() {
                             {String(line.schedule?.fromTime ?? "-")} - {String(line.schedule?.toTime ?? "-")}
                           </p>
                           <Badge className="mt-2" variant={line.journal ? "success" : "outline"}>
-                            {line.journal ? "Saved" : "Ready"}
+                            {isConfirmed ? "Confirmed" : line.journal ? "Saved" : "Ready"}
                           </Badge>
                         </td>
                         <td className="w-[180px] px-4 py-3">
@@ -270,6 +291,7 @@ export function JournalBoard() {
                         <td className="w-[210px] px-4 py-3">
                           <select
                             className="h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={isConfirmed}
                             multiple
                             onChange={(event) =>
                               updateDraft(line.attendance.id, {
@@ -290,6 +312,7 @@ export function JournalBoard() {
                         <td className="w-[240px] px-4 py-3">
                           <textarea
                             className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={isConfirmed}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { materialCovered: event.target.value })
                             }
@@ -299,6 +322,7 @@ export function JournalBoard() {
                         <td className="w-[210px] px-4 py-3">
                           <input
                             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={isConfirmed}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { techniqueFocus: event.target.value })
                             }
@@ -308,6 +332,7 @@ export function JournalBoard() {
                         <td className="w-[240px] px-4 py-3">
                           <textarea
                             className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={isConfirmed}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { homework: event.target.value })
                             }
@@ -317,6 +342,7 @@ export function JournalBoard() {
                         <td className="w-[170px] px-4 py-3">
                           <select
                             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={isConfirmed}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { progressRating: event.target.value })
                             }
@@ -333,22 +359,43 @@ export function JournalBoard() {
                           <input
                             checked={draft.parentVisible}
                             className="size-4 accent-zinc-950"
+                            disabled={isConfirmed}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { parentVisible: event.target.checked })
                             }
                             type="checkbox"
                           />
                         </td>
-                        <td className="w-[110px] px-4 py-3">
-                          <Button
-                            disabled={savingId === line.attendance.id}
-                            onClick={() => void saveJournal(line)}
-                            size="sm"
-                            type="button"
-                          >
-                            <Save className="size-4" />
-                            Save
-                          </Button>
+                        <td className="w-[130px] px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {!isConfirmed ? (
+                              <IconAction
+                                ariaLabel="Save journal"
+                                disabled={savingId === line.attendance.id}
+                                onClick={() => void saveJournal(line)}
+                                tooltip="Save journal"
+                              >
+                                <Save className="size-4" />
+                              </IconAction>
+                            ) : null}
+                            {line.journal && !isConfirmed ? (
+                              <IconAction
+                                ariaLabel="Confirm journal"
+                                disabled={savingId === line.attendance.id}
+                                onClick={() => void confirmJournal(line)}
+                                tooltip="Confirm journal"
+                                variant="glass"
+                              >
+                                <CheckCircle2 className="size-4" />
+                              </IconAction>
+                            ) : null}
+                          </div>
+                          <div className="mt-2">
+                            {!line.journal ? (
+                              <p className="text-xs italic text-zinc-500">Save journal to confirm.</p>
+                            ) : null}
+                            {isConfirmed ? <ConfirmedText journal={line.journal} /> : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -393,6 +440,34 @@ function buildDrafts(journals: Row[]) {
   );
 }
 
+function buildJournalPayload(line: JournalLine, draft: JournalDraft) {
+  const attendanceId = line.attendance.id;
+  const schedule = line.schedule;
+
+  if (!schedule) {
+    throw new Error("Schedule belum tersedia untuk attendance ini");
+  }
+
+  return {
+    id: line.journal?.id ?? `journal-${attendanceId}`,
+    studentId: line.attendance.studentId,
+    instructorId: schedule.instructorId,
+    courseScheduleId: schedule.id,
+    lessonDate: schedule.scheduleDate,
+    instrumentId: line.attendance.instrumentId || schedule.instrumentId,
+    level: String(line.student?.skillLevel ?? "Beginner"),
+    attendanceId,
+    materialCovered: draft.materialCovered,
+    techniqueFocus: draft.techniqueFocus,
+    repertoireIds: draft.repertoireIds,
+    homework: draft.homework,
+    teacherNotes: draft.teacherNotes,
+    progressRating: draft.progressRating,
+    parentVisible: draft.parentVisible,
+    submittedAt: new Date().toISOString(),
+  };
+}
+
 function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
 }
@@ -400,4 +475,60 @@ function mapById(rows: Row[]) {
 function studentName(student: Row | null) {
   if (!student) return "Unknown student";
   return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
+}
+
+function IconAction({
+  ariaLabel,
+  children,
+  disabled,
+  onClick,
+  tooltip,
+  variant,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  disabled: boolean;
+  onClick: () => void;
+  tooltip: string;
+  variant?: "default" | "glass" | "ghost";
+}) {
+  return (
+    <span className="group relative inline-flex">
+      <Button
+        aria-label={ariaLabel}
+        className="size-9"
+        disabled={disabled}
+        onClick={onClick}
+        size="icon"
+        type="button"
+        variant={variant}
+      >
+        {children}
+      </Button>
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/45 bg-zinc-950 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 shadow-xl transition group-focus-within:opacity-100 group-hover:opacity-100">
+        {tooltip}
+      </span>
+    </span>
+  );
+}
+
+function ConfirmedText({ journal }: { journal: Row | null }) {
+  if (!journal) return null;
+
+  return (
+    <p className="text-xs italic text-zinc-500">
+      Confirmed by {formatDisplayText(journal.confirmedByName) || "Unknown User"}
+      {formatDateTime(journal.confirmedAt) ? ` at ${formatDateTime(journal.confirmedAt)}` : ""}
+    </p>
+  );
+}
+
+function formatDateTime(value: unknown) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
