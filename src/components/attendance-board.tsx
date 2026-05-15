@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   instructorAttendanceStatusOptions,
   studentAttendanceStatusOptions,
 } from "@/lib/options";
@@ -367,26 +374,19 @@ export function AttendanceBoard() {
                   </p>
                 </div>
                 {combinedGroup.groups.length > 1 ? (
-                  <select
-                    className="h-8 w-full rounded-2xl border border-white/50 bg-white/58 px-2 text-zinc-900 outline-none backdrop-blur-xl"
-                    onChange={(event) =>
+                  <PackageSelector
+                    groups={combinedGroup.groups}
+                    onChange={(value) =>
                       setSelectedPackageByGroup((current) => ({
                         ...current,
-                        [combinedGroup.id]: event.target.value,
+                        [combinedGroup.id]: value,
                       }))
                     }
-                    style={{ fontSize: 10 }}
                     value={group.id}
-                  >
-                    {combinedGroup.groups.map((packageGroup) => (
-                      <option key={packageGroup.id} value={packageGroup.id}>
-                        {packageLabel(packageGroup)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : null}
-                <div className="no-scrollbar flex flex-wrap gap-x-4 gap-y-2 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:overflow-visible sm:whitespace-normal">
-                  <Info icon={<UserRound className="size-3.5" />} label="Instructor" value={stringField(group.instructor, "instructorName")} />
+                <div className="no-scrollbar flex flex-nowrap gap-x-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:flex-wrap sm:gap-x-4 sm:gap-y-2 sm:overflow-visible sm:whitespace-normal">
+                  <Info icon={<UserRound className="size-3.5" />} label="Instructor" showMobileLabel value={stringField(group.instructor, "instructorName")} />
                   <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
                   <Info
                     icon={<CalendarCheck className="size-3.5" />}
@@ -435,26 +435,19 @@ export function AttendanceBoard() {
                   </p>
                 </div>
                 {combinedGroup.groups.length > 1 ? (
-                  <select
-                    className="h-8 w-full rounded-2xl border border-white/50 bg-white/58 px-2 text-zinc-900 outline-none backdrop-blur-xl"
-                    onChange={(event) =>
+                  <PackageSelector
+                    groups={combinedGroup.groups}
+                    onChange={(value) =>
                       setSelectedPackageByGroup((current) => ({
                         ...current,
-                        [combinedGroup.id]: event.target.value,
+                        [combinedGroup.id]: value,
                       }))
                     }
-                    style={{ fontSize: 10 }}
                     value={group.id}
-                  >
-                    {combinedGroup.groups.map((packageGroup) => (
-                      <option key={packageGroup.id} value={packageGroup.id}>
-                        {packageLabel(packageGroup)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : null}
-                <div className="no-scrollbar flex flex-wrap gap-x-4 gap-y-2 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:overflow-visible sm:whitespace-normal">
-                  <Info icon={<UserRound className="size-3.5" />} label="Student" value={studentName(combinedGroup.student)} />
+                <div className="no-scrollbar flex flex-nowrap gap-x-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:flex-wrap sm:gap-x-4 sm:gap-y-2 sm:overflow-visible sm:whitespace-normal">
+                  <Info icon={<UserRound className="size-3.5" />} label="Student" showMobileLabel value={studentName(combinedGroup.student)} />
                   <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
                   <Info
                     icon={<CalendarCheck className="size-3.5" />}
@@ -555,7 +548,7 @@ function SessionRail({ children, sessionCount }: { children: ReactNode; sessionC
         </div>
       </div>
       <div
-        className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 xl:gap-2"
+        className="no-scrollbar flex snap-x gap-1.5 overflow-x-auto scroll-smooth pb-1 sm:gap-3 xl:gap-2"
         ref={railRef}
       >
         {children}
@@ -581,31 +574,31 @@ function SessionCard({
 
   return (
     <button
-      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] xl:w-[150px] xl:p-2.5"
+      className="w-[112px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-1.5 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] sm:p-3 xl:w-[150px] xl:p-2.5"
       onClick={onOpen}
       type="button"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-[8px] font-medium uppercase text-zinc-500 sm:text-xs">Session {sessionNumber}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-950 sm:mt-1 sm:text-base">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-[8px] text-zinc-500 sm:text-xs">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${statusDotClass(status)}`} />
+        <span className={`mt-1 size-2 shrink-0 rounded-full sm:size-2.5 ${statusDotClass(status)}`} />
       </div>
       {isDraftReschedule ? (
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <Badge className="max-w-[110px] truncate" variant="warning">
+        <div className="mt-2.5 flex items-center justify-between gap-2 sm:mt-3">
+          <Badge className="max-w-[84px] truncate px-1 py-0 text-[8px] sm:max-w-[110px] sm:px-2.5 sm:py-0.5 sm:text-xs" variant="warning">
             Draft
           </Badge>
           <FinalityIndicator draft />
         </div>
       ) : (
-        <div className="mt-3 flex items-start justify-between gap-2">
-          <div className="min-w-0 space-y-1">
-            <Badge className="max-w-[110px] truncate" variant={statusVariant(status)}>
+        <div className="mt-2.5 flex items-start justify-between gap-2 sm:mt-3">
+          <div className="min-w-0 space-y-0.5 sm:space-y-1">
+            <Badge className="max-w-[84px] truncate px-1 py-0 text-[8px] sm:max-w-[110px] sm:px-2.5 sm:py-0.5 sm:text-xs" variant={statusVariant(status)}>
               {formatDisplayText(status)}
             </Badge>
             {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
@@ -1022,7 +1015,7 @@ function ConfirmedBadge({
   compact?: boolean;
 }) {
   return (
-    <p className={`${compact ? "max-w-[120px] truncate whitespace-nowrap text-[9px] leading-tight" : "max-w-[220px] text-xs"} italic text-zinc-500 ${align === "right" ? "text-right" : ""}`}>
+    <p className={`${compact ? "line-clamp-2 max-w-[96px] whitespace-normal text-[7px] leading-[1.1] sm:max-w-[120px] sm:text-[9px]" : "max-w-[220px] text-xs"} italic text-zinc-500 ${align === "right" ? "text-right" : ""}`}>
       Confirmed by {formatDisplayText(attendance.confirmedByName) || "Unknown User"}
       {!compact && formatDateTime(attendance.confirmedAt) ? ` at ${formatDateTime(attendance.confirmedAt)}` : ""}
     </p>
@@ -1038,7 +1031,7 @@ function FinalityIndicator({
 }) {
   if (draft) {
     return (
-      <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+      <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-100 px-1 py-0 text-[8px] font-semibold text-amber-800 sm:px-2 sm:py-0.5 sm:text-[10px]">
         Draft
       </span>
     );
@@ -1046,8 +1039,8 @@ function FinalityIndicator({
 
   if (!confirmed) {
     return (
-      <span className="inline-flex w-fit max-w-[120px] items-center gap-1 truncate whitespace-nowrap text-[9px] italic leading-tight text-amber-700">
-        <AlertTriangle className="size-3 shrink-0" />
+      <span className="inline-flex w-fit max-w-[96px] items-center gap-0.5 truncate whitespace-nowrap text-[7px] italic leading-tight text-amber-700 sm:max-w-[120px] sm:gap-1 sm:text-[9px]">
+        <AlertTriangle className="size-2 shrink-0 sm:size-3" />
         Belum confirm
       </span>
     );
@@ -1080,23 +1073,23 @@ function InstructorSessionCard({
 
   return (
     <button
-      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] xl:w-[150px] xl:p-2.5"
+      className="w-[112px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-1.5 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px] sm:p-3 xl:w-[150px] xl:p-2.5"
       onClick={onOpen}
       type="button"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
-          <p className="text-xs text-zinc-500">
+          <p className="text-[8px] font-medium uppercase text-zinc-500 sm:text-xs">Session {sessionNumber}</p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-950 sm:mt-1 sm:text-base">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-[8px] text-zinc-500 sm:text-xs">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${statusDotClass(status)}`} />
+        <span className={`mt-1 size-2 shrink-0 rounded-full sm:size-2.5 ${statusDotClass(status)}`} />
       </div>
-      <div className="mt-3 flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-1">
-          <Badge className="max-w-[110px] truncate" variant={instructorStatusVariant(status)}>
+      <div className="mt-2.5 flex items-start justify-between gap-2 sm:mt-3">
+        <div className="min-w-0 space-y-0.5 sm:space-y-1">
+          <Badge className="max-w-[84px] truncate px-1 py-0 text-[8px] sm:max-w-[110px] sm:px-2.5 sm:py-0.5 sm:text-xs" variant={instructorStatusVariant(status)}>
             {formatDisplayText(status)}
           </Badge>
           {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
@@ -1106,6 +1099,34 @@ function InstructorSessionCard({
         </div>
       </div>
     </button>
+  );
+}
+
+function PackageSelector({
+  groups,
+  onChange,
+  value,
+}: {
+  groups: AttendanceGroup[];
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <Select onValueChange={onChange} value={value}>
+      <SelectTrigger
+        className="h-8 px-2 text-[10px] leading-none [&_[data-slot=select-value]]:text-[10px] [&_[data-slot=select-value]]:leading-none"
+        style={{ fontSize: 10, lineHeight: 1 }}
+      >
+        <SelectValue className="truncate text-[10px] leading-none" placeholder="Select package" />
+      </SelectTrigger>
+      <SelectContent>
+        {groups.map((packageGroup) => (
+          <SelectItem className="text-[10px]" key={packageGroup.id} value={packageGroup.id}>
+            {packageLabel(packageGroup)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -1523,17 +1544,19 @@ function Info({
   icon,
   label,
   mobileHidden = false,
+  showMobileLabel = false,
   value,
 }: {
   icon: ReactNode;
   label: string;
   mobileHidden?: boolean;
+  showMobileLabel?: boolean;
   value: string;
 }) {
   return (
     <span className={`${mobileHidden ? "hidden sm:inline-flex" : "inline-flex"} min-w-0 shrink-0 items-center gap-1.5`}>
       <span className="shrink-0 text-zinc-500">{icon}</span>
-      <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] text-zinc-400">
+      <span className={`${showMobileLabel ? "inline" : "hidden"} shrink-0 text-[10px] uppercase tracking-[0.08em] text-zinc-400 sm:inline`}>
         {label}
       </span>
       <span className="truncate text-xs font-medium text-zinc-800">{value || "-"}</span>
