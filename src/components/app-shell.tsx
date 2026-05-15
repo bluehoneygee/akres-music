@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getNavigationForRole } from "@/lib/navigation";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayText } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -92,7 +92,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {role ? (
             <div className="mt-4 rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-600">
               <span className="block font-medium uppercase text-zinc-400">Role</span>
-              <span className="mt-0.5 block font-semibold text-zinc-700">{role}</span>
+              <span className="mt-0.5 block font-semibold text-zinc-700">
+                {formatDisplayText(role)}
+              </span>
             </div>
           ) : null}
           <Card className="liquid-glass mt-8 rounded-[24px] bg-white/36">

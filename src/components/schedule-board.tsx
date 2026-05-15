@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -193,17 +194,14 @@ function ScheduleSessionCard({
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <Badge variant={scheduleStatusVariant(status)}>{status}</Badge>
+        <Badge variant={scheduleStatusVariant(status)}>{formatDisplayText(status)}</Badge>
       </div>
 
-      <div className="mt-3 rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-500">
-        Status schedule mengikuti update dari Attendance.
-        {schedule.originalScheduleId ? (
-          <span className="mt-1 block">
-            Makeup/reschedule dari {String(schedule.originalScheduleId)}
-          </span>
-        ) : null}
-      </div>
+      {schedule.originalScheduleId ? (
+        <div className="mt-3 rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-500">
+          Makeup/reschedule dari {String(schedule.originalScheduleId)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -261,12 +259,12 @@ function mapById(rows: Row[]) {
 }
 
 function stringField(row: Row | null, key: string) {
-  return String(row?.[key] ?? "-");
+  return formatDisplayText(row?.[key]);
 }
 
 function studentName(student: Row | null) {
   if (!student) return "Unknown student";
-  return `${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`.trim();
+  return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
 }
 
 function lessonLocation(group: ScheduleGroup) {

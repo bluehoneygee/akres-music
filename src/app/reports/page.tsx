@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readDatabase } from "@/lib/db";
+import { formatDisplayText } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,8 @@ export default async function ReportsPage() {
           {reports.map(([title, value]) => (
             <div className="rounded-[20px] border border-white/45 bg-white/42 p-4" key={title}>
               <Badge variant="outline">Report</Badge>
-              <p className="mt-4 font-medium">{title}</p>
-              <p className="mt-1 text-2xl font-semibold">{value}</p>
+              <p className="mt-4 font-medium">{formatDisplayText(title)}</p>
+              <p className="mt-1 text-2xl font-semibold">{formatDisplayText(value)}</p>
             </div>
           ))}
         </CardContent>

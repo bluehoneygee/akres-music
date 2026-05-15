@@ -113,6 +113,11 @@ export async function readDatabase(): Promise<Database> {
 
 export async function listRecords(resource: ResourceName) {
   const records = await (await collection(resource)).find({}).sort({ createdAt: -1 }).toArray();
+
+  if (resource === "lesson-packages") {
+    return hydrateLessonPackageInstruments(records).then((rows) => rows.map(fromMongo));
+  }
+
   return records.map(fromMongo);
 }
 
@@ -150,7 +155,7 @@ async function createLessonPackageWithSchedules(
   now: string,
 ) {
   const id = String(payload.id || `lesson-packages-${crypto.randomUUID()}`);
-  const packagePayload = normalizeLessonPackagePayload(payload);
+  const packagePayload = await normalizeLessonPackagePayload(payload);
 
   const record = {
     _id: id,
@@ -170,7 +175,7 @@ async function createLessonPackageWithSchedules(
   return fromMongo(record as Document);
 }
 
-function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
+async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
   const courseId = String(payload.courseId || "");
   const studentId = String(payload.studentId || "");
   const instructorId = String(payload.instructorId || "");
@@ -179,9 +184,10 @@ function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
   const lessonDays = toStringArray(payload.lessonDays);
   const fromTime = String(payload.fromTime || "");
   const toTime = String(payload.toTime || "");
+  const instrumentId = String(payload.instrumentId || (await findCourseInstrumentId(courseId)) || "");
 
-  if (!courseId || !studentId || !instructorId || !billingPeriod || !lessonStartDate || !fromTime || !toTime || lessonDays.length === 0) {
-    throw new Error("Lesson package needs student, course, instructor, billing period, start date, lesson days, and time.");
+  if (!courseId || !studentId || !instructorId || !instrumentId || !billingPeriod || !lessonStartDate || !fromTime || !toTime || lessonDays.length === 0) {
+    throw new Error("Lesson package needs student, course, instructor, instrument, billing period, start date, lesson days, and time.");
   }
 
   return {
@@ -189,19 +195,52 @@ function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     courseId,
     studentId,
     instructorId,
-    instrumentId: String(payload.instrumentId || payload.primaryInstrumentId || ""),
+    instrumentId,
     billingPeriod,
     lessonStartDate,
     lessonDays,
     lessonCount: payload.lessonCount || 4,
     fromTime,
     toTime,
-    lessonMode: String(payload.lessonMode || payload.preferredLessonMode || "Studio"),
+    lessonMode: String(payload.lessonMode || "Studio"),
     studioRoomId: String(payload.studioRoomId || ""),
     homeVisitAddress: String(payload.homeVisitAddress || ""),
-    travelNotes: String(payload.travelNotes || ""),
     status: String(payload.status || "Active"),
   };
+}
+
+async function findCourseInstrumentId(courseId: string) {
+  if (!courseId) return "";
+
+  const db = await getMongoDb();
+  const course = await db.collection("courses").findOne<{ instrumentId?: string }>({ id: courseId });
+  return course?.instrumentId ?? "";
+}
+
+async function hydrateLessonPackageInstruments(records: Document[]) {
+  const missingCourseIds = [
+    ...new Set(
+      records
+        .filter((record) => !record.instrumentId && record.courseId)
+        .map((record) => String(record.courseId)),
+    ),
+  ];
+
+  if (missingCourseIds.length === 0) return records;
+
+  const db = await getMongoDb();
+  const courses = await db
+    .collection("courses")
+    .find({ id: { $in: missingCourseIds } })
+    .project({ id: 1, instrumentId: 1 })
+    .toArray();
+  const instrumentByCourse = new Map(courses.map((course) => [String(course.id), course.instrumentId]));
+
+  return records.map((record) =>
+    record.instrumentId
+      ? record
+      : { ...record, instrumentId: instrumentByCourse.get(String(record.courseId)) ?? "" },
+  );
 }
 
 function pickLessonPackageSchedulePayload(payload: Record<string, unknown>) {
@@ -406,8 +445,10 @@ async function syncScheduleStatusFromAttendance(
     if (attendanceStatus === "Rescheduled") scheduleStatus = "Rescheduled";
   }
 
-  if (resource === "instructor-attendance" && attendanceStatus === "Cancelled") {
-    scheduleStatus = "Cancelled";
+  if (resource === "instructor-attendance") {
+    if (attendanceStatus === "Cancelled" || attendanceStatus === "Absent") {
+      scheduleStatus = "Rescheduled";
+    }
   }
 
   if (!scheduleId || !scheduleStatus) return;
@@ -422,9 +463,59 @@ async function syncScheduleStatusFromAttendance(
       },
     },
   );
+
+  if (
+    resource === "instructor-attendance" &&
+    (attendanceStatus === "Cancelled" || attendanceStatus === "Absent")
+  ) {
+    await db.collection("student-attendance").updateOne(
+      { courseScheduleId: scheduleId },
+      {
+        $set: {
+          status: "Rescheduled",
+          makeupRequired: true,
+          absenceReason:
+            attendanceStatus === "Absent" ? "Instructor Absent" : "Instructor Cancelled",
+          updatedAt,
+        },
+      },
+    );
+  }
 }
 
 export async function deleteRecord(resource: ResourceName, id: string) {
+  if (resource === "lesson-packages") {
+    return deleteLessonPackageCascade(id);
+  }
+
   const result = await (await collection(resource)).deleteOne({ id });
   return result.deletedCount > 0;
+}
+
+async function deleteLessonPackageCascade(id: string) {
+  const db = await getMongoDb();
+  const scheduleIds = await db
+    .collection("schedules")
+    .find({ lessonPackageId: id })
+    .project({ id: 1 })
+    .toArray()
+    .then((rows) => rows.map((row) => row.id).filter(Boolean));
+
+  const result = await db.collection("lesson-packages").deleteOne({ id });
+
+  if (result.deletedCount === 0) {
+    return false;
+  }
+
+  await Promise.all([
+    db.collection("schedules").deleteMany({ lessonPackageId: id }),
+    db.collection("student-attendance").deleteMany({
+      $or: [{ lessonPackageId: id }, { courseScheduleId: { $in: scheduleIds } }],
+    }),
+    db.collection("instructor-attendance").deleteMany({
+      $or: [{ lessonPackageId: id }, { courseScheduleId: { $in: scheduleIds } }],
+    }),
+  ]);
+
+  return true;
 }

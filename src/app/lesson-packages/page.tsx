@@ -33,11 +33,6 @@ export default function LessonPackagesPage() {
             label: "Student",
             type: "relation",
             relation: { resource: "students", labelFields: ["firstName", "lastName"] },
-            relationFilter: {
-              sourceField: "courseId",
-              sourceOptionField: "instrumentId",
-              optionField: "primaryInstrumentId",
-            },
             required: true,
           },
           {
@@ -70,8 +65,7 @@ export default function LessonPackagesPage() {
             label: "Lesson mode",
             type: "select",
             options: lessonModeOptions,
-            deriveFrom: { sourceField: "studentId", sourceOptionField: "preferredLessonMode" },
-            hidden: true,
+            required: true,
           },
           {
             key: "studioRoomId",
@@ -88,12 +82,6 @@ export default function LessonPackagesPage() {
           {
             key: "homeVisitAddress",
             label: "Home visit address",
-            visibleWhen: { field: "lessonMode", value: "Home Visit" },
-          },
-          {
-            key: "travelNotes",
-            label: "Travel notes",
-            type: "textarea",
             visibleWhen: { field: "lessonMode", value: "Home Visit" },
           },
           {

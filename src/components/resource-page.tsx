@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ResourceName } from "@/lib/models";
+import { formatDisplayText } from "@/lib/utils";
 
 export type FieldConfig = {
   key: string;
@@ -111,11 +112,12 @@ export function ResourcePage({
       field.key,
       records.map((record) => ({
         value: String(record[valueField] ?? record.id),
-        label:
+        label: formatDisplayText(
           field.relation!.labelFields
             .map((labelField) => record[labelField])
             .filter(Boolean)
             .join(" ") || String(record[valueField] ?? record.id),
+        ),
         record,
       })),
     ] as const;
@@ -717,6 +719,23 @@ function formatValue(
   field?: FieldConfig,
   relationOptions?: Record<string, RelationOption[]>,
 ) {
+  if (field?.type === "select" && field.options) {
+    const options = field.options;
+
+    if (Array.isArray(value)) {
+      return (
+        value
+          .map((item) => optionLabel(options, item))
+          .map(formatDisplayText)
+          .join(", ") || "-"
+      );
+    }
+
+    if (value === null || value === undefined || value === "") return "-";
+
+    return formatDisplayText(optionLabel(options, value));
+  }
+
   if (field?.type === "relation" && relationOptions) {
     const options = relationOptions[field.key] ?? [];
 
@@ -724,17 +743,22 @@ function formatValue(
       return (
         value
           .map((item) => options.find((option) => option.value === String(item))?.label ?? String(item))
+          .map(formatDisplayText)
           .join(", ") || "-"
       );
     }
 
     if (value === null || value === undefined || value === "") return "-";
 
-    return options.find((option) => option.value === String(value))?.label ?? String(value);
+    return formatDisplayText(options.find((option) => option.value === String(value))?.label ?? String(value));
   }
 
-  if (Array.isArray(value)) return value.join(", ") || "-";
+  if (Array.isArray(value)) return value.map(formatDisplayText).join(", ") || "-";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "-";
-  return String(value);
+  return formatDisplayText(value);
+}
+
+function optionLabel(options: { label: string; value: string }[], value: unknown) {
+  return options.find((option) => option.value === String(value))?.label ?? String(value);
 }

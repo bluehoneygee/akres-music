@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { studentAttendanceStatusOptions } from "@/lib/options";
+import {
+  instructorAttendanceStatusOptions,
+  studentAttendanceStatusOptions,
+} from "@/lib/options";
+import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -32,6 +36,8 @@ export function AttendanceBoard() {
   const [instructors, setInstructors] = useState<Row[]>([]);
   const [schedules, setSchedules] = useState<Row[]>([]);
   const [attendance, setAttendance] = useState<Row[]>([]);
+  const [instructorAttendance, setInstructorAttendance] = useState<Row[]>([]);
+  const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
 
@@ -39,14 +45,22 @@ export function AttendanceBoard() {
     setLoading(true);
 
     try {
-      const [packageRows, studentRows, courseRows, instructorRows, scheduleRows, attendanceRows] =
-        await Promise.all([
+      const [
+        packageRows,
+        studentRows,
+        courseRows,
+        instructorRows,
+        scheduleRows,
+        attendanceRows,
+        instructorAttendanceRows,
+      ] = await Promise.all([
           fetchRows("lesson-packages"),
           fetchRows("students"),
           fetchRows("courses"),
           fetchRows("instructors"),
           fetchRows("schedules"),
           fetchRows("student-attendance"),
+          fetchRows("instructor-attendance"),
         ]);
 
       setPackages(packageRows);
@@ -55,6 +69,7 @@ export function AttendanceBoard() {
       setInstructors(instructorRows);
       setSchedules(scheduleRows);
       setAttendance(attendanceRows);
+      setInstructorAttendance(instructorAttendanceRows);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load attendance");
     } finally {
@@ -66,7 +81,7 @@ export function AttendanceBoard() {
     void loadData();
   }, []);
 
-  const groups = useMemo(() => {
+  const studentGroups = useMemo(() => {
     const studentsById = mapById(students);
     const coursesById = mapById(courses);
     const instructorsById = mapById(instructors);
@@ -115,6 +130,52 @@ export function AttendanceBoard() {
     return [...packageGroups, ...orphanGroups].filter((group) => group.sessions.length > 0);
   }, [attendance, courses, instructors, packages, schedules, students]);
 
+  const instructorGroups = useMemo(() => {
+    const studentsById = mapById(students);
+    const coursesById = mapById(courses);
+    const instructorsById = mapById(instructors);
+    const attendanceByScheduleId = new Map(
+      instructorAttendance.map((row) => [String(row.courseScheduleId ?? ""), row]),
+    );
+    const schedulesByPackage = schedules.reduce<Record<string, Row[]>>((acc, schedule) => {
+      const packageId =
+        String(schedule.lessonPackageId ?? "") ||
+        `${String(schedule.studentId ?? "")}-${String(schedule.scheduleMonth ?? "")}`;
+
+      if (!acc[packageId]) acc[packageId] = [];
+      acc[packageId].push(schedule);
+      return acc;
+    }, {});
+
+    const packageGroups = packages.map((lessonPackage) =>
+      buildGroup({
+        id: lessonPackage.id,
+        lessonPackage,
+        packageSchedules: schedulesByPackage[lessonPackage.id] ?? [],
+        studentsById,
+        coursesById,
+        instructorsById,
+        attendanceByScheduleId,
+      }),
+    );
+    const packageIds = new Set(packages.map((lessonPackage) => lessonPackage.id));
+    const orphanGroups = Object.entries(schedulesByPackage)
+      .filter(([packageId]) => !packageIds.has(packageId))
+      .map(([packageId, packageSchedules]) =>
+        buildGroup({
+          id: packageId,
+          lessonPackage: null,
+          packageSchedules,
+          studentsById,
+          coursesById,
+          instructorsById,
+          attendanceByScheduleId,
+        }),
+      );
+
+    return [...packageGroups, ...orphanGroups].filter((group) => group.sessions.length > 0);
+  }, [courses, instructorAttendance, instructors, packages, schedules, students]);
+
   async function updateAttendance(id: string, payload: Record<string, unknown>) {
     setSavingId(id);
 
@@ -134,6 +195,30 @@ export function AttendanceBoard() {
       toast.success("Attendance updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update attendance");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function updateInstructorAttendance(id: string, payload: Record<string, unknown>) {
+    setSavingId(id);
+
+    try {
+      const response = await fetch(`/api/instructor-attendance/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = (await response.json()) as { data?: Row; error?: string };
+
+      if (!response.ok || !json.data) {
+        throw new Error(json.error ?? "Unable to update instructor attendance");
+      }
+
+      setInstructorAttendance((current) => current.map((row) => (row.id === id ? json.data! : row)));
+      toast.success("Instructor attendance updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update instructor attendance");
     } finally {
       setSavingId("");
     }
@@ -217,7 +302,7 @@ export function AttendanceBoard() {
               Attendance
             </CardTitle>
             <p className="mt-2 text-sm text-zinc-500">
-              Absensi digroup per paket les. Setiap murid tampil satu baris, detail sesi ada di kanan.
+              Absensi murid dan instruktur digroup per paket les dengan detail sesi di kanan.
             </p>
           </div>
           <Button onClick={loadData} size="icon" variant="glass" aria-label="Refresh">
@@ -226,6 +311,25 @@ export function AttendanceBoard() {
         </CardHeader>
       </Card>
 
+      <div className="flex w-fit rounded-full border border-white/40 bg-white/40 p-1 backdrop-blur-xl">
+        <Button
+          onClick={() => setActiveTab("students")}
+          size="sm"
+          type="button"
+          variant={activeTab === "students" ? "default" : "ghost"}
+        >
+          Students
+        </Button>
+        <Button
+          onClick={() => setActiveTab("instructors")}
+          size="sm"
+          type="button"
+          variant={activeTab === "instructors" ? "default" : "ghost"}
+        >
+          Instructors
+        </Button>
+      </div>
+
       <div className="space-y-3">
         {loading ? (
           <Card className="liquid-glass">
@@ -233,7 +337,7 @@ export function AttendanceBoard() {
           </Card>
         ) : null}
 
-        {!loading && groups.length === 0 ? (
+        {!loading && (activeTab === "students" ? studentGroups : instructorGroups).length === 0 ? (
           <Card className="liquid-glass">
             <CardContent className="p-5 text-sm text-zinc-500">
               Belum ada attendance. Buat Lesson Package dulu supaya schedules dan attendance otomatis muncul.
@@ -241,7 +345,7 @@ export function AttendanceBoard() {
           </Card>
         ) : null}
 
-        {groups.map((group) => (
+        {activeTab === "students" ? studentGroups.map((group) => (
           <Card className="liquid-glass" key={group.id}>
             <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="space-y-3">
@@ -270,6 +374,42 @@ export function AttendanceBoard() {
                     key={String(schedule.id)}
                     onCreateMakeupSchedule={createMakeupSchedule}
                     onUpdate={updateAttendance}
+                    schedule={schedule}
+                    sessionNumber={index + 1}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )) : instructorGroups.map((group) => (
+          <Card className="liquid-glass" key={group.id}>
+            <CardContent className="grid gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="space-y-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-zinc-950">
+                    {stringField(group.instructor, "instructorName")}
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500">{stringField(group.course, "courseName")}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-zinc-500">
+                  <Info label="Student" value={studentName(group.student)} />
+                  <Info label="Period" value={stringField(group.package, "billingPeriod")} />
+                  <Info label="Start" value={stringField(group.package, "lessonStartDate")} />
+                  <Info
+                    label="Progress"
+                    value={`${instructorPresentCount(group.sessions)}/${group.sessions.length} present`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
+                  <InstructorSessionCard
+                    attendance={attendanceRow}
+                    disabled={savingId === attendanceRow?.id}
+                    instructors={instructors}
+                    key={String(schedule.id)}
+                    onUpdate={updateInstructorAttendance}
                     schedule={schedule}
                     sessionNumber={index + 1}
                   />
@@ -320,7 +460,7 @@ function SessionCard({
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
         </div>
-        <Badge variant={statusVariant(status)}>{status}</Badge>
+        <Badge variant={statusVariant(status)}>{formatDisplayText(status)}</Badge>
       </div>
 
       {attendance ? (
@@ -439,6 +579,104 @@ function SessionCard({
   );
 }
 
+function InstructorSessionCard({
+  attendance,
+  disabled,
+  instructors,
+  onUpdate,
+  schedule,
+  sessionNumber,
+}: {
+  attendance: Row | null;
+  disabled: boolean;
+  instructors: Row[];
+  onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
+  schedule: Row;
+  sessionNumber: number;
+}) {
+  const status = String(attendance?.status ?? "Pending");
+  const needsSubstitute = status === "Substitute";
+
+  return (
+    <div className="rounded-2xl border border-white/45 bg-white/42 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
+          <p className="mt-1 font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-xs text-zinc-500">
+            {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
+          </p>
+        </div>
+        <Badge variant={instructorStatusVariant(status)}>{formatDisplayText(status)}</Badge>
+      </div>
+
+      {attendance ? (
+        <div className="mt-3 space-y-2">
+          <select
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+            disabled={disabled}
+            onChange={(event) => {
+              const nextStatus = event.target.value;
+              void onUpdate(attendance.id, {
+                ...attendance,
+                status: nextStatus,
+                substituteInstructorId:
+                  nextStatus === "Substitute" ? attendance.substituteInstructorId : "",
+              });
+            }}
+            value={status}
+          >
+            {instructorAttendanceStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          {needsSubstitute ? (
+            <select
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              disabled={disabled}
+              onChange={(event) =>
+                void onUpdate(attendance.id, {
+                  ...attendance,
+                  substituteInstructorId: event.target.value,
+                  status: "Substitute",
+                })
+              }
+              value={String(attendance.substituteInstructorId ?? "")}
+            >
+              <option value="">Select substitute</option>
+              {instructors
+                .filter((instructor) => instructor.id !== attendance.instructorId)
+                .map((instructor) => (
+                  <option key={instructor.id} value={instructor.id}>
+                    {formatDisplayText(instructor.instructorName)}
+                  </option>
+                ))}
+            </select>
+          ) : null}
+
+          <input
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+            disabled={disabled}
+            onBlur={(event) =>
+              void onUpdate(attendance.id, {
+                ...attendance,
+                notes: event.target.value,
+              })
+            }
+            placeholder="Notes"
+            defaultValue={String(attendance.notes ?? "")}
+          />
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-zinc-500">Instructor attendance belum tersedia.</p>
+      )}
+    </div>
+  );
+}
+
 async function fetchRows(resource: string) {
   const response = await fetch(`/api/${resource}`, { cache: "no-store" });
   const json = (await response.json()) as { data?: Row[]; error?: string };
@@ -492,15 +730,19 @@ function mapById(rows: Row[]) {
 }
 
 function stringField(row: Row | null, key: string) {
-  return String(row?.[key] ?? "-");
+  return formatDisplayText(row?.[key]);
 }
 
 function studentName(student: Row | null) {
   if (!student) return "Unknown student";
-  return `${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`.trim();
+  return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
 }
 
 function completedCount(sessions: SessionRow[]) {
+  return sessions.filter(({ attendance }) => attendance?.status === "Present").length;
+}
+
+function instructorPresentCount(sessions: SessionRow[]) {
   return sessions.filter(({ attendance }) => attendance?.status === "Present").length;
 }
 
@@ -508,6 +750,13 @@ function statusVariant(status: string) {
   if (status === "Present") return "success";
   if (status === "Pending") return "outline";
   if (status === "Late" || status === "Permission") return "warning";
+  return "danger";
+}
+
+function instructorStatusVariant(status: string) {
+  if (status === "Present") return "success";
+  if (status === "Pending") return "outline";
+  if (status === "Substitute") return "warning";
   return "danger";
 }
 

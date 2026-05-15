@@ -34,11 +34,8 @@ export type Guardian = BaseRecord & {
 export type Student = BaseRecord & {
   firstName: string;
   lastName: string;
-  primaryInstrumentId: string;
-  secondaryInstrumentIds: string[];
   skillLevel: "Beginner" | "Intermediate" | "Advanced";
   learningGoal: string;
-  preferredLessonMode: "Studio" | "Home Visit";
   guardianIds: string[];
   portalEnabled: boolean;
   musicNotes: string;
@@ -75,7 +72,6 @@ export type LessonPackage = BaseRecord & {
   lessonMode: "Studio" | "Home Visit";
   studioRoomId: string;
   homeVisitAddress: string;
-  travelNotes: string;
   status: "Active" | "Completed" | "Cancelled";
 };
 

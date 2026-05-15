@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { readDatabase } from "@/lib/db";
+import { formatDisplayText } from "@/lib/utils";
 import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
@@ -148,13 +149,13 @@ export default async function HomePage() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-medium">
-                      {student?.firstName} {student?.lastName}
+                      {formatDisplayText(`${student?.firstName ?? ""} ${student?.lastName ?? ""}`)}
                     </p>
-                    <p className="truncate text-sm text-zinc-500">{course?.courseName}</p>
+                    <p className="truncate text-sm text-zinc-500">{formatDisplayText(course?.courseName)}</p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-600">
                       <span className="inline-flex items-center gap-1">
                         <Users className="size-3.5" />
-                        {instructor?.instructorName}
+                        {formatDisplayText(instructor?.instructorName)}
                       </span>
                       <span className="inline-flex items-center gap-1">
                         {item.lessonMode === "Studio" ? (
@@ -162,11 +163,13 @@ export default async function HomePage() {
                         ) : (
                           <Home className="size-3.5" />
                         )}
-                        {item.lessonMode === "Studio" ? room?.roomName : item.homeVisitAddress}
+                        {formatDisplayText(item.lessonMode === "Studio" ? room?.roomName : item.homeVisitAddress)}
                       </span>
                     </div>
                   </div>
-                  <Badge variant={statusVariant(item.scheduleStatus)}>{item.scheduleStatus}</Badge>
+                  <Badge variant={statusVariant(item.scheduleStatus)}>
+                    {formatDisplayText(item.scheduleStatus)}
+                  </Badge>
                 </div>
               );
             })}
@@ -206,14 +209,14 @@ export default async function HomePage() {
                 <div className="flex items-center justify-between gap-3" key={item.id}>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {student?.firstName} {student?.lastName}
+                      {formatDisplayText(`${student?.firstName ?? ""} ${student?.lastName ?? ""}`)}
                     </p>
                     <p className="text-xs text-zinc-500">
-                      {instrument?.instrumentName}
+                      {formatDisplayText(instrument?.instrumentName)}
                       {item.makeupRequired ? " - makeup required" : ""}
                     </p>
                   </div>
-                  <Badge variant={statusVariant(item.status)}>{item.status}</Badge>
+                  <Badge variant={statusVariant(item.status)}>{formatDisplayText(item.status)}</Badge>
                 </div>
               );
             })}
@@ -232,13 +235,15 @@ export default async function HomePage() {
                 <div className="rounded-[20px] border border-white/45 bg-white/42 p-4" key={journal.id}>
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <p className="font-medium">
-                      {student?.firstName} {student?.lastName}
+                      {formatDisplayText(`${student?.firstName ?? ""} ${student?.lastName ?? ""}`)}
                     </p>
                     <Badge variant={statusVariant(journal.progressRating)}>
-                      {journal.progressRating}
+                      {formatDisplayText(journal.progressRating)}
                     </Badge>
                   </div>
-                  <p className="min-h-16 text-sm text-zinc-600">{journal.materialCovered}</p>
+                  <p className="min-h-16 text-sm text-zinc-600">
+                    {formatDisplayText(journal.materialCovered)}
+                  </p>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between text-xs text-zinc-500">
                       <span>Parent visible</span>
@@ -269,7 +274,7 @@ export default async function HomePage() {
                 `${db.rooms.filter((room) => room.isActive).length} studio room aktif`,
               ].map((item) => (
                 <div className="rounded-2xl border border-white/45 bg-white/42 p-3" key={item}>
-                  {item}
+                  {formatDisplayText(item)}
                 </div>
               ))}
             </div>
