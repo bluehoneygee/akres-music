@@ -119,19 +119,51 @@ Relationships:
 
 Mewakili jadwal les privat.
 
+### Lesson Package / Enrollment
+
+Mewakili paket les privat yang dibeli atau diperpanjang murid. Satu package menghasilkan beberapa Course Schedule dan Attendance.
+
 Custom fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
+| `student` | Link: Student | Yes | Murid pemilik paket |
+| `course` | Link: Course | Yes | Course yang diambil |
+| `instructor` | Link: Instructor | Yes | Guru paket |
+| `instrument` | Link: Instrument | Yes | Instrumen dari course |
+| `billing_period` | Month | Yes | Periode billing paket, contoh 2026-05 |
+| `lesson_start_date` | Date | Yes | Tanggal mulai mencari sesi pertama |
+| `lesson_days` | Multi Select | Yes | Hari les dalam minggu |
+| `lesson_count` | Int | Yes | Jumlah sesi paket, default 4 |
+| `from_time` | Time | Yes | Jam mulai |
+| `to_time` | Time | Yes | Jam selesai |
+| `lesson_mode` | Select | Yes | Studio, Home Visit |
+| `studio_room` | Link: Studio Room | No | Ruang studio jika lesson_mode = Studio |
+| `home_visit_address` | Small Text | No | Alamat rumah jika lesson_mode = Home Visit |
+| `travel_notes` | Small Text | No | Catatan akses/perjalanan |
+| `status` | Select | Yes | Active, Completed, Cancelled |
+
+Relationships:
+
+- Lesson Package belongs to one Student.
+- Lesson Package creates many Course Schedule records.
+- Lesson Package is linked by generated Student Attendance and Instructor Attendance.
+
+Custom fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `lesson_package` | Link: Lesson Package | No | Paket asal jadwal |
 | `instrument` | Link: Instrument | Yes | Instrumen sesi |
 | `lesson_mode` | Select | Yes | Studio, Home Visit |
 | `studio_room` | Link: Studio Room | No | Ruang studio jika lesson_mode = Studio |
 | `home_visit_address` | Small Text | No | Alamat rumah jika lesson_mode = Home Visit |
 | `travel_notes` | Small Text | No | Catatan akses/perjalanan untuk home visit |
 | `private_lesson` | Check | Yes | Selalu aktif |
-| `schedule_month` | Month | No | Bulan jadwal/paket, contoh 2026-05 |
+| `schedule_month` | Month | No | Billing period paket, contoh 2026-05 |
+| `lesson_start_date` | Date | No | Tanggal mulai paket 4 sesi |
 | `lesson_days` | Multi Select | No | Hari les dalam minggu, contoh Monday dan Wednesday |
-| `lesson_count` | Int | No | Jumlah sesi paket dalam bulan, default 4 |
+| `lesson_count` | Int | No | Jumlah sesi paket sejak lesson_start_date, default 4 |
 | `schedule_status` | Select | Yes | Scheduled, Completed, Cancelled, Rescheduled |
 | `original_schedule` | Link: Course Schedule | No | Jadwal asal jika reschedule |
 | `reschedule_reason` | Small Text | No | Alasan reschedule |
@@ -179,7 +211,7 @@ Custom fields:
 | `student` | Link: Student | Yes | Murid terkait |
 | `instrument` | Link: Instrument | No | Instrumen terkait |
 | `billing_period` | Data | Yes | Periode tagihan, contoh 2026-05 |
-| `lesson_package` | Data | No | Paket les, contoh 4x per bulan |
+| `lesson_package` | Data | No | Paket les, contoh 4 sesi sejak start date |
 
 Relationships:
 
