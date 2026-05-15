@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, Clock3, RefreshCw, UserRound } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, UserRound } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,6 +18,10 @@ type Row = Record<string, unknown> & { id: string };
 type SessionRow = {
   schedule: Row;
   attendance: Row | null;
+};
+
+type SelectedSession = SessionRow & {
+  sessionNumber: number;
 };
 
 type AttendanceGroup = {
@@ -46,6 +50,8 @@ export function AttendanceBoard() {
   const [instructorAttendance, setInstructorAttendance] = useState<Row[]>([]);
   const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
+  const [selectedStudentSession, setSelectedStudentSession] = useState<SelectedSession | null>(null);
+  const [selectedInstructorSession, setSelectedInstructorSession] = useState<SelectedSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
   const schedulesById = useMemo(() => mapById(schedules), [schedules]);
@@ -193,6 +199,14 @@ export function AttendanceBoard() {
     () => combineAttendanceGroups(instructorPackageGroups),
     [instructorPackageGroups],
   );
+  const selectedStudentAttendance = selectedStudentSession
+    ? attendance.find((row) => row.courseScheduleId === selectedStudentSession.schedule.id) ??
+      selectedStudentSession.attendance
+    : null;
+  const selectedInstructorAttendance = selectedInstructorSession
+    ? instructorAttendance.find((row) => row.courseScheduleId === selectedInstructorSession.schedule.id) ??
+      selectedInstructorSession.attendance
+    : null;
 
   async function updateAttendance(id: string, payload: Record<string, unknown>) {
     setSavingId(id);
@@ -243,41 +257,6 @@ export function AttendanceBoard() {
       toast.success("Instructor attendance updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update instructor attendance");
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function createRescheduleSession({
-    attendanceRow,
-    fromTime,
-    rescheduleDate,
-    toTime,
-  }: {
-    attendanceRow: Row;
-    fromTime: string;
-    rescheduleDate: string;
-    toTime: string;
-  }) {
-    if (!rescheduleDate || !fromTime || !toTime) {
-      toast.error("Pilih tanggal dan jam reschedule dulu");
-      return;
-    }
-
-    setSavingId(attendanceRow.id);
-
-    try {
-      await updateAttendance(attendanceRow.id, {
-        ...attendanceRow,
-        makeupRequired: true,
-        pendingRescheduleDate: rescheduleDate,
-        pendingRescheduleFromTime: fromTime,
-        pendingRescheduleToTime: toTime,
-      });
-      await loadData();
-      toast.success("Draft reschedule saved");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to save draft reschedule");
     } finally {
       setSavingId("");
     }
@@ -405,10 +384,9 @@ export function AttendanceBoard() {
                     ))}
                   </select>
                 ) : null}
-                <div className="no-scrollbar flex gap-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:grid sm:grid-cols-2 sm:gap-1.5 sm:overflow-visible sm:whitespace-normal">
+                <div className="no-scrollbar flex flex-wrap gap-x-4 gap-y-2 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:overflow-visible sm:whitespace-normal">
                   <Info icon={<UserRound className="size-3.5" />} label="Instructor" value={stringField(group.instructor, "instructorName")} />
                   <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
-                  <Info mobileHidden icon={<Clock3 className="size-3.5" />} label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
                     icon={<CalendarCheck className="size-3.5" />}
                     label="Progress"
@@ -421,12 +399,15 @@ export function AttendanceBoard() {
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <SessionCard
                     attendance={attendanceRow}
-                    disabled={savingId === attendanceRow?.id}
                     key={String(schedule.id)}
-                    onCreateRescheduleSession={createRescheduleSession}
-                    onUpdate={updateAttendance}
+                    onOpen={() =>
+                      setSelectedStudentSession({
+                        attendance: attendanceRow,
+                        schedule,
+                        sessionNumber: index + 1,
+                      })
+                    }
                     schedule={schedule}
-                    schedulesById={schedulesById}
                     sessionNumber={index + 1}
                   />
                 ))}
@@ -470,10 +451,9 @@ export function AttendanceBoard() {
                     ))}
                   </select>
                 ) : null}
-                <div className="no-scrollbar flex gap-3 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:grid sm:grid-cols-2 sm:gap-1.5 sm:overflow-visible sm:whitespace-normal">
+                <div className="no-scrollbar flex flex-wrap gap-x-4 gap-y-2 overflow-x-auto whitespace-nowrap text-xs text-zinc-600 sm:overflow-visible sm:whitespace-normal">
                   <Info icon={<UserRound className="size-3.5" />} label="Student" value={studentName(combinedGroup.student)} />
                   <Info icon={<CalendarDays className="size-3.5" />} label="Period" value={stringField(group.package, "billingPeriod")} />
-                  <Info mobileHidden icon={<Clock3 className="size-3.5" />} label="Start" value={stringField(group.package, "lessonStartDate")} />
                   <Info
                     icon={<CalendarCheck className="size-3.5" />}
                     label="Progress"
@@ -486,13 +466,15 @@ export function AttendanceBoard() {
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <InstructorSessionCard
                     attendance={attendanceRow}
-                    disabled={savingId === attendanceRow?.id}
-                    instructors={instructors}
                     key={String(schedule.id)}
-                    onCreateRescheduleSession={createInstructorRescheduleSession}
-                    onUpdate={updateInstructorAttendance}
+                    onOpen={() =>
+                      setSelectedInstructorSession({
+                        attendance: attendanceRow,
+                        schedule,
+                        sessionNumber: index + 1,
+                      })
+                    }
                     schedule={schedule}
-                    schedulesById={schedulesById}
                     sessionNumber={index + 1}
                   />
                 ))}
@@ -502,6 +484,30 @@ export function AttendanceBoard() {
           );
         })}
       </div>
+      {selectedStudentSession ? (
+        <StudentAttendanceModal
+          attendance={selectedStudentAttendance}
+          disabled={savingId === selectedStudentAttendance?.id}
+          onClose={() => setSelectedStudentSession(null)}
+          onUpdate={updateAttendance}
+          schedule={selectedStudentSession.schedule}
+          schedulesById={schedulesById}
+          sessionNumber={selectedStudentSession.sessionNumber}
+        />
+      ) : null}
+      {selectedInstructorSession ? (
+        <InstructorAttendanceModal
+          attendance={selectedInstructorAttendance}
+          disabled={savingId === selectedInstructorAttendance?.id}
+          instructors={instructors}
+          onClose={() => setSelectedInstructorSession(null)}
+          onCreateRescheduleSession={createInstructorRescheduleSession}
+          onUpdate={updateInstructorAttendance}
+          schedule={selectedInstructorSession.schedule}
+          schedulesById={schedulesById}
+          sessionNumber={selectedInstructorSession.sessionNumber}
+        />
+      ) : null}
     </div>
   );
 }
@@ -557,21 +563,71 @@ function SessionRail({ children }: { children: ReactNode }) {
 
 function SessionCard({
   attendance,
+  onOpen,
+  schedule,
+  sessionNumber,
+}: {
+  attendance: Row | null;
+  onOpen: () => void;
+  schedule: Row;
+  sessionNumber: number;
+}) {
+  const status = String(attendance?.status ?? "Pending");
+  const isDraftReschedule = Boolean(schedule.isDraftReschedule);
+  const confirmed = Boolean(attendance?.confirmed);
+
+  return (
+    <button
+      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px]"
+      onClick={onOpen}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
+          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-xs text-zinc-500">
+            {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
+          </p>
+        </div>
+        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${statusDotClass(status)}`} />
+      </div>
+      {isDraftReschedule ? (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <Badge className="max-w-[110px] truncate" variant="warning">
+            Draft
+          </Badge>
+          <FinalityIndicator draft />
+        </div>
+      ) : (
+        <div className="mt-3 flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
+            <Badge className="max-w-[110px] truncate" variant={statusVariant(status)}>
+              {formatDisplayText(status)}
+            </Badge>
+            {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
+          </div>
+          {shouldShowFinalityWarning(status, confirmed) ? (
+            <FinalityIndicator confirmed={false} />
+          ) : null}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function StudentAttendanceModal({
+  attendance,
   disabled,
+  onClose,
   onUpdate,
-  onCreateRescheduleSession,
   schedule,
   schedulesById,
   sessionNumber,
 }: {
   attendance: Row | null;
   disabled: boolean;
-  onCreateRescheduleSession: (payload: {
-    attendanceRow: Row;
-    fromTime: string;
-    rescheduleDate: string;
-    toTime: string;
-  }) => Promise<void>;
+  onClose: () => void;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
   schedule: Row;
   schedulesById: Map<string, Row>;
@@ -589,170 +645,226 @@ function SessionCard({
   const controlDisabled = disabled || confirmed;
   const linkedReschedule = schedulesById.get(String(attendance?.makeupScheduleId ?? ""));
   const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
-  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [replacementOpen, setReplacementOpen] = useState(false);
+  const [replacementStatus, setReplacementStatus] = useState(status);
   const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
   const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
-    <div className="min-h-[220px] w-[245px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 sm:w-[280px]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
-          <p className="text-xs text-zinc-500">
-            {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
-          </p>
-        </div>
-        <Badge className="shrink-0" variant={statusVariant(status)}>{formatDisplayText(status)}</Badge>
-      </div>
-
-      {isDraftReschedule ? (
-        <div className="mt-3 space-y-2">
-          {schedule.originalScheduleId ? (
-            <RescheduleBadge
-              label="From"
-              value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
-            />
-          ) : null}
-          <p className="text-xs italic text-zinc-500">
-            Draft reschedule. It will appear in Schedules after attendance is confirmed.
-          </p>
-        </div>
-      ) : attendance ? (
-        <div className="mt-3 space-y-2">
-          <select
-            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-            disabled={controlDisabled}
-            onChange={(event) => {
-              const nextStatus = event.target.value;
-              const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
-              void onUpdate(attendance.id, {
-                ...attendance,
-                status: nextStatus,
-                absenceReason: clearsReschedule ? "" : attendance.absenceReason,
-                makeupRequired: clearsReschedule ? false : attendance.makeupRequired,
-                makeupScheduleId: clearsReschedule ? "" : attendance.makeupScheduleId,
-              });
-            }}
-            value={status}
-          >
-            {studentAttendanceStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          {confirmed ? <ConfirmedBadge attendance={attendance} /> : null}
-
-          {schedule.originalScheduleId ? (
-            <RescheduleBadge
-              label="From"
-              value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
-            />
-          ) : null}
-
-          {needsReason ? (
-            <>
-              <input
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                disabled={controlDisabled}
-                onBlur={(event) =>
-                  void onUpdate(attendance.id, {
-                    ...attendance,
-                    absenceReason: event.target.value,
-                  })
-                }
-                placeholder="Absence reason"
-                defaultValue={String(attendance.absenceReason ?? "")}
+    <>
+      <AttendanceModalShell
+        onClose={onClose}
+        schedule={schedule}
+        sessionNumber={sessionNumber}
+        status={status}
+        attendance={attendance}
+        confirmed={confirmed}
+        draft={isDraftReschedule}
+        variantFn={statusVariant}
+      >
+        {isDraftReschedule ? (
+          <div className="space-y-2">
+            {schedule.originalScheduleId ? (
+              <RescheduleBadge
+                label="From"
+                value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
               />
-              <label className="flex items-center gap-2 text-xs text-zinc-600">
+            ) : null}
+            <p className="text-xs italic text-zinc-500">
+              Draft reschedule. It will appear in Schedules after attendance is confirmed.
+            </p>
+          </div>
+        ) : attendance ? (
+          <div className="space-y-3">
+            <select
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              disabled={controlDisabled}
+              onChange={(event) => {
+                const nextStatus = event.target.value;
+                const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
+                const opensReplacement = ["Absent", "Sick", "Permission"].includes(nextStatus);
+
+                if (opensReplacement && !attendance.makeupScheduleId && !pendingReschedule) {
+                  setReplacementStatus(nextStatus);
+                  setReplacementOpen(true);
+                  return;
+                }
+
+                void onUpdate(attendance.id, {
+                  ...attendance,
+                  status: nextStatus,
+                  absenceReason: clearsReschedule ? "" : attendance.absenceReason,
+                  makeupRequired: clearsReschedule ? false : attendance.makeupRequired,
+                  makeupScheduleId: clearsReschedule ? "" : attendance.makeupScheduleId,
+                });
+              }}
+              value={status}
+            >
+              {studentAttendanceStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            {schedule.originalScheduleId ? (
+              <RescheduleBadge
+                label="From"
+                value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
+              />
+            ) : null}
+
+            {needsReason ? (
+              <>
                 <input
-                  checked={Boolean(attendance.makeupRequired)}
-                  className="size-4 accent-zinc-950"
+                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                   disabled={controlDisabled}
-                  onChange={(event) =>
+                  onBlur={(event) =>
                     void onUpdate(attendance.id, {
                       ...attendance,
-                      makeupRequired: event.target.checked,
+                      absenceReason: event.target.value,
                     })
                   }
-                  type="checkbox"
+                  placeholder="Absence reason"
+                  defaultValue={String(attendance.absenceReason ?? "")}
                 />
-                Reschedule required
-              </label>
-              {attendance.makeupScheduleId ? (
-                <RescheduleBadge
-                  label="To"
-                  value={
-                    linkedReschedule
-                      ? scheduleDateTime(linkedReschedule)
-                      : "Replacement session created"
-                  }
-                />
-              ) : pendingReschedule ? (
-                <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
-              ) : (
-                <div className="grid gap-2">
+                <label className="flex items-center gap-2 text-xs text-zinc-600">
                   <input
-                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                    checked={Boolean(attendance.makeupRequired)}
+                    className="size-4 accent-zinc-950"
                     disabled={controlDisabled}
-                    onChange={(event) => setRescheduleDate(event.target.value)}
-                    type="date"
-                    value={rescheduleDate}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                      disabled={controlDisabled}
-                      onChange={(event) => setRescheduleFromTime(event.target.value)}
-                      type="time"
-                      value={rescheduleFromTime}
-                    />
-                    <input
-                      className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                      disabled={controlDisabled}
-                      onChange={(event) => setRescheduleToTime(event.target.value)}
-                      type="time"
-                      value={rescheduleToTime}
-                    />
-                  </div>
-                  <Button
-                    disabled={controlDisabled}
-                    onClick={() =>
-                      void onCreateRescheduleSession({
-                        attendanceRow: attendance,
-                        fromTime: rescheduleFromTime,
-                        rescheduleDate,
-                        toTime: rescheduleToTime,
+                    onChange={(event) =>
+                      void onUpdate(attendance.id, {
+                        ...attendance,
+                        makeupRequired: event.target.checked,
                       })
                     }
+                    type="checkbox"
+                  />
+                  Reschedule required
+                </label>
+                {attendance.makeupScheduleId ? (
+                  <RescheduleBadge
+                    label="To"
+                    value={
+                      linkedReschedule
+                        ? scheduleDateTime(linkedReschedule)
+                        : "Replacement session created"
+                    }
+                  />
+                ) : pendingReschedule ? (
+                  <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
+                ) : (
+                  <Button
+                    disabled={controlDisabled}
+                    onClick={() => {
+                      setReplacementStatus(status);
+                      setReplacementOpen(true);
+                    }}
                     size="sm"
                     type="button"
                     variant="glass"
                   >
-                    Add reschedule session
+                    Set replacement schedule
                   </Button>
-                </div>
-              )}
-            </>
-          ) : null}
-          {canConfirm ? (
-            <Button
-              className="w-full"
-              disabled={disabled}
-              onClick={() => void onUpdate(attendance.id, { ...attendance, confirmed: true })}
-              size="sm"
-              type="button"
-              variant="default"
-            >
-              Confirm Attendance
+                )}
+              </>
+            ) : null}
+            {canConfirm ? (
+              <Button
+                className="w-full"
+                disabled={disabled}
+                onClick={() => void onUpdate(attendance.id, { ...attendance, confirmed: true })}
+                size="sm"
+                type="button"
+                variant="default"
+              >
+                Confirm Attendance
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-500">Attendance record belum tersedia.</p>
+        )}
+      </AttendanceModalShell>
+      {attendance && replacementOpen ? (
+        <ReplacementScheduleModal
+          attendance={attendance}
+          defaultFromTime={rescheduleFromTime}
+          defaultReason={String(attendance.absenceReason ?? "")}
+          defaultStatus={replacementStatus}
+          defaultToTime={rescheduleToTime}
+          onClose={() => setReplacementOpen(false)}
+          onSave={async ({ fromTime, reason, rescheduleDate: nextDate, status: nextStatus, toTime }) => {
+            await onUpdate(attendance.id, {
+              ...attendance,
+              status: nextStatus,
+              absenceReason: reason,
+              makeupRequired: true,
+              pendingRescheduleDate: nextDate,
+              pendingRescheduleFromTime: fromTime,
+              pendingRescheduleToTime: toTime,
+            });
+            setRescheduleFromTime(fromTime);
+            setRescheduleToTime(toTime);
+            setReplacementOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function AttendanceModalShell({
+  attendance,
+  children,
+  confirmed,
+  draft,
+  onClose,
+  schedule,
+  sessionNumber,
+  status,
+  variantFn,
+}: {
+  attendance: Row | null;
+  children: ReactNode;
+  confirmed: boolean;
+  draft: boolean;
+  onClose: () => void;
+  schedule: Row;
+  sessionNumber: number;
+  status: string;
+  variantFn: (status: string) => "success" | "outline" | "warning" | "danger";
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[460px] overflow-y-auto rounded-3xl border border-white/55 bg-white/90 p-4 shadow-2xl backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+              Session {sessionNumber}
+            </p>
+            <h2 className="mt-1 truncate text-lg font-semibold text-zinc-950">
+              {String(schedule.scheduleDate ?? "-")}
+            </h2>
+            <p className="text-sm text-zinc-500">
+              {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
+            </p>
+          </div>
+          <div className="flex w-full shrink-0 items-start justify-between gap-2 sm:w-auto sm:justify-end">
+            <div className="flex min-w-0 flex-col items-start gap-1 sm:items-end">
+              <Badge variant={variantFn(status)}>{formatDisplayText(status)}</Badge>
+              {shouldShowFinalityWarning(status, confirmed) || draft ? (
+                <FinalityIndicator draft={draft} confirmed={confirmed} />
+              ) : null}
+            </div>
+            <Button onClick={onClose} size="sm" type="button" variant="glass">
+              Close
             </Button>
-          ) : null}
+          </div>
         </div>
-      ) : (
-        <p className="mt-3 text-xs text-zinc-500">Attendance record belum tersedia.</p>
-      )}
+        <div className="mt-4">{children}</div>
+      </div>
     </div>
   );
 }
@@ -768,19 +880,237 @@ function RescheduleBadge({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ConfirmedBadge({ attendance }: { attendance: Row }) {
+function ReplacementScheduleModal({
+  defaultFromTime,
+  defaultReason,
+  defaultStatus,
+  defaultToTime,
+  onClose,
+  onSave,
+}: {
+  attendance: Row;
+  defaultFromTime: string;
+  defaultReason: string;
+  defaultStatus: string;
+  defaultToTime: string;
+  onClose: () => void;
+  onSave: (payload: {
+    fromTime: string;
+    reason: string;
+    rescheduleDate: string;
+    status: string;
+    toTime: string;
+  }) => Promise<void>;
+}) {
+  const [status, setStatus] = useState(defaultStatus);
+  const [reason, setReason] = useState(defaultReason);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [fromTime, setFromTime] = useState(defaultFromTime);
+  const [toTime, setToTime] = useState(defaultToTime);
+  const replacementStatusOptions = studentAttendanceStatusOptions.filter((option) =>
+    ["Absent", "Sick", "Permission"].includes(option.value),
+  );
+
   return (
-    <p className="text-xs italic text-zinc-500">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[420px] overflow-y-auto rounded-3xl border border-white/55 bg-white/90 p-4 shadow-2xl backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+              Replacement schedule
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-zinc-950">Set Jadwal Pengganti</h2>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onClose} size="sm" type="button" variant="glass">
+              Close
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">Status</span>
+            <select
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              onChange={(event) => setStatus(event.target.value)}
+              value={status}
+            >
+              {replacementStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">Reason</span>
+            <input
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Absence reason"
+              value={reason}
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+              Replacement date
+            </span>
+            <input
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              onChange={(event) => setRescheduleDate(event.target.value)}
+              type="date"
+              value={rescheduleDate}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">From</span>
+              <input
+                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                onChange={(event) => setFromTime(event.target.value)}
+                type="time"
+                value={fromTime}
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">To</span>
+              <input
+                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                onChange={(event) => setToTime(event.target.value)}
+                type="time"
+                value={toTime}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={onClose} type="button" variant="glass">
+            Cancel
+          </Button>
+          <Button
+            onClick={() =>
+              void onSave({
+                fromTime,
+                reason,
+                rescheduleDate,
+                status,
+                toTime,
+              })
+            }
+            type="button"
+          >
+            Save Replacement
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmedBadge({
+  align = "left",
+  attendance,
+  compact = false,
+}: {
+  align?: "left" | "right";
+  attendance: Row;
+  compact?: boolean;
+}) {
+  return (
+    <p className={`${compact ? "max-w-[120px] truncate whitespace-nowrap text-[9px] leading-tight" : "max-w-[220px] text-xs"} italic text-zinc-500 ${align === "right" ? "text-right" : ""}`}>
       Confirmed by {formatDisplayText(attendance.confirmedByName) || "Unknown User"}
-      {formatDateTime(attendance.confirmedAt) ? ` at ${formatDateTime(attendance.confirmedAt)}` : ""}
+      {!compact && formatDateTime(attendance.confirmedAt) ? ` at ${formatDateTime(attendance.confirmedAt)}` : ""}
     </p>
   );
 }
 
+function FinalityIndicator({
+  confirmed = false,
+  draft = false,
+}: {
+  confirmed?: boolean;
+  draft?: boolean;
+}) {
+  if (draft) {
+    return (
+      <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+        Draft
+      </span>
+    );
+  }
+
+  if (!confirmed) {
+    return (
+      <span className="inline-flex w-fit max-w-[120px] items-center gap-1 truncate whitespace-nowrap text-[9px] italic leading-tight text-amber-700">
+        <AlertTriangle className="size-3 shrink-0" />
+        Belum confirm
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+      Final
+    </span>
+  );
+}
+
+function shouldShowFinalityWarning(status: string, confirmed: boolean) {
+  return !confirmed && status !== "Pending";
+}
+
 function InstructorSessionCard({
+  attendance,
+  onOpen,
+  schedule,
+  sessionNumber,
+}: {
+  attendance: Row | null;
+  onOpen: () => void;
+  schedule: Row;
+  sessionNumber: number;
+}) {
+  const status = String(attendance?.status ?? "Pending");
+  const confirmed = Boolean(attendance?.confirmed);
+
+  return (
+    <button
+      className="w-[168px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 text-left transition hover:border-sky-200 hover:bg-white/62 sm:w-[190px]"
+      onClick={onOpen}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
+          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-xs text-zinc-500">
+            {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
+          </p>
+        </div>
+        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${statusDotClass(status)}`} />
+      </div>
+      <div className="mt-3 flex items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <Badge className="max-w-[110px] truncate" variant={instructorStatusVariant(status)}>
+            {formatDisplayText(status)}
+          </Badge>
+          {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
+        </div>
+        {shouldShowFinalityWarning(status, confirmed) ? (
+          <FinalityIndicator confirmed={false} />
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+function InstructorAttendanceModal({
   attendance,
   disabled,
   instructors,
+  onClose,
   onCreateRescheduleSession,
   onUpdate,
   schedule,
@@ -790,6 +1120,7 @@ function InstructorSessionCard({
   attendance: Row | null;
   disabled: boolean;
   instructors: Row[];
+  onClose: () => void;
   onCreateRescheduleSession: (payload: {
     attendanceRow: Row;
     fromTime: string;
@@ -816,20 +1147,18 @@ function InstructorSessionCard({
   const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
-    <div className="min-h-[220px] w-[245px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3 sm:w-[280px]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
-          <p className="mt-1 truncate font-semibold text-zinc-950">{String(schedule.scheduleDate ?? "-")}</p>
-          <p className="text-xs text-zinc-500">
-            {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
-          </p>
-        </div>
-        <Badge className="shrink-0" variant={instructorStatusVariant(status)}>{formatDisplayText(status)}</Badge>
-      </div>
-
+    <AttendanceModalShell
+      onClose={onClose}
+      schedule={schedule}
+      sessionNumber={sessionNumber}
+      status={status}
+      attendance={attendance}
+      confirmed={Boolean(attendance?.confirmed)}
+      draft={false}
+      variantFn={instructorStatusVariant}
+    >
       {attendance ? (
-        <div className="mt-3 space-y-2">
+        <div className="space-y-3">
           <select
             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
             disabled={controlDisabled}
@@ -854,8 +1183,6 @@ function InstructorSessionCard({
               </option>
             ))}
           </select>
-
-          {confirmed ? <ConfirmedBadge attendance={attendance} /> : null}
 
           {attendance.rescheduleScheduleId ? (
             <RescheduleBadge
@@ -966,9 +1293,9 @@ function InstructorSessionCard({
           ) : null}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-zinc-500">Instructor attendance belum tersedia.</p>
+        <p className="text-xs text-zinc-500">Instructor attendance belum tersedia.</p>
       )}
-    </div>
+    </AttendanceModalShell>
   );
 }
 
@@ -1168,7 +1495,7 @@ function originalSessionCount(sessions: SessionRow[]) {
 function statusVariant(status: string) {
   if (status === "Present") return "success";
   if (status === "Pending") return "outline";
-  if (status === "Late" || status === "Permission") return "warning";
+  if (status === "Permission" || status === "Rescheduled") return "warning";
   return "danger";
 }
 
@@ -1177,6 +1504,16 @@ function instructorStatusVariant(status: string) {
   if (status === "Pending") return "outline";
   if (status === "Substitute" || status === "Rescheduled") return "warning";
   return "danger";
+}
+
+function statusDotClass(status: string) {
+  if (status === "Present") return "bg-emerald-500";
+  if (status === "Pending") return "bg-zinc-300";
+  if (status === "Permission" || status === "Rescheduled" || status === "Substitute") {
+    return "bg-amber-500";
+  }
+
+  return "bg-rose-500";
 }
 
 function Info({
@@ -1191,12 +1528,12 @@ function Info({
   value: string;
 }) {
   return (
-    <span className={`${mobileHidden ? "hidden sm:block" : "inline-flex"} min-w-0 shrink-0 items-center gap-1.5 sm:block sm:rounded-2xl sm:border sm:border-white/40 sm:bg-white/36 sm:px-3 sm:py-2`}>
-      <span className="shrink-0 text-zinc-500 sm:hidden">{icon}</span>
-      <span className="hidden truncate text-[10px] uppercase tracking-[0.08em] text-zinc-400 sm:block sm:text-xs">
+    <span className={`${mobileHidden ? "hidden sm:inline-flex" : "inline-flex"} min-w-0 shrink-0 items-center gap-1.5`}>
+      <span className="shrink-0 text-zinc-500">{icon}</span>
+      <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] text-zinc-400">
         {label}
       </span>
-      <span className="truncate sm:mt-1 sm:block sm:text-sm sm:font-medium sm:text-zinc-800">{value || "-"}</span>
+      <span className="truncate text-xs font-medium text-zinc-800">{value || "-"}</span>
     </span>
   );
 }

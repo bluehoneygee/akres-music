@@ -836,7 +836,7 @@ async function syncScheduleStatusFromAttendance(
 
   if (resource === "student-attendance") {
     if (attendanceStatus === "Pending") scheduleStatus = "Scheduled";
-    if (attendanceStatus === "Present" || attendanceStatus === "Late") scheduleStatus = "Completed";
+    if (attendanceStatus === "Present") scheduleStatus = "Completed";
     if (["Absent", "Sick", "Permission", "Rescheduled"].includes(attendanceStatus)) {
       scheduleStatus = "Rescheduled";
     }

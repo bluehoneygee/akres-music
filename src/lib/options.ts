@@ -48,7 +48,6 @@ export const studentAttendanceStatusOptions = [
   "Absent",
   "Sick",
   "Permission",
-  "Late",
   "Rescheduled",
 ].map((value) => ({ label: value, value }));
 
