@@ -47,7 +47,14 @@ export async function POST(
     return NextResponse.json({ error: "You do not have permission to create records here" }, { status: 403 });
   }
 
-  const payload = (await request.json()) as Record<string, unknown>;
-  const record = await createRecord(resource, payload);
-  return NextResponse.json({ data: record }, { status: 201 });
+  try {
+    const payload = (await request.json()) as Record<string, unknown>;
+    const record = await createRecord(resource, payload);
+    return NextResponse.json({ data: record }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to create record" },
+      { status: 400 },
+    );
+  }
 }

@@ -60,6 +60,12 @@ export const appNavigation = [
     roles: ["System Manager", "Academic Staff"],
   },
   {
+    label: "Lesson Packages",
+    href: "/lesson-packages",
+    icon: CalendarDays,
+    roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
+  },
+  {
     label: "Studio Rooms",
     href: "/studio-rooms",
     icon: Piano,

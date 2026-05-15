@@ -10,6 +10,7 @@ export const resources: ResourceName[] = [
   "guardians",
   "instructors",
   "courses",
+  "lesson-packages",
   "rooms",
   "schedules",
   "student-attendance",
@@ -126,8 +127,8 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
     return fromMongo(scheduleRecords[0] as Document);
   }
 
-  if (resource === "students") {
-    return createStudentWithOptionalSchedule(payload, now);
+  if (resource === "lesson-packages") {
+    return createLessonPackageWithSchedules(payload, now);
   }
 
   const id = String(payload.id || `${resource}-${crypto.randomUUID()}`);
@@ -144,73 +145,83 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
   return fromMongo(record);
 }
 
-async function createStudentWithOptionalSchedule(
+async function createLessonPackageWithSchedules(
   payload: Record<string, unknown>,
   now: string,
 ) {
-  const id = String(payload.id || `students-${crypto.randomUUID()}`);
-  const studentPayload = { ...payload };
-  const schedulePayload = pickStudentSchedulePayload(studentPayload, id);
-
-  for (const key of studentSchedulePayloadKeys) {
-    delete studentPayload[key];
-  }
+  const id = String(payload.id || `lesson-packages-${crypto.randomUUID()}`);
+  const packagePayload = normalizeLessonPackagePayload(payload);
 
   const record = {
     _id: id,
-    ...studentPayload,
+    ...packagePayload,
     id,
     createdAt: now,
     updatedAt: now,
   };
 
-  await (await collection("students")).insertOne(record as Document);
+  await (await collection("lesson-packages")).insertOne(record as Document);
 
-  if (schedulePayload) {
-    const scheduleRecords = buildScheduleRecords(schedulePayload, now);
-    const db = await getMongoDb();
-    await db.collection("schedules").insertMany(scheduleRecords as Document[]);
-    await ensureAttendanceForSchedules(scheduleRecords, now);
-  }
+  const scheduleRecords = buildScheduleRecords(pickLessonPackageSchedulePayload(record), now);
+  const db = await getMongoDb();
+  await db.collection("schedules").insertMany(scheduleRecords as Document[]);
+  await ensureAttendanceForSchedules(scheduleRecords, now);
 
   return fromMongo(record as Document);
 }
 
-const studentSchedulePayloadKeys = [
-  "onboardingCourseId",
-  "onboardingInstructorId",
-  "scheduleMonth",
-  "lessonDays",
-  "lessonCount",
-  "fromTime",
-  "toTime",
-  "studioRoomId",
-  "homeVisitAddress",
-  "travelNotes",
-];
-
-function pickStudentSchedulePayload(payload: Record<string, unknown>, studentId: string) {
-  const courseId = String(payload.onboardingCourseId || "");
-  const instructorId = String(payload.onboardingInstructorId || "");
-  const scheduleMonth = String(payload.scheduleMonth || "");
+function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
+  const courseId = String(payload.courseId || "");
+  const studentId = String(payload.studentId || "");
+  const instructorId = String(payload.instructorId || "");
+  const billingPeriod = String(payload.billingPeriod || payload.scheduleMonth || "");
+  const lessonStartDate = String(payload.lessonStartDate || "");
+  const lessonDays = toStringArray(payload.lessonDays);
   const fromTime = String(payload.fromTime || "");
   const toTime = String(payload.toTime || "");
 
-  if (!courseId || !instructorId || !scheduleMonth || !fromTime || !toTime) {
-    return null;
+  if (!courseId || !studentId || !instructorId || !billingPeriod || !lessonStartDate || !fromTime || !toTime || lessonDays.length === 0) {
+    throw new Error("Lesson package needs student, course, instructor, billing period, start date, lesson days, and time.");
   }
 
   return {
+    ...payload,
     courseId,
     studentId,
     instructorId,
-    instrumentId: String(payload.primaryInstrumentId || ""),
-    scheduleMonth,
-    lessonDays: payload.lessonDays,
+    instrumentId: String(payload.instrumentId || payload.primaryInstrumentId || ""),
+    billingPeriod,
+    lessonStartDate,
+    lessonDays,
     lessonCount: payload.lessonCount || 4,
     fromTime,
     toTime,
-    lessonMode: String(payload.preferredLessonMode || "Studio"),
+    lessonMode: String(payload.lessonMode || payload.preferredLessonMode || "Studio"),
+    studioRoomId: String(payload.studioRoomId || ""),
+    homeVisitAddress: String(payload.homeVisitAddress || ""),
+    travelNotes: String(payload.travelNotes || ""),
+    status: String(payload.status || "Active"),
+  };
+}
+
+function pickLessonPackageSchedulePayload(payload: Record<string, unknown>) {
+  const lessonPackageId = String(payload.id || "");
+  const billingPeriod = String(payload.billingPeriod || "");
+
+  return {
+    id: `schedule-${lessonPackageId}`,
+    lessonPackageId,
+    courseId: String(payload.courseId || ""),
+    studentId: String(payload.studentId || ""),
+    instructorId: String(payload.instructorId || ""),
+    instrumentId: String(payload.instrumentId || ""),
+    scheduleMonth: billingPeriod,
+    lessonStartDate: String(payload.lessonStartDate || ""),
+    lessonDays: payload.lessonDays,
+    lessonCount: payload.lessonCount || 4,
+    fromTime: String(payload.fromTime || ""),
+    toTime: String(payload.toTime || ""),
+    lessonMode: String(payload.lessonMode || "Studio"),
     studioRoomId: String(payload.studioRoomId || ""),
     homeVisitAddress: String(payload.homeVisitAddress || ""),
     travelNotes: String(payload.travelNotes || ""),
@@ -222,14 +233,15 @@ function pickStudentSchedulePayload(payload: Record<string, unknown>, studentId:
 
 function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
   const scheduleMonth = String(payload.scheduleMonth || "");
+  const lessonStartDate = String(payload.lessonStartDate || "");
   const lessonDays = toStringArray(payload.lessonDays);
   const lessonCount = Number(payload.lessonCount || 4);
   const singleDate = String(payload.scheduleDate || "");
-  const monthlyDates =
-    scheduleMonth && lessonDays.length > 0
-      ? expandMonthlyLessonDates(scheduleMonth, lessonDays, lessonCount)
+  const packageDates =
+    (lessonStartDate || scheduleMonth) && lessonDays.length > 0
+      ? expandPackageLessonDates(lessonStartDate || `${scheduleMonth}-01`, lessonDays, lessonCount)
       : [];
-  const dates = monthlyDates.length > 0 ? monthlyDates : [singleDate];
+  const dates = packageDates.length > 0 ? packageDates : [singleDate];
   const baseId = String(payload.id || `schedules-${crypto.randomUUID()}`);
 
   return dates.map((scheduleDate, index) => {
@@ -241,6 +253,7 @@ function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
       id,
       scheduleDate,
       scheduleMonth,
+      lessonStartDate,
       lessonDays,
       lessonCount,
       privateLesson: true,
@@ -272,6 +285,7 @@ async function ensureAttendanceForSchedules(
             $setOnInsert: {
               _id: studentAttendanceId,
               id: studentAttendanceId,
+              lessonPackageId: String(schedule.lessonPackageId || ""),
               studentId: String(schedule.studentId || ""),
               courseScheduleId: scheduleId,
               instrumentId: String(schedule.instrumentId || ""),
@@ -294,6 +308,7 @@ async function ensureAttendanceForSchedules(
             $setOnInsert: {
               _id: instructorAttendanceId,
               id: instructorAttendanceId,
+              lessonPackageId: String(schedule.lessonPackageId || ""),
               instructorId: String(schedule.instructorId || ""),
               courseScheduleId: scheduleId,
               attendanceDate: String(schedule.scheduleDate || ""),
@@ -320,32 +335,32 @@ function toStringArray(value: unknown) {
     .filter(Boolean);
 }
 
-function expandMonthlyLessonDates(
-  scheduleMonth: string,
+function expandPackageLessonDates(
+  lessonStartDate: string,
   lessonDays: string[],
   lessonCount: number,
 ) {
-  if (!/^\d{4}-\d{2}$/.test(scheduleMonth)) return [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lessonStartDate)) return [];
 
-  const [year, month] = scheduleMonth.split("-").map(Number);
-  const selectedDays = new Set(lessonDays.map(Number));
+  const [year, month, day] = lessonStartDate.split("-").map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
+
+  if (Number.isNaN(current.getTime())) return [];
+
+  const selectedDays = new Set(
+    lessonDays.map(Number).filter((dayOfWeek) => dayOfWeek >= 0 && dayOfWeek <= 6),
+  );
   const maxDates = Number.isFinite(lessonCount) && lessonCount > 0 ? lessonCount : 4;
   const dates: string[] = [];
 
-  for (let day = 1; day <= 31; day += 1) {
-    const current = new Date(Date.UTC(year, month - 1, day));
+  if (selectedDays.size === 0) return [];
 
-    if (current.getUTCMonth() !== month - 1) {
-      break;
-    }
-
+  for (let attempts = 0; dates.length < maxDates && attempts < 370; attempts += 1) {
     if (selectedDays.has(current.getUTCDay())) {
       dates.push(formatDate(current));
-
-      if (dates.length >= maxDates) {
-        break;
-      }
     }
+
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return dates;

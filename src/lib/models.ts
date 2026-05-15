@@ -4,6 +4,7 @@ export type ResourceName =
   | "guardians"
   | "instructors"
   | "courses"
+  | "lesson-packages"
   | "rooms"
   | "schedules"
   | "student-attendance"
@@ -60,6 +61,24 @@ export type Course = BaseRecord & {
   defaultFee: number;
 };
 
+export type LessonPackage = BaseRecord & {
+  studentId: string;
+  courseId: string;
+  instructorId: string;
+  instrumentId: string;
+  billingPeriod: string;
+  lessonStartDate: string;
+  lessonDays: string[];
+  lessonCount: number;
+  fromTime: string;
+  toTime: string;
+  lessonMode: "Studio" | "Home Visit";
+  studioRoomId: string;
+  homeVisitAddress: string;
+  travelNotes: string;
+  status: "Active" | "Completed" | "Cancelled";
+};
+
 export type StudioRoom = BaseRecord & {
   roomName: string;
   capacity: number;
@@ -68,6 +87,7 @@ export type StudioRoom = BaseRecord & {
 };
 
 export type CourseSchedule = BaseRecord & {
+  lessonPackageId: string;
   courseId: string;
   studentId: string;
   instructorId: string;
@@ -81,6 +101,7 @@ export type CourseSchedule = BaseRecord & {
   travelNotes: string;
   privateLesson: boolean;
   scheduleMonth: string;
+  lessonStartDate: string;
   lessonDays: string[];
   lessonCount: number;
   scheduleStatus: "Scheduled" | "Completed" | "Cancelled" | "Rescheduled";
@@ -89,6 +110,7 @@ export type CourseSchedule = BaseRecord & {
 };
 
 export type StudentAttendance = BaseRecord & {
+  lessonPackageId: string;
   studentId: string;
   courseScheduleId: string;
   instrumentId: string;
@@ -102,6 +124,7 @@ export type StudentAttendance = BaseRecord & {
 };
 
 export type InstructorAttendance = BaseRecord & {
+  lessonPackageId: string;
   instructorId: string;
   courseScheduleId: string;
   attendanceDate: string;
@@ -165,6 +188,7 @@ export type Database = {
   guardians: Guardian[];
   instructors: Instructor[];
   courses: Course[];
+  "lesson-packages": LessonPackage[];
   rooms: StudioRoom[];
   schedules: CourseSchedule[];
   "student-attendance": StudentAttendance[];

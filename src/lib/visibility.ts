@@ -34,6 +34,9 @@ export async function filterRecordsForSession(
     const studentIds = new Set(schedules.map((schedule) => schedule.studentId));
 
     if (resource === "students") return records.filter((row) => studentIds.has(row.id));
+    if (resource === "lesson-packages") {
+      return records.filter((row) => row.instructorId === instructorId);
+    }
     if (resource === "schedules") return records.filter((row) => row.instructorId === instructorId);
     if (resource === "instructor-attendance") {
       return records.filter((row) => row.instructorId === instructorId);
@@ -78,7 +81,7 @@ function filterStudentScoped(resource: ResourceName, records: AnyRow[], studentI
   if (resource === "journals") {
     return records.filter((row) => studentIds.has(row.studentId) && row.parentVisible === true);
   }
-  if (["schedules", "student-attendance", "invoices"].includes(resource)) {
+  if (["lesson-packages", "schedules", "student-attendance", "invoices"].includes(resource)) {
     return records.filter((row) => studentIds.has(row.studentId));
   }
   return [];

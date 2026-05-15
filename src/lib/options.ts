@@ -37,6 +37,11 @@ export const scheduleStatusOptions = [
   "Rescheduled",
 ].map((value) => ({ label: value, value }));
 
+export const lessonPackageStatusOptions = ["Active", "Completed", "Cancelled"].map((value) => ({
+  label: value,
+  value,
+}));
+
 export const studentAttendanceStatusOptions = [
   "Pending",
   "Present",

@@ -22,6 +22,7 @@ const allResources: SecuredResource[] = [
   "guardians",
   "instructors",
   "courses",
+  "lesson-packages",
   "rooms",
   "schedules",
   "student-attendance",
@@ -38,6 +39,7 @@ const academicResources: SecuredResource[] = [
   "guardians",
   "instructors",
   "courses",
+  "lesson-packages",
   "rooms",
   "schedules",
   "student-attendance",
@@ -50,6 +52,7 @@ const academicResources: SecuredResource[] = [
 
 const instructorReadResources: SecuredResource[] = [
   "students",
+  "lesson-packages",
   "schedules",
   "student-attendance",
   "instructor-attendance",
@@ -59,6 +62,7 @@ const instructorReadResources: SecuredResource[] = [
 
 const portalReadResources: SecuredResource[] = [
   "students",
+  "lesson-packages",
   "schedules",
   "student-attendance",
   "journals",
