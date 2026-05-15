@@ -32,14 +32,14 @@ Flow normal sekarang:
 4. Sistem otomatis generate 4 sesi sejak `lessonStartDate` sesuai `lessonDays`.
 5. Sistem otomatis generate Student Attendance dan Instructor Attendance dengan status `Pending`.
 6. Menu Schedules dipakai sebagai kalender read-only. Tampilan digroup per `Student + Course`; package/bulan dipilih dari dropdown di dalam card.
-7. Menu Attendance dipakai untuk update status, alasan absen, dan membuat makeup session. Tampilan juga digroup per `Student + Course`.
+7. Menu Attendance dipakai untuk update status, alasan absen, dan membuat reschedule session. Tampilan juga digroup per `Student + Course`.
 
 Catatan pemakaian manual:
 
 - API `POST /api/{resource}` menerima satu object per request.
 - Array di tiap bagian bawah adalah 3 contoh payload; submit object-nya satu per satu.
 - Untuk attendance, gunakan halaman Attendance atau `PUT /api/{resource}/{id}` karena record-nya sudah dibuat otomatis dari Lesson Package.
-- Untuk makeup, di UI Attendance pilih tanggal dan jam. Sistem membuat schedule makeup dan link ke attendance asal.
+- Untuk reschedule, di UI Attendance pilih tanggal dan jam. Sistem membuat schedule pengganti dan link ke attendance asal.
 
 Catatan:
 
@@ -451,13 +451,13 @@ Catatan instructor attendance:
 - Jika instructor `Substitute`, jadwal tetap berjalan dan student attendance tidak berubah.
 - Jika instructor `Absent` atau `Cancelled`, schedule menjadi `Rescheduled`, student attendance otomatis menjadi `Rescheduled`, dan `makeupRequired` otomatis `true`.
 
-## 10. Makeup Session
+## 10. Reschedule Session
 
-Makeup session sebaiknya dibuat dari UI Attendance dengan memilih tanggal dan jam. UI akan:
+Reschedule session sebaiknya dibuat dari UI Attendance dengan memilih tanggal dan jam. UI akan:
 
 1. Membuat schedule baru di package yang sama.
 2. Mengisi `makeupScheduleId` di attendance asal.
-3. Reload Attendance sehingga card makeup muncul sesuai urutan tanggal.
+3. Reload Attendance sehingga card reschedule muncul sesuai urutan tanggal.
 
 Kalau perlu dicoba via API manual, kirim payload schedule baru ini satu per satu.
 
@@ -466,7 +466,7 @@ Resource: `schedules`
 ```json
 [
   {
-    "id": "makeup-schedule-package-ayu-2026-05",
+    "id": "reschedule-schedule-package-ayu-2026-05",
     "lessonPackageId": "package-ayu-2026-05",
     "courseId": "course-piano-beginner",
     "studentId": "student-ayu",
@@ -484,10 +484,10 @@ Resource: `schedules`
     "homeVisitAddress": "",
     "scheduleStatus": "Scheduled",
     "originalScheduleId": "schedule-package-ayu-2026-05",
-    "rescheduleReason": "Makeup for sick absence"
+    "rescheduleReason": "Rescheduled from sick absence"
   },
   {
-    "id": "makeup-schedule-package-nara-2026-05",
+    "id": "reschedule-schedule-package-nara-2026-05",
     "lessonPackageId": "package-nara-2026-05",
     "courseId": "course-vocal-intermediate",
     "studentId": "student-nara",
@@ -505,10 +505,10 @@ Resource: `schedules`
     "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
     "scheduleStatus": "Scheduled",
     "originalScheduleId": "schedule-package-nara-2026-05",
-    "rescheduleReason": "Makeup for permission absence"
+    "rescheduleReason": "Rescheduled from permission absence"
   },
   {
-    "id": "makeup-schedule-package-luna-2026-05-2",
+    "id": "reschedule-schedule-package-luna-2026-05-2",
     "lessonPackageId": "package-luna-2026-05",
     "courseId": "course-violin-beginner",
     "studentId": "student-luna",
@@ -526,12 +526,12 @@ Resource: `schedules`
     "homeVisitAddress": "",
     "scheduleStatus": "Scheduled",
     "originalScheduleId": "schedule-package-luna-2026-05-2",
-    "rescheduleReason": "Optional makeup example"
+    "rescheduleReason": "Optional reschedule example"
   }
 ]
 ```
 
-Setelah schedule makeup dibuat manual via API, link-kan ke attendance asal:
+Setelah schedule reschedule dibuat manual via API, link-kan ke attendance asal:
 
 Resource: `student-attendance`
 
@@ -542,21 +542,21 @@ Resource: `student-attendance`
     "status": "Sick",
     "absenceReason": "Flu",
     "makeupRequired": true,
-    "makeupScheduleId": "makeup-schedule-package-ayu-2026-05"
+    "makeupScheduleId": "reschedule-schedule-package-ayu-2026-05"
   },
   {
     "id": "student-attendance-schedule-package-nara-2026-05",
     "status": "Permission",
     "absenceReason": "Family event",
     "makeupRequired": true,
-    "makeupScheduleId": "makeup-schedule-package-nara-2026-05"
+    "makeupScheduleId": "reschedule-schedule-package-nara-2026-05"
   },
   {
     "id": "student-attendance-schedule-package-luna-2026-05-2",
     "status": "Permission",
     "absenceReason": "Exam preparation",
     "makeupRequired": true,
-    "makeupScheduleId": "makeup-schedule-package-luna-2026-05-2"
+    "makeupScheduleId": "reschedule-schedule-package-luna-2026-05-2"
   }
 ]
 ```

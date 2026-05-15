@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarDays, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ export function ScheduleBoard() {
   const [schedules, setSchedules] = useState<Row[]>([]);
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const schedulesById = useMemo(() => mapById(schedules), [schedules]);
 
   async function loadData() {
     setLoading(true);
@@ -191,15 +192,16 @@ export function ScheduleBoard() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <SessionRail>
                 {group.schedules.map((schedule, index) => (
                   <ScheduleSessionCard
                     key={schedule.id}
                     schedule={schedule}
+                    schedulesById={schedulesById}
                     sessionNumber={index + 1}
                   />
                 ))}
-              </div>
+              </SessionRail>
             </CardContent>
           </Card>
           );
@@ -209,17 +211,62 @@ export function ScheduleBoard() {
   );
 }
 
+function SessionRail({ children }: { children: ReactNode }) {
+  const railRef = useRef<HTMLDivElement>(null);
+
+  function scrollByCard(direction: "left" | "right") {
+    railRef.current?.scrollBy({
+      behavior: "smooth",
+      left: direction === "left" ? -320 : 320,
+    });
+  }
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex justify-end gap-2">
+        <Button
+          aria-label="Previous sessions"
+          onClick={() => scrollByCard("left")}
+          size="icon"
+          type="button"
+          variant="glass"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          aria-label="Next sessions"
+          onClick={() => scrollByCard("right")}
+          size="icon"
+          type="button"
+          variant="glass"
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <div
+        className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1"
+        ref={railRef}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ScheduleSessionCard({
   schedule,
+  schedulesById,
   sessionNumber,
 }: {
   schedule: Row;
+  schedulesById: Map<string, Row>;
   sessionNumber: number;
 }) {
   const status = String(schedule.scheduleStatus ?? "Scheduled");
+  const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
 
   return (
-    <div className="rounded-2xl border border-white/45 bg-white/42 p-3">
+    <div className="min-h-[138px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
@@ -232,10 +279,21 @@ function ScheduleSessionCard({
       </div>
 
       {schedule.originalScheduleId ? (
-        <div className="mt-3 rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-500">
-          Makeup/reschedule dari {String(schedule.originalScheduleId)}
-        </div>
+        <RescheduleBadge
+          value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
+        />
       ) : null}
+    </div>
+  );
+}
+
+function RescheduleBadge({ value }: { value: string }) {
+  return (
+    <div className="mt-3 flex w-fit max-w-full flex-col items-start gap-2 rounded-2xl border border-amber-200/70 bg-amber-100/70 px-3 py-2 text-xs text-amber-950 shadow-sm">
+      <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+        Rescheduled From
+      </span>
+      <span className="min-w-0 break-words font-medium">{value}</span>
     </div>
   );
 }
@@ -341,6 +399,13 @@ function stringField(row: Row | null, key: string) {
 function studentName(student: Row | null) {
   if (!student) return "Unknown student";
   return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
+}
+
+function scheduleDateTime(schedule: Row) {
+  const date = String(schedule.scheduleDate ?? "-");
+  const fromTime = String(schedule.fromTime ?? "-");
+  const toTime = String(schedule.toTime ?? "-");
+  return `${date}, ${fromTime} - ${toTime}`;
 }
 
 function lessonLocation(group: ScheduleGroup) {

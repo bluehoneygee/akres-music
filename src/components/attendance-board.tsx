@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarCheck, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CalendarCheck, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,7 @@ export function AttendanceBoard() {
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const schedulesById = useMemo(() => mapById(schedules), [schedules]);
 
   async function loadData() {
     setLoading(true);
@@ -209,6 +210,9 @@ export function AttendanceBoard() {
       }
 
       setAttendance((current) => current.map((row) => (row.id === id ? json.data! : row)));
+      if ("status" in payload || "makeupScheduleId" in payload || "makeupRequired" in payload) {
+        await loadData();
+      }
       toast.success("Attendance updated");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update attendance");
@@ -241,21 +245,21 @@ export function AttendanceBoard() {
     }
   }
 
-  async function createMakeupSchedule({
+  async function createRescheduleSession({
     attendanceRow,
     fromTime,
-    makeupDate,
+    rescheduleDate,
     schedule,
     toTime,
   }: {
     attendanceRow: Row;
     fromTime: string;
-    makeupDate: string;
+    rescheduleDate: string;
     schedule: Row;
     toTime: string;
   }) {
-    if (!makeupDate || !fromTime || !toTime) {
-      toast.error("Pilih tanggal dan jam makeup dulu");
+    if (!rescheduleDate || !fromTime || !toTime) {
+      toast.error("Pilih tanggal dan jam reschedule dulu");
       return;
     }
 
@@ -266,7 +270,7 @@ export function AttendanceBoard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: `makeup-${schedule.id}`,
+          id: `reschedule-${schedule.id}`,
           lessonPackageId: schedule.lessonPackageId,
           courseId: schedule.courseId,
           studentId: schedule.studentId,
@@ -276,7 +280,7 @@ export function AttendanceBoard() {
           lessonStartDate: "",
           lessonDays: [],
           lessonCount: 1,
-          scheduleDate: makeupDate,
+          scheduleDate: rescheduleDate,
           fromTime,
           toTime,
           lessonMode: schedule.lessonMode,
@@ -285,13 +289,13 @@ export function AttendanceBoard() {
           travelNotes: schedule.travelNotes,
           scheduleStatus: "Scheduled",
           originalScheduleId: schedule.id,
-          rescheduleReason: `Makeup for ${String(schedule.scheduleDate ?? "")}`,
+          rescheduleReason: `Rescheduled from ${String(schedule.scheduleDate ?? "")}`,
         }),
       });
       const json = (await response.json()) as { data?: Row; error?: string };
 
       if (!response.ok || !json.data) {
-        throw new Error(json.error ?? "Unable to create makeup schedule");
+        throw new Error(json.error ?? "Unable to create reschedule session");
       }
 
       await updateAttendance(attendanceRow.id, {
@@ -300,9 +304,9 @@ export function AttendanceBoard() {
         makeupScheduleId: json.data.id,
       });
       await loadData();
-      toast.success("Makeup schedule created");
+      toast.success("Reschedule session created");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Unable to create makeup schedule");
+      toast.error(error instanceof Error ? error.message : "Unable to create reschedule session");
     } finally {
       setSavingId("");
     }
@@ -406,19 +410,20 @@ export function AttendanceBoard() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <SessionRail>
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <SessionCard
                     attendance={attendanceRow}
                     disabled={savingId === attendanceRow?.id}
                     key={String(schedule.id)}
-                    onCreateMakeupSchedule={createMakeupSchedule}
+                    onCreateRescheduleSession={createRescheduleSession}
                     onUpdate={updateAttendance}
                     schedule={schedule}
+                    schedulesById={schedulesById}
                     sessionNumber={index + 1}
                   />
                 ))}
-              </div>
+              </SessionRail>
             </CardContent>
           </Card>
           );
@@ -469,7 +474,7 @@ export function AttendanceBoard() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <SessionRail>
                 {group.sessions.map(({ schedule, attendance: attendanceRow }, index) => (
                   <InstructorSessionCard
                     attendance={attendanceRow}
@@ -481,7 +486,7 @@ export function AttendanceBoard() {
                     sessionNumber={index + 1}
                   />
                 ))}
-              </div>
+              </SessionRail>
             </CardContent>
           </Card>
           );
@@ -491,35 +496,81 @@ export function AttendanceBoard() {
   );
 }
 
+function SessionRail({ children }: { children: ReactNode }) {
+  const railRef = useRef<HTMLDivElement>(null);
+
+  function scrollByCard(direction: "left" | "right") {
+    railRef.current?.scrollBy({
+      behavior: "smooth",
+      left: direction === "left" ? -320 : 320,
+    });
+  }
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex justify-end gap-2">
+        <Button
+          aria-label="Previous sessions"
+          onClick={() => scrollByCard("left")}
+          size="icon"
+          type="button"
+          variant="glass"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Button
+          aria-label="Next sessions"
+          onClick={() => scrollByCard("right")}
+          size="icon"
+          type="button"
+          variant="glass"
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <div
+        className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1"
+        ref={railRef}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function SessionCard({
   attendance,
   disabled,
   onUpdate,
-  onCreateMakeupSchedule,
+  onCreateRescheduleSession,
   schedule,
+  schedulesById,
   sessionNumber,
 }: {
   attendance: Row | null;
   disabled: boolean;
-  onCreateMakeupSchedule: (payload: {
+  onCreateRescheduleSession: (payload: {
     attendanceRow: Row;
     fromTime: string;
-    makeupDate: string;
+    rescheduleDate: string;
     schedule: Row;
     toTime: string;
   }) => Promise<void>;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
   schedule: Row;
+  schedulesById: Map<string, Row>;
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
   const needsReason = status !== "Present" && status !== "Pending";
-  const [makeupDate, setMakeupDate] = useState("");
-  const [makeupFromTime, setMakeupFromTime] = useState(String(schedule.fromTime ?? ""));
-  const [makeupToTime, setMakeupToTime] = useState(String(schedule.toTime ?? ""));
+  const linkedReschedule = schedulesById.get(String(attendance?.makeupScheduleId ?? ""));
+  const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
+  const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
 
   return (
-    <div className="rounded-2xl border border-white/45 bg-white/42 p-3">
+    <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
@@ -538,17 +589,13 @@ function SessionCard({
             disabled={disabled}
             onChange={(event) => {
               const nextStatus = event.target.value;
+              const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
               void onUpdate(attendance.id, {
                 ...attendance,
                 status: nextStatus,
-                absenceReason:
-                  nextStatus === "Present" || nextStatus === "Pending"
-                    ? ""
-                    : attendance.absenceReason,
-                makeupRequired:
-                  nextStatus === "Present" || nextStatus === "Pending"
-                    ? false
-                    : attendance.makeupRequired,
+                absenceReason: clearsReschedule ? "" : attendance.absenceReason,
+                makeupRequired: clearsReschedule ? false : attendance.makeupRequired,
+                makeupScheduleId: clearsReschedule ? "" : attendance.makeupScheduleId,
               });
             }}
             value={status}
@@ -559,6 +606,13 @@ function SessionCard({
               </option>
             ))}
           </select>
+
+          {schedule.originalScheduleId ? (
+            <RescheduleBadge
+              label="From"
+              value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
+            />
+          ) : null}
 
           {needsReason ? (
             <>
@@ -587,53 +641,58 @@ function SessionCard({
                   }
                   type="checkbox"
                 />
-                Makeup required
+                Reschedule required
               </label>
               {attendance.makeupScheduleId ? (
-                <div className="rounded-2xl border border-white/40 bg-white/36 px-3 py-2 text-xs text-zinc-600">
-                  Makeup linked: {String(attendance.makeupScheduleId)}
-                </div>
+                <RescheduleBadge
+                  label="To"
+                  value={
+                    linkedReschedule
+                      ? scheduleDateTime(linkedReschedule)
+                      : "Replacement session created"
+                  }
+                />
               ) : (
                 <div className="grid gap-2">
                   <input
                     className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                     disabled={disabled}
-                    onChange={(event) => setMakeupDate(event.target.value)}
+                    onChange={(event) => setRescheduleDate(event.target.value)}
                     type="date"
-                    value={makeupDate}
+                    value={rescheduleDate}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                       disabled={disabled}
-                      onChange={(event) => setMakeupFromTime(event.target.value)}
+                      onChange={(event) => setRescheduleFromTime(event.target.value)}
                       type="time"
-                      value={makeupFromTime}
+                      value={rescheduleFromTime}
                     />
                     <input
                       className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                       disabled={disabled}
-                      onChange={(event) => setMakeupToTime(event.target.value)}
+                      onChange={(event) => setRescheduleToTime(event.target.value)}
                       type="time"
-                      value={makeupToTime}
+                      value={rescheduleToTime}
                     />
                   </div>
                   <Button
                     disabled={disabled}
                     onClick={() =>
-                      void onCreateMakeupSchedule({
+                      void onCreateRescheduleSession({
                         attendanceRow: attendance,
-                        fromTime: makeupFromTime,
-                        makeupDate,
+                        fromTime: rescheduleFromTime,
+                        rescheduleDate,
                         schedule,
-                        toTime: makeupToTime,
+                        toTime: rescheduleToTime,
                       })
                     }
                     size="sm"
                     type="button"
                     variant="glass"
                   >
-                    Add makeup session
+                    Add reschedule session
                   </Button>
                 </div>
               )}
@@ -643,6 +702,17 @@ function SessionCard({
       ) : (
         <p className="mt-3 text-xs text-zinc-500">Attendance record belum tersedia.</p>
       )}
+    </div>
+  );
+}
+
+function RescheduleBadge({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex w-fit max-w-full flex-col items-start gap-2 rounded-2xl border border-amber-200/70 bg-amber-100/70 px-3 py-2 text-xs text-amber-950 shadow-sm">
+      <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+        Rescheduled {label}
+      </span>
+      <span className="min-w-0 break-words font-medium">{value}</span>
     </div>
   );
 }
@@ -666,7 +736,7 @@ function InstructorSessionCard({
   const needsSubstitute = status === "Substitute";
 
   return (
-    <div className="rounded-2xl border border-white/45 bg-white/42 p-3">
+    <div className="min-h-[220px] w-[280px] shrink-0 snap-start rounded-2xl border border-white/45 bg-white/42 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase text-zinc-500">Session {sessionNumber}</p>
@@ -785,7 +855,7 @@ function buildGroup({
     course: coursesById.get(courseId) ?? null,
     instructor: instructorsById.get(instructorId) ?? null,
     sessions: [...packageSchedules]
-      .sort((left, right) => String(left.scheduleDate ?? "").localeCompare(String(right.scheduleDate ?? "")))
+      .sort(compareScheduleRows)
       .map((schedule) => ({
         schedule,
         attendance: attendanceByScheduleId.get(schedule.id) ?? null,
@@ -850,6 +920,26 @@ function stringField(row: Row | null, key: string) {
 function studentName(student: Row | null) {
   if (!student) return "Unknown student";
   return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
+}
+
+function scheduleDateTime(schedule: Row) {
+  const date = String(schedule.scheduleDate ?? "-");
+  const fromTime = String(schedule.fromTime ?? "-");
+  const toTime = String(schedule.toTime ?? "-");
+  return `${date}, ${fromTime} - ${toTime}`;
+}
+
+function compareScheduleRows(left: Row, right: Row) {
+  return scheduleSortKey(left).localeCompare(scheduleSortKey(right));
+}
+
+function scheduleSortKey(schedule: Row) {
+  return [
+    String(schedule.scheduleDate ?? ""),
+    String(schedule.fromTime ?? ""),
+    String(schedule.toTime ?? ""),
+    String(schedule.id ?? ""),
+  ].join("|");
 }
 
 function completedCount(sessions: SessionRow[]) {

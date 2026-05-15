@@ -87,7 +87,7 @@ export default async function HomePage() {
   const alerts = [
     {
       title: "Review absensi minggu ini",
-      meta: `${scopedAttendance.filter((row) => ["Absent", "Sick", "Permission"].includes(row.status)).length} catatan absen perlu dicek untuk makeup lesson.`,
+      meta: `${scopedAttendance.filter((row) => ["Absent", "Sick", "Permission"].includes(row.status)).length} catatan absen perlu dicek untuk reschedule lesson.`,
       variant: "secondary" as const,
     },
     {
@@ -213,7 +213,7 @@ export default async function HomePage() {
                     </p>
                     <p className="text-xs text-zinc-500">
                       {formatDisplayText(instrument?.instrumentName)}
-                      {item.makeupRequired ? " - makeup required" : ""}
+                      {item.makeupRequired ? " - reschedule required" : ""}
                     </p>
                   </div>
                   <Badge variant={statusVariant(item.status)}>{formatDisplayText(item.status)}</Badge>
