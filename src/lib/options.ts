@@ -65,7 +65,7 @@ export const progressRatingOptions = ["Needs Work", "Improving", "Good", "Excell
   (value) => ({ label: value, value }),
 );
 
-export const invoiceStatusOptions = ["Draft", "Unpaid", "Paid", "Overdue"].map((value) => ({
+export const invoiceStatusOptions = ["Unpaid", "Paid"].map((value) => ({
   label: value,
   value,
 }));

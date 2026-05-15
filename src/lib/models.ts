@@ -177,11 +177,18 @@ export type Repertoire = BaseRecord & {
 export type Invoice = BaseRecord & {
   studentId: string;
   instrumentId: string;
+  lessonPackageId: string;
+  courseId: string;
   billingPeriod: string;
   lessonPackage: string;
   amount: number;
   dueDate: string;
-  status: "Draft" | "Unpaid" | "Paid" | "Overdue";
+  paidAt: string;
+  status: "Unpaid" | "Paid";
+  confirmed: boolean;
+  confirmedByUserId: string;
+  confirmedByName: string;
+  confirmedAt: string;
 };
 
 export type Notification = BaseRecord & {

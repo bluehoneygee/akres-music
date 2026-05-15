@@ -160,6 +160,7 @@ async function ensureDemoRecords() {
       ),
     );
     await ensureAttendanceForSchedules(scheduleRecords, now);
+    await ensureInvoiceForLessonPackage(packageRecord, now);
   }
 }
 
@@ -244,8 +245,52 @@ async function createLessonPackageWithSchedules(
   const db = await getMongoDb();
   await db.collection("schedules").insertMany(scheduleRecords as Document[]);
   await ensureAttendanceForSchedules(scheduleRecords, now);
+  await ensureInvoiceForLessonPackage(record, now);
 
   return fromMongo(record as Document);
+}
+
+async function ensureInvoiceForLessonPackage(
+  lessonPackage: Record<string, unknown>,
+  now: string,
+) {
+  const lessonPackageId = String(lessonPackage.id || "");
+  if (!lessonPackageId) return;
+
+  const db = await getMongoDb();
+  const course = await db.collection("courses").findOne<{
+    courseName?: string;
+    defaultFee?: number;
+  }>({ id: String(lessonPackage.courseId || "") });
+  const invoiceId = `invoice-${lessonPackageId}`;
+  const billingPeriod = String(lessonPackage.billingPeriod || "");
+
+  await db.collection("invoices").updateOne(
+    { id: invoiceId },
+    {
+      $setOnInsert: {
+        _id: invoiceId,
+        id: invoiceId,
+        studentId: String(lessonPackage.studentId || ""),
+        instrumentId: String(lessonPackage.instrumentId || ""),
+        lessonPackageId,
+        courseId: String(lessonPackage.courseId || ""),
+        billingPeriod,
+        lessonPackage: course?.courseName || "Lesson Package",
+        amount: Number(course?.defaultFee || 0),
+        dueDate: "",
+        paidAt: "",
+        status: "Unpaid",
+        confirmed: false,
+        confirmedByUserId: "",
+        confirmedByName: "",
+        confirmedAt: "",
+        createdAt: now,
+        updatedAt: now,
+      },
+    },
+    { upsert: true },
+  );
 }
 
 async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
@@ -508,11 +553,11 @@ export async function updateRecord(
   const updatedAt = new Date().toISOString();
   const previous = await records.findOne({ id });
 
-  if (isAttendanceResource(resource) && previous?.confirmed) {
-    throw new Error("Attendance already confirmed");
+  if (isLockableResource(resource) && previous?.confirmed) {
+    throw new Error(resource === "invoices" ? "Payment already confirmed" : "Attendance already confirmed");
   }
 
-  const updatePayload = normalizeAttendanceConfirmationPayload(resource, payload, actor, updatedAt);
+  const updatePayload = normalizeConfirmationPayload(resource, payload, actor, updatedAt);
   const result = await records.findOneAndUpdate(
     { id },
     { $set: { ...updatePayload, id, updatedAt } },
@@ -530,13 +575,17 @@ function isAttendanceResource(resource: ResourceName) {
   return resource === "student-attendance" || resource === "instructor-attendance";
 }
 
-function normalizeAttendanceConfirmationPayload(
+function isLockableResource(resource: ResourceName) {
+  return isAttendanceResource(resource) || resource === "invoices";
+}
+
+function normalizeConfirmationPayload(
   resource: ResourceName,
   payload: Record<string, unknown>,
   actor: UpdateActor | undefined,
   updatedAt: string,
 ) {
-  if (!isAttendanceResource(resource)) return payload;
+  if (!isLockableResource(resource)) return payload;
 
   const {
     confirmedByUserId: _confirmedByUserId,
@@ -544,6 +593,11 @@ function normalizeAttendanceConfirmationPayload(
     confirmedAt: _confirmedAt,
     ...cleanPayload
   } = payload;
+
+  if (resource === "invoices") {
+    cleanPayload.status = cleanPayload.status === "Paid" ? "Paid" : "Unpaid";
+    cleanPayload.paidAt = cleanPayload.status === "Paid" ? cleanPayload.paidAt || updatedAt : "";
+  }
 
   if (cleanPayload.confirmed === true) {
     return {
@@ -815,6 +869,7 @@ async function deleteLessonPackageCascade(id: string) {
 
   await Promise.all([
     db.collection("schedules").deleteMany({ lessonPackageId: id }),
+    db.collection("invoices").deleteMany({ lessonPackageId: id }),
     db.collection("student-attendance").deleteMany({
       $or: [{ lessonPackageId: id }, { courseScheduleId: { $in: scheduleIds } }],
     }),
