@@ -367,15 +367,15 @@ export function ResourcePage({
               </div>
             ) : null}
             <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full min-w-[820px] border-separate border-spacing-y-2 text-left text-sm">
+              <table className="w-max max-w-full border-separate border-spacing-y-2 text-left text-sm sm:w-full sm:min-w-[820px]">
                 <thead className="text-xs uppercase text-zinc-500">
                   <tr>
                     {tableFields.map((field) => (
-                      <th className="px-3 py-2 font-medium" key={field.key}>
+                      <th className="whitespace-nowrap px-3 py-2 font-medium" key={field.key}>
                         {field.label}
                       </th>
                     ))}
-                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,7 +383,7 @@ export function ResourcePage({
                     <tr className="bg-white/42" key={row.id}>
                       {tableFields.map((field, index) => (
                         <td
-                          className={`px-3 py-3 text-zinc-700 ${index === 0 ? "rounded-l-2xl font-medium text-zinc-950" : ""}`}
+                          className={`whitespace-nowrap px-3 py-3 text-zinc-700 ${index === 0 ? "rounded-l-2xl font-medium text-zinc-950" : ""}`}
                           key={field.key}
                         >
                           {formatValue(row[field.key], field, relationOptions)}
