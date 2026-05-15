@@ -3,6 +3,7 @@ import type { Collection, Document, Filter } from "mongodb";
 
 import type { AnyRecord, Database, ResourceName } from "@/lib/models";
 import { getMongoDb } from "@/lib/mongodb";
+import { seedDatabase, seedUsers } from "@/lib/seed";
 
 export const resources: ResourceName[] = [
   "instruments",
@@ -46,6 +47,7 @@ async function seed() {
   const marker = db.collection("_meta");
 
   await ensureDefaultUsers();
+  await ensureDemoRecords();
 
   await marker.updateOne(
     { key: "seeded" },
@@ -57,37 +59,102 @@ async function seed() {
 async function ensureDefaultUsers() {
   const db = await getMongoDb();
   const passwordHash = await bcrypt.hash("admin123", 12);
-  const users = [
-    {
-      email: "admin@akres.test",
-      emailVerified: null,
-      name: "Administrator Akres",
-      role: "System Manager",
-      passwordHash,
-    },
-  ];
 
   await Promise.all(
-    users.map((user) => {
-      const { name, role, ...insertOnly } = user;
-
-      return db.collection("users").updateOne(
+    seedUsers.map((user) =>
+      db.collection("users").updateOne(
         { email: user.email },
         {
           $setOnInsert: {
-            ...insertOnly,
+            email: user.email,
+            emailVerified: null,
+            name: user.name,
+            role: user.role,
+            studentId: user.studentId,
+            guardianId: user.guardianId,
+            instructorId: user.instructorId,
+            passwordHash,
             createdAt: new Date().toISOString(),
           },
           $set: {
-            name,
-            role,
             updatedAt: new Date().toISOString(),
           },
         },
         { upsert: true },
-      );
-    }),
+      ),
+    ),
   );
+}
+
+async function ensureDemoRecords() {
+  const db = await getMongoDb();
+  const now = new Date().toISOString();
+  const seededResources: ResourceName[] = [
+    "instruments",
+    "rooms",
+    "instructors",
+    "guardians",
+    "students",
+    "courses",
+    "repertoires",
+  ];
+
+  for (const resource of seededResources) {
+    const rows = seedDatabase[resource] as Array<Record<string, unknown>>;
+
+    await Promise.all(
+      rows.map((row) => {
+        const { updatedAt: _updatedAt, ...insertOnly } = row;
+
+        return db.collection(resource).updateOne(
+          { id: row.id },
+          {
+            $setOnInsert: {
+              _id: row.id,
+              ...insertOnly,
+              createdAt: row.createdAt ?? now,
+            },
+            $set: {
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        );
+      }),
+    );
+  }
+
+  for (const lessonPackage of seedDatabase["lesson-packages"]) {
+    const existingPackage = await db
+      .collection("lesson-packages")
+      .findOne({ id: lessonPackage.id });
+    const packageRecord = existingPackage ?? {
+      _id: lessonPackage.id,
+      ...lessonPackage,
+      createdAt: lessonPackage.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    if (!existingPackage) {
+      await db.collection("lesson-packages").insertOne(packageRecord as Document);
+    }
+
+    const scheduleRecords = buildScheduleRecords(
+      pickLessonPackageSchedulePayload(packageRecord),
+      now,
+    );
+
+    await Promise.all(
+      scheduleRecords.map((schedule) =>
+        db.collection("schedules").updateOne(
+          { id: schedule.id },
+          { $setOnInsert: schedule },
+          { upsert: true },
+        ),
+      ),
+    );
+    await ensureAttendanceForSchedules(scheduleRecords, now);
+  }
 }
 
 function fromMongo<T extends Document>(record: T): Omit<T, "_id"> & { id: string } {
@@ -441,8 +508,11 @@ async function syncScheduleStatusFromAttendance(
   let scheduleStatus = "";
 
   if (resource === "student-attendance") {
-    if (attendanceStatus === "Present") scheduleStatus = "Completed";
-    if (attendanceStatus === "Rescheduled") scheduleStatus = "Rescheduled";
+    if (attendanceStatus === "Pending") scheduleStatus = "Scheduled";
+    if (attendanceStatus === "Present" || attendanceStatus === "Late") scheduleStatus = "Completed";
+    if (["Absent", "Sick", "Permission", "Rescheduled"].includes(attendanceStatus)) {
+      scheduleStatus = "Rescheduled";
+    }
   }
 
   if (resource === "instructor-attendance") {
@@ -476,6 +546,33 @@ async function syncScheduleStatusFromAttendance(
           makeupRequired: true,
           absenceReason:
             attendanceStatus === "Absent" ? "Instructor Absent" : "Instructor Cancelled",
+          updatedAt,
+        },
+      },
+    );
+  }
+
+  if (
+    resource === "student-attendance" &&
+    (attendanceStatus === "Pending" || attendanceStatus === "Present")
+  ) {
+    const linkedRescheduleId = String(attendance.makeupScheduleId || "");
+
+    if (linkedRescheduleId) {
+      await Promise.all([
+        db.collection("schedules").deleteOne({ id: linkedRescheduleId }),
+        db.collection("student-attendance").deleteMany({ courseScheduleId: linkedRescheduleId }),
+        db.collection("instructor-attendance").deleteMany({ courseScheduleId: linkedRescheduleId }),
+      ]);
+    }
+
+    await db.collection("student-attendance").updateOne(
+      { id: String(attendance.id || "") },
+      {
+        $set: {
+          absenceReason: "",
+          makeupRequired: false,
+          makeupScheduleId: "",
           updatedAt,
         },
       },
