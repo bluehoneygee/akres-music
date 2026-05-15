@@ -18,18 +18,14 @@ Custom fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `primary_instrument` | Link: Instrument | Yes | Instrumen utama |
-| `secondary_instruments` | Table: Student Instrument | No | Instrumen tambahan |
 | `skill_level` | Select | Yes | Beginner, Intermediate, Advanced |
 | `learning_goal` | Select | No | Hobby, Exam Prep, Performance, Competition, Theory |
-| `preferred_lesson_mode` | Select | No | Studio, Home Visit |
 | `parent_guardian` | Link: User/Customer/Guardian | No | Orang tua/wali utama |
 | `portal_enabled` | Check | No | Akses portal murid aktif |
 | `music_notes` | Small Text | No | Catatan internal |
 
 Relationships:
 
-- Student has many Student Instrument.
 - Student has many Guardian records through child table `guardians`.
 - Student has many Student Attendance.
 - Student has many Lesson Journal.
@@ -140,7 +136,6 @@ Custom fields:
 | `lesson_mode` | Select | Yes | Studio, Home Visit |
 | `studio_room` | Link: Studio Room | No | Ruang studio jika lesson_mode = Studio |
 | `home_visit_address` | Small Text | No | Alamat rumah jika lesson_mode = Home Visit |
-| `travel_notes` | Small Text | No | Catatan akses/perjalanan |
 | `status` | Select | Yes | Active, Completed, Cancelled |
 
 Relationships:
@@ -237,22 +232,6 @@ Fields:
 Naming:
 
 - Autoname by `instrument_name`.
-
-### Student Instrument
-
-Purpose:
-
-Child table untuk instrumen yang dipelajari murid.
-
-Fields:
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `instrument` | Link: Instrument | Yes | Instrumen |
-| `level` | Select | Yes | Beginner, Intermediate, Advanced |
-| `start_date` | Date | No | Tanggal mulai |
-| `teacher` | Link: Instructor | No | Guru utama |
-| `is_primary` | Check | No | Instrumen utama |
 
 ### Instructor Instrument
 
@@ -394,7 +373,6 @@ Naming:
 
 ```text
 Student
-  -> Student Instrument
   -> Student Attendance
   -> Lesson Journal
   -> Fees / Sales Invoice

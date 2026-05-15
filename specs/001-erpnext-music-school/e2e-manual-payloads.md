@@ -31,13 +31,15 @@ Flow normal sekarang:
 3. Buat Lesson Package: student, course, instructor, billing period, lesson start date, hari, dan jam.
 4. Sistem otomatis generate 4 sesi sejak `lessonStartDate` sesuai `lessonDays`.
 5. Sistem otomatis generate Student Attendance dan Instructor Attendance dengan status `Pending`.
-6. Menu Schedules dan Attendance dipakai untuk review/edit, bukan create manual.
+6. Menu Schedules dipakai sebagai kalender read-only per package.
+7. Menu Attendance dipakai untuk update status, alasan absen, dan membuat makeup session.
 
 Catatan pemakaian manual:
 
 - API `POST /api/{resource}` menerima satu object per request.
 - Array di tiap bagian bawah adalah 3 contoh payload; submit object-nya satu per satu.
 - Untuk attendance, gunakan halaman Attendance atau `PUT /api/{resource}/{id}` karena record-nya sudah dibuat otomatis dari Lesson Package.
+- Untuk makeup, di UI Attendance pilih tanggal dan jam. Sistem membuat schedule makeup dan link ke attendance asal.
 
 Catatan:
 
@@ -206,7 +208,7 @@ Resource: `rooms`
 
 Resource: `students`
 
-Payload Student fokus ke profil murid. Jadwal dibuat dari Lesson Package.
+Payload Student fokus ke profil murid. Instrument dan lesson mode dipilih saat membuat Lesson Package.
 
 ```json
 [
@@ -214,10 +216,8 @@ Payload Student fokus ke profil murid. Jadwal dibuat dari Lesson Package.
     "id": "student-luna",
     "firstName": "Luna",
     "lastName": "Hartono",
-    "primaryInstrumentId": "inst-violin",
     "skillLevel": "Beginner",
     "learningGoal": "Performance",
-    "preferredLessonMode": "Studio",
     "guardianIds": ["guardian-dewi"],
     "portalEnabled": true,
     "musicNotes": "Mulai dari postur bowing dasar."
@@ -226,10 +226,8 @@ Payload Student fokus ke profil murid. Jadwal dibuat dari Lesson Package.
     "id": "student-ayu",
     "firstName": "Ayu",
     "lastName": "Prameswari",
-    "primaryInstrumentId": "inst-piano",
     "skillLevel": "Beginner",
     "learningGoal": "Technique",
-    "preferredLessonMode": "Studio",
     "guardianIds": ["guardian-rina"],
     "portalEnabled": true,
     "musicNotes": "Fokus koordinasi tangan kanan dan kiri."
@@ -238,10 +236,8 @@ Payload Student fokus ke profil murid. Jadwal dibuat dari Lesson Package.
     "id": "student-nara",
     "firstName": "Nara",
     "lastName": "Saputra",
-    "primaryInstrumentId": "inst-vocal",
     "skillLevel": "Intermediate",
     "learningGoal": "Confidence",
-    "preferredLessonMode": "Home Visit",
     "guardianIds": ["guardian-andi"],
     "portalEnabled": true,
     "musicNotes": "Latihan pernapasan dan artikulasi."
@@ -253,7 +249,7 @@ Payload Student fokus ke profil murid. Jadwal dibuat dari Lesson Package.
 
 Resource: `lesson-packages`
 
-Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis.
+Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis. Di UI, `instrumentId` otomatis dari Course, sedangkan `lessonMode` dipilih per package.
 
 ```json
 [
@@ -303,7 +299,6 @@ Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis.
     "toTime": "20:00",
     "lessonMode": "Home Visit",
     "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
-    "travelNotes": "Parkir di depan rumah.",
     "status": "Active"
   }
 ]
@@ -323,6 +318,8 @@ Attendance juga otomatis dibuat:
 student-attendance-schedule-package-luna-2026-05
 instructor-attendance-schedule-package-luna-2026-05
 ```
+
+Schedules yang dibuat dari Lesson Package tampil read-only di menu Schedules. Status schedule mengikuti update Attendance.
 
 ## 8. Repertoires
 
@@ -368,6 +365,7 @@ Resource: `repertoires`
 Resource: `student-attendance`
 
 Record attendance sudah otomatis dibuat. Gunakan payload ini untuk update record yang sudah ada, bukan create baru.
+Di UI Attendance, update status ini dilakukan dari select per session card.
 
 ```json
 [
@@ -417,7 +415,117 @@ Resource: `instructor-attendance`
 ]
 ```
 
-## 10. Lesson Journals
+## 10. Makeup Session
+
+Makeup session sebaiknya dibuat dari UI Attendance dengan memilih tanggal dan jam. UI akan:
+
+1. Membuat schedule baru di package yang sama.
+2. Mengisi `makeupScheduleId` di attendance asal.
+3. Reload Attendance sehingga card makeup muncul sesuai urutan tanggal.
+
+Kalau perlu dicoba via API manual, kirim payload schedule baru ini satu per satu.
+
+Resource: `schedules`
+
+```json
+[
+  {
+    "id": "makeup-schedule-package-ayu-2026-05",
+    "lessonPackageId": "package-ayu-2026-05",
+    "courseId": "course-piano-beginner",
+    "studentId": "student-ayu",
+    "instructorId": "instructor-budi",
+    "instrumentId": "inst-piano",
+    "scheduleMonth": "2026-05",
+    "lessonStartDate": "",
+    "lessonDays": [],
+    "lessonCount": 1,
+    "scheduleDate": "2026-05-22",
+    "fromTime": "15:00",
+    "toTime": "16:00",
+    "lessonMode": "Studio",
+    "studioRoomId": "room-piano-1",
+    "homeVisitAddress": "",
+    "scheduleStatus": "Scheduled",
+    "originalScheduleId": "schedule-package-ayu-2026-05",
+    "rescheduleReason": "Makeup for sick absence"
+  },
+  {
+    "id": "makeup-schedule-package-nara-2026-05",
+    "lessonPackageId": "package-nara-2026-05",
+    "courseId": "course-vocal-intermediate",
+    "studentId": "student-nara",
+    "instructorId": "instructor-maya",
+    "instrumentId": "inst-vocal",
+    "scheduleMonth": "2026-05",
+    "lessonStartDate": "",
+    "lessonDays": [],
+    "lessonCount": 1,
+    "scheduleDate": "2026-05-29",
+    "fromTime": "19:00",
+    "toTime": "20:00",
+    "lessonMode": "Home Visit",
+    "studioRoomId": "",
+    "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
+    "scheduleStatus": "Scheduled",
+    "originalScheduleId": "schedule-package-nara-2026-05",
+    "rescheduleReason": "Makeup for permission absence"
+  },
+  {
+    "id": "makeup-schedule-package-luna-2026-05-2",
+    "lessonPackageId": "package-luna-2026-05",
+    "courseId": "course-violin-beginner",
+    "studentId": "student-luna",
+    "instructorId": "instructor-sari",
+    "instrumentId": "inst-violin",
+    "scheduleMonth": "2026-05",
+    "lessonStartDate": "",
+    "lessonDays": [],
+    "lessonCount": 1,
+    "scheduleDate": "2026-06-13",
+    "fromTime": "09:00",
+    "toTime": "10:00",
+    "lessonMode": "Studio",
+    "studioRoomId": "room-strings-1",
+    "homeVisitAddress": "",
+    "scheduleStatus": "Scheduled",
+    "originalScheduleId": "schedule-package-luna-2026-05-2",
+    "rescheduleReason": "Optional makeup example"
+  }
+]
+```
+
+Setelah schedule makeup dibuat manual via API, link-kan ke attendance asal:
+
+Resource: `student-attendance`
+
+```json
+[
+  {
+    "id": "student-attendance-schedule-package-ayu-2026-05",
+    "status": "Sick",
+    "absenceReason": "Flu",
+    "makeupRequired": true,
+    "makeupScheduleId": "makeup-schedule-package-ayu-2026-05"
+  },
+  {
+    "id": "student-attendance-schedule-package-nara-2026-05",
+    "status": "Permission",
+    "absenceReason": "Family event",
+    "makeupRequired": true,
+    "makeupScheduleId": "makeup-schedule-package-nara-2026-05"
+  },
+  {
+    "id": "student-attendance-schedule-package-luna-2026-05-2",
+    "status": "Permission",
+    "absenceReason": "Exam preparation",
+    "makeupRequired": true,
+    "makeupScheduleId": "makeup-schedule-package-luna-2026-05-2"
+  }
+]
+```
+
+## 11. Lesson Journals
 
 Resource: `journals`
 
@@ -468,7 +576,7 @@ Resource: `journals`
 ]
 ```
 
-## 11. Billing
+## 12. Billing
 
 Resource: `invoices`
 
@@ -507,7 +615,7 @@ Resource: `invoices`
 ]
 ```
 
-## 12. Users
+## 13. Users
 
 Resource: `users`
 
