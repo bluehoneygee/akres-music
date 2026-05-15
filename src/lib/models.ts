@@ -3,6 +3,7 @@ export type ResourceName =
   | "students"
   | "guardians"
   | "instructors"
+  | "instructor-availability"
   | "courses"
   | "lesson-packages"
   | "rooms"
@@ -47,6 +48,15 @@ export type Instructor = BaseRecord & {
   levelFrom: "Beginner" | "Intermediate" | "Advanced";
   levelTo: "Beginner" | "Intermediate" | "Advanced";
   portalEnabled: boolean;
+};
+
+export type InstructorAvailability = BaseRecord & {
+  instructorId: string;
+  dayOfWeek: string;
+  fromTime: string;
+  toTime: string;
+  lessonMode: "Studio" | "Home Visit";
+  active: boolean;
 };
 
 export type Course = BaseRecord & {
@@ -210,6 +220,7 @@ export type Database = {
   students: Student[];
   guardians: Guardian[];
   instructors: Instructor[];
+  "instructor-availability": InstructorAvailability[];
   courses: Course[];
   "lesson-packages": LessonPackage[];
   rooms: StudioRoom[];

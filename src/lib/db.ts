@@ -10,6 +10,7 @@ export const resources: ResourceName[] = [
   "students",
   "guardians",
   "instructors",
+  "instructor-availability",
   "courses",
   "lesson-packages",
   "rooms",
@@ -99,6 +100,7 @@ async function ensureDemoRecords() {
     "instruments",
     "rooms",
     "instructors",
+    "instructor-availability",
     "guardians",
     "students",
     "courses",
@@ -311,10 +313,21 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
   const fromTime = String(payload.fromTime || "");
   const toTime = String(payload.toTime || "");
   const instrumentId = String(payload.instrumentId || (await findCourseInstrumentId(courseId)) || "");
+  const lessonMode = String(payload.lessonMode || "Studio");
 
   if (!courseId || !studentId || !instructorId || !instrumentId || !billingPeriod || !lessonStartDate || !fromTime || !toTime || lessonDays.length === 0) {
     throw new Error("Lesson package needs student, course, instructor, instrument, billing period, start date, lesson days, and time.");
   }
+
+  await assertInstructorSlotAvailable({
+    instructorId,
+    lessonStartDate,
+    lessonDays,
+    lessonCount: Number(payload.lessonCount || 4),
+    fromTime,
+    toTime,
+    lessonMode,
+  });
 
   return {
     ...payload,
@@ -328,7 +341,7 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     lessonCount: payload.lessonCount || 4,
     fromTime,
     toTime,
-    lessonMode: String(payload.lessonMode || "Studio"),
+    lessonMode,
     studioRoomId: String(payload.studioRoomId || ""),
     homeVisitAddress: String(payload.homeVisitAddress || ""),
     status: String(payload.status || "Active"),
@@ -545,6 +558,101 @@ function expandPackageLessonDates(
   }
 
   return dates;
+}
+
+async function assertInstructorSlotAvailable({
+  instructorId,
+  lessonStartDate,
+  lessonDays,
+  lessonCount,
+  fromTime,
+  toTime,
+  lessonMode,
+}: {
+  instructorId: string;
+  lessonStartDate: string;
+  lessonDays: string[];
+  lessonCount: number;
+  fromTime: string;
+  toTime: string;
+  lessonMode: string;
+}) {
+  const dates = expandPackageLessonDates(lessonStartDate, lessonDays, lessonCount);
+  if (dates.length === 0) return;
+
+  const db = await getMongoDb();
+  const availability = await db
+    .collection("instructor-availability")
+    .find({ instructorId, active: { $ne: false } })
+    .toArray();
+
+  if (availability.length === 0) {
+    throw new Error("Instructor availability belum diatur. Isi availability instructor dulu sebelum membuat Lesson Package.");
+  }
+
+  const unavailableDate = dates.find((date) => {
+    const dayOfWeek = String(new Date(`${date}T00:00:00.000Z`).getUTCDay());
+
+    return !availability.some((slot) => {
+      const slotMode = String(slot.lessonMode || "");
+      return (
+        String(slot.dayOfWeek) === dayOfWeek &&
+        (!slotMode || slotMode === lessonMode) &&
+        timeToMinutes(String(slot.fromTime || "")) <= timeToMinutes(fromTime) &&
+        timeToMinutes(String(slot.toTime || "")) >= timeToMinutes(toTime)
+      );
+    });
+  });
+
+  if (unavailableDate) {
+    throw new Error(`Instructor tidak available pada ${unavailableDate}, ${fromTime} - ${toTime}.`);
+  }
+
+  const existingSchedules = await db
+    .collection("schedules")
+    .find({
+      instructorId,
+      scheduleDate: { $in: dates },
+      scheduleStatus: { $ne: "Cancelled" },
+    })
+    .toArray();
+
+  const conflict = existingSchedules.find((schedule) =>
+    rangesOverlap(
+      fromTime,
+      toTime,
+      String(schedule.fromTime || ""),
+      String(schedule.toTime || ""),
+    ),
+  );
+
+  if (conflict) {
+    throw new Error(
+      `Instructor sudah terisi pada ${String(conflict.scheduleDate || "")}, ${String(conflict.fromTime || "")} - ${String(conflict.toTime || "")}.`,
+    );
+  }
+}
+
+function rangesOverlap(
+  leftFrom: string,
+  leftTo: string,
+  rightFrom: string,
+  rightTo: string,
+) {
+  const startA = timeToMinutes(leftFrom);
+  const endA = timeToMinutes(leftTo);
+  const startB = timeToMinutes(rightFrom);
+  const endB = timeToMinutes(rightTo);
+
+  if ([startA, endA, startB, endB].some((value) => Number.isNaN(value))) return false;
+  return startA < endB && startB < endA;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
+
+  return hours * 60 + minutes;
 }
 
 function formatDate(value: Date) {

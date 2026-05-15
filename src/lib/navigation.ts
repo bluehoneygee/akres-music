@@ -1,13 +1,13 @@
 import {
   Banknote,
   BookOpenCheck,
+  CalendarClock,
   CalendarDays,
   FileText,
   GraduationCap,
   LayoutDashboard,
   Music2,
   Piano,
-  ShieldCheck,
   SquareLibrary,
   UserCog,
   Users,
@@ -51,6 +51,12 @@ export const appNavigation = [
     label: "Instructors",
     href: "/instructors",
     icon: Users,
+    roles: ["System Manager", "Academic Staff"],
+  },
+  {
+    label: "Instructor Availability",
+    href: "/instructor-availability",
+    icon: CalendarClock,
     roles: ["System Manager", "Academic Staff"],
   },
   {
@@ -99,12 +105,6 @@ export const appNavigation = [
     label: "Billing",
     href: "/billing",
     icon: Banknote,
-    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
-  },
-  {
-    label: "Reports",
-    href: "/reports",
-    icon: ShieldCheck,
     roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
   },
 ];

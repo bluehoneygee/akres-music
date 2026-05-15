@@ -37,6 +37,9 @@ export async function filterRecordsForSession(
     if (resource === "lesson-packages") {
       return records.filter((row) => row.instructorId === instructorId);
     }
+    if (resource === "instructor-availability") {
+      return records.filter((row) => row.instructorId === instructorId);
+    }
     if (resource === "schedules") return records.filter((row) => row.instructorId === instructorId);
     if (resource === "instructor-attendance") {
       return records.filter((row) => row.instructorId === instructorId);

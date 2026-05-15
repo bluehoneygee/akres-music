@@ -39,6 +39,10 @@ export type FieldConfig = {
     sourceField: string;
     sourceOptionField: string;
   };
+  availabilityDateFrom?: {
+    monthField: string;
+    slotField: string;
+  };
   autoSelectSingleOption?: boolean;
   multiple?: boolean;
   visibleWhen?: {
@@ -113,12 +117,7 @@ export function ResourcePage({
       field.key,
       records.map((record) => ({
         value: String(record[valueField] ?? record.id),
-        label: formatDisplayText(
-          field.relation!.labelFields
-            .map((labelField) => record[labelField])
-            .filter(Boolean)
-            .join(" ") || String(record[valueField] ?? record.id),
-        ),
+        label: formatRelationOptionLabel(field, record, valueField),
         record,
       })),
     ] as const;
@@ -456,14 +455,19 @@ export function ResourcePage({
                           disabled={!fieldVisible}
                           multiple={field.multiple}
                           onChange={(event) =>
-                            setDraft((current) => ({
-                              ...current,
-                              [field.key]: field.multiple
+                            setDraft((current) => {
+                              const nextValue = field.multiple
                                 ? Array.from(event.target.selectedOptions, (option) => option.value)
-                                : event.target.value,
-                              ...clearHiddenDependentValues(fields, field.key, event.target.value),
-                              ...clearFilteredDependentValues(fields, field.key),
-                            }))
+                                : event.target.value;
+                              const nextDraft = {
+                                ...current,
+                                [field.key]: nextValue,
+                                ...clearHiddenDependentValues(fields, field.key, event.target.value),
+                                ...clearFilteredDependentValues(fields, field.key),
+                              };
+
+                              return applyDerivedValues(fields, nextDraft, relationOptions);
+                            })
                           }
                           value={
                             field.multiple
@@ -475,7 +479,7 @@ export function ResourcePage({
                           {(
                             field.type === "relation"
                               ? getFieldOptions(field, draft, relationOptions)
-                              : field.options ?? []
+                              : getSelectOptions(field, draft, relationOptions)
                           ).map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -502,11 +506,17 @@ export function ResourcePage({
                         className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
                         disabled={!fieldVisible}
                         onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            [field.key]:
-                              field.type === "number" ? Number(event.target.value) : event.target.value,
-                          }))
+                          setDraft((current) =>
+                            applyDerivedValues(
+                              fields,
+                              {
+                                ...current,
+                                [field.key]:
+                                  field.type === "number" ? Number(event.target.value) : event.target.value,
+                              },
+                              relationOptions,
+                            ),
+                          )
                         }
                         type={field.type ?? "text"}
                         value={String(draft[field.key] ?? "")}
@@ -679,6 +689,87 @@ function clearFilteredDependentValues(fields: FieldConfig[], changedField: strin
   );
 }
 
+function applyDerivedValues(
+  fields: FieldConfig[],
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  const updates = Object.fromEntries(
+    fields
+      .filter((field) => field.deriveFrom)
+      .map((field) => [field.key, getDerivedValue(field, draft, relationOptions)])
+      .filter(([, value]) => value !== undefined),
+  ) as Record<string, RecordValue>;
+
+  const nextDraft = { ...draft, ...updates };
+
+  const availabilityDateField = fields.find((field) => field.availabilityDateFrom);
+  if (availabilityDateField) {
+    const options = getAvailabilityDateOptions(availabilityDateField, nextDraft, relationOptions);
+    const currentDate = String(nextDraft[availabilityDateField.key] ?? "");
+    const nextDate = options.some((option) => option.value === currentDate)
+      ? currentDate
+      : options[0]?.value ?? "";
+
+    nextDraft[availabilityDateField.key] = nextDate;
+    if (fields.some((field) => field.key === "lessonStartDate")) {
+      nextDraft.lessonStartDate = nextDate;
+    }
+  } else if (
+    fields.some((field) => field.key === "lessonStartDate") &&
+    nextDraft.availabilitySlotId &&
+    nextDraft.billingPeriod
+  ) {
+    const options = getAvailabilityDateOptions(
+      {
+        key: "lessonStartDate",
+        label: "Lesson start date",
+        availabilityDateFrom: {
+          monthField: "billingPeriod",
+          slotField: "availabilitySlotId",
+        },
+      },
+      nextDraft,
+      relationOptions,
+    );
+
+    if (options[0]?.value) nextDraft.lessonStartDate = options[0].value;
+  }
+
+  return nextDraft;
+}
+
+function getSelectOptions(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  if (field.availabilityDateFrom) {
+    return getAvailabilityDateOptions(field, draft, relationOptions);
+  }
+
+  return field.options ?? [];
+}
+
+function getAvailabilityDateOptions(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  if (!field.availabilityDateFrom) return [];
+
+  const monthValue = String(draft[field.availabilityDateFrom.monthField] ?? "");
+  const slotId = String(draft[field.availabilityDateFrom.slotField] ?? "");
+  const slot = relationOptions[field.availabilityDateFrom.slotField]?.find(
+    (option) => option.value === slotId,
+  )?.record;
+
+  return datesInMonthForDay(monthValue, String(slot?.dayOfWeek ?? "")).map((date) => ({
+    label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}`,
+    value: date,
+  }));
+}
+
 function getFieldOptions(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
@@ -715,6 +806,59 @@ function getFieldOptions(
   });
 }
 
+function formatRelationOptionLabel(field: FieldConfig, record: UiRecord, valueField: string) {
+  if (field.relation?.resource === "instructor-availability") {
+    return [
+      lessonDayLabel(record.dayOfWeek),
+      `${String(record.fromTime ?? "")} - ${String(record.toTime ?? "")}`,
+      formatDisplayText(record.lessonMode),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  return formatDisplayText(
+    field.relation!.labelFields
+      .map((labelField) => record[labelField])
+      .filter(Boolean)
+      .join(" ") || String(record[valueField] ?? record.id),
+  );
+}
+
+function lessonDayLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    "0": "Sunday",
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday",
+  };
+
+  return labels[String(value ?? "")] ?? "";
+}
+
+function datesInMonthForDay(monthValue: string, dayOfWeekValue: string) {
+  if (!/^\d{4}-\d{2}$/.test(monthValue)) return [];
+
+  const targetDay = Number(dayOfWeekValue);
+  if (!Number.isInteger(targetDay) || targetDay < 0 || targetDay > 6) return [];
+
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  const dates: string[] = [];
+
+  while (date.getUTCMonth() === month - 1) {
+    if (date.getUTCDay() === targetDay) {
+      dates.push(date.toISOString().slice(0, 10));
+    }
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
 function getDerivedValue(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
@@ -723,13 +867,16 @@ function getDerivedValue(
   if (!field.deriveFrom) return undefined;
 
   const sourceValue = draft[field.deriveFrom.sourceField];
-  if (!sourceValue) return undefined;
+  if (!sourceValue) return field.multiple ? [] : "";
 
   const sourceOptions = relationOptions[field.deriveFrom.sourceField] ?? [];
   const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
   const derivedValue = sourceRecord?.[field.deriveFrom.sourceOptionField];
 
-  return Array.isArray(derivedValue) ? derivedValue.map(String) : String(derivedValue ?? "");
+  if (Array.isArray(derivedValue)) return derivedValue.map(String);
+  if (field.multiple) return derivedValue ? [String(derivedValue)] : [];
+
+  return String(derivedValue ?? "");
 }
 
 function toMultiSelectValue(value: RecordValue | undefined) {
