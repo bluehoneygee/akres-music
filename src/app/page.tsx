@@ -4,8 +4,6 @@ import {
   BookOpenCheck,
   CalendarDays,
   CheckCircle2,
-  Clock3,
-  FileText,
   GraduationCap,
   Home,
   MapPin,
@@ -16,13 +14,10 @@ import { auth } from "@/auth";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { readDatabase } from "@/lib/db";
 import type {
   CourseSchedule,
   Invoice,
-  LessonJournal,
-  LessonPackage,
   Student,
   StudentAttendance,
 } from "@/lib/models";
@@ -70,7 +65,6 @@ export default async function HomePage() {
     : confirmedJournals;
   const activePackages = lessonPackages.filter((lessonPackage) => lessonPackage.status === "Active");
   const openInvoices = invoices.filter((invoice) => invoice.status !== "Paid");
-  const paidInvoices = invoices.filter((invoice) => invoice.status === "Paid");
   const attendanceSummary = summarizeAttendance(attendance);
   const completionPercent = attendance.length
     ? Math.round(((attendanceSummary.present + attendanceSummary.late) / attendance.length) * 100)
@@ -161,18 +155,24 @@ export default async function HomePage() {
 
   return (
     <AppShell>
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         {metrics.map((metric) => (
           <Card className="liquid-glass" key={metric.label}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-zinc-500">{metric.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-normal">{metric.value}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{metric.delta}</p>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex min-h-[88px] flex-col justify-between gap-2 sm:min-h-0 sm:flex-row sm:items-start sm:gap-3">
+                <div className={`grid size-8 shrink-0 place-items-center rounded-2xl sm:order-2 sm:size-11 ${metric.tint}`}>
+                  <metric.icon className="size-4 sm:size-5" />
                 </div>
-                <div className={`grid size-11 place-items-center rounded-2xl ${metric.tint}`}>
-                  <metric.icon className="size-5" />
+                <div className="min-w-0 sm:order-1">
+                  <p className="truncate text-xs text-zinc-500 sm:text-sm">
+                    {metric.label}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tracking-normal sm:mt-2 sm:text-3xl">
+                    {metric.value}
+                  </p>
+                  <p className="mt-1 truncate text-[11px] text-zinc-500 sm:text-xs">
+                    {metric.delta}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -182,7 +182,7 @@ export default async function HomePage() {
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
         <Card className="liquid-glass">
-          <CardHeader>
+          <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Jadwal Les Anak" : "Jadwal Les Terdekat"}</CardTitle>
             <p className="mt-1 text-sm text-zinc-500">
               {isPortal
@@ -190,7 +190,7 @@ export default async function HomePage() {
                 : "Sesi aktif terdekat dari seluruh jadwal akademik."}
             </p>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 p-4 pt-0 sm:space-y-3 sm:p-5 sm:pt-0">
             {upcomingSchedules.length === 0 ? (
               <p className="text-sm text-zinc-500">Belum ada jadwal aktif.</p>
             ) : null}
@@ -203,24 +203,34 @@ export default async function HomePage() {
 
               return (
                 <div
-                  className="grid gap-3 rounded-[20px] border border-white/45 bg-white/42 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] sm:grid-cols-[92px_minmax(0,1fr)_auto]"
+                  className="grid gap-2 rounded-[20px] border border-white/45 bg-white/42 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] sm:grid-cols-[92px_minmax(0,1fr)_auto] sm:gap-3"
                   key={item.id}
                 >
-                  <div>
-                    <p className="font-semibold">{item.fromTime}</p>
-                    <p className="text-xs text-zinc-500">{item.scheduleDate}</p>
+                  <div className="flex items-start justify-between gap-3 sm:block">
+                    <div>
+                      <p className="font-semibold">{item.fromTime}</p>
+                      <p className="text-xs text-zinc-500">{item.scheduleDate}</p>
+                    </div>
+                    <Badge
+                      className="px-2.5 py-0.5 sm:hidden"
+                      variant={statusVariant(item.scheduleStatus)}
+                    >
+                      {formatDisplayText(item.scheduleStatus)}
+                    </Badge>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {formatDisplayText(student ? studentName(student) : "Unknown Student")}
-                    </p>
-                    <p className="truncate text-sm text-zinc-500">{formatDisplayText(course?.courseName)}</p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-600">
-                      <span className="inline-flex items-center gap-1">
-                        <Users className="size-3.5" />
-                        {formatDisplayText(instructor?.instructorName)}
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(112px,.72fr)] gap-3 sm:block">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {formatDisplayText(student ? studentName(student) : "Unknown Student")}
+                      </p>
+                      <p className="truncate text-sm text-zinc-500">{formatDisplayText(course?.courseName)}</p>
+                    </div>
+                    <div className="min-w-0 space-y-1 text-xs text-zinc-600 sm:mt-2 sm:flex sm:flex-wrap sm:gap-2 sm:space-y-0">
+                      <span className="flex max-w-full items-center gap-1">
+                        <Users className="size-3.5 shrink-0" />
+                        <span className="truncate">{formatDisplayText(instructor?.instructorName)}</span>
                       </span>
-                      <span className="inline-flex min-w-0 items-center gap-1">
+                      <span className="flex max-w-full min-w-0 items-center gap-1">
                         {item.lessonMode === "Studio" ? (
                           <MapPin className="size-3.5 shrink-0" />
                         ) : (
@@ -233,7 +243,7 @@ export default async function HomePage() {
                     </div>
                   </div>
                   <Badge
-                    className="self-start justify-self-start px-3 py-1 sm:self-center sm:justify-self-end"
+                    className="hidden self-start justify-self-start px-3 py-1 sm:inline-flex sm:self-center sm:justify-self-end"
                     variant={statusVariant(item.scheduleStatus)}
                   >
                     {formatDisplayText(item.scheduleStatus)}
@@ -245,18 +255,30 @@ export default async function HomePage() {
         </Card>
 
         <Card className="liquid-glass">
-          <CardHeader>
+          <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Yang Perlu Dilihat" : "Prioritas Hari Ini"}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 p-4 pt-0 sm:space-y-3 sm:p-5 sm:pt-0">
             {actionItems.map((item) => (
-              <div className="rounded-[20px] border border-white/45 bg-white/42 p-4" key={item.title}>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <AlertTriangle className="size-5 text-zinc-500" />
-                  <Badge variant={item.variant}>{isPortal ? "Info" : "Action"}</Badge>
+              <div className="rounded-[20px] border border-white/45 bg-white/42 p-3 sm:p-4" key={item.title}>
+                <div className="flex items-start gap-3 sm:block">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-2xl bg-white/45 text-zinc-500 sm:hidden">
+                    <AlertTriangle className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="hidden items-center justify-between gap-3 sm:mb-3 sm:flex">
+                      <AlertTriangle className="size-5 text-zinc-500" />
+                      <Badge variant={item.variant}>{isPortal ? "Info" : "Action"}</Badge>
+                    </div>
+                    <div className="flex items-start justify-between gap-2 sm:block">
+                      <p className="font-medium">{item.title}</p>
+                      <Badge className="shrink-0 sm:hidden" variant={item.variant}>
+                        {isPortal ? "Info" : "Action"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-500">{item.meta}</p>
+                  </div>
                 </div>
-                <p className="font-medium">{item.title}</p>
-                <p className="mt-1 text-sm text-zinc-500">{item.meta}</p>
               </div>
             ))}
           </CardContent>
@@ -265,43 +287,23 @@ export default async function HomePage() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         <Card className="liquid-glass">
-          <CardHeader>
+          <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>Rekap Kehadiran</CardTitle>
-            <p className="mt-1 text-sm text-zinc-500">
-              Present dan late dihitung sebagai sesi berjalan.
-            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-[22px] border border-white/45 bg-white/42 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-zinc-500">Progress kehadiran</p>
-                  <p className="mt-1 text-2xl font-semibold">{completionPercent}%</p>
-                </div>
-                <CheckCircle2 className="size-6 text-emerald-600" />
-              </div>
-              <Progress className="mt-4" value={completionPercent} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <MetricPill label="Present" value={attendanceSummary.present} />
-              <MetricPill label="Late" value={attendanceSummary.late} />
-              <MetricPill label="Sick" value={attendanceSummary.sick} />
-              <MetricPill label="Permission" value={attendanceSummary.permission} />
-              <MetricPill label="Absent" value={attendanceSummary.absent} />
-              <MetricPill label="Rescheduled" value={attendanceSummary.rescheduled} />
-            </div>
+          <CardContent className="space-y-3 p-4 pt-0 sm:space-y-4 sm:p-5 sm:pt-0">
+            <AttendancePieChart
+              completionPercent={completionPercent}
+              summary={attendanceSummary}
+              total={attendance.length}
+            />
           </CardContent>
         </Card>
 
         <Card className="liquid-glass xl:col-span-2">
-          <CardHeader>
+          <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Progress Terbaru" : "Lesson Journal Terbaru"}</CardTitle>
-            <p className="mt-1 text-sm text-zinc-500">
-              Hanya journal yang sudah confirmed yang masuk ringkasan.
-            </p>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
+          <CardContent className="grid gap-2 p-4 pt-0 sm:gap-3 sm:p-5 sm:pt-0 md:grid-cols-3">
             {latestJournals.length === 0 ? (
               <p className="text-sm text-zinc-500 md:col-span-3">Belum ada journal terkonfirmasi.</p>
             ) : null}
@@ -310,19 +312,19 @@ export default async function HomePage() {
               const student = db.students.find((row) => row.id === journal.studentId);
 
               return (
-                <div className="rounded-[20px] border border-white/45 bg-white/42 p-4" key={journal.id}>
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
+                <div className="rounded-[20px] border border-white/45 bg-white/42 p-3 sm:p-4" key={journal.id}>
+                  <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
+                    <div className="min-w-0">
                       <p className="font-medium">
                         {formatDisplayText(student ? studentName(student) : "Unknown Student")}
                       </p>
                       <p className="mt-1 text-xs text-zinc-500">{journal.lessonDate}</p>
                     </div>
-                    <Badge variant={statusVariant(journal.progressRating)}>
+                    <Badge className="shrink-0" variant={statusVariant(journal.progressRating)}>
                       {formatDisplayText(journal.progressRating)}
                     </Badge>
                   </div>
-                  <p className="min-h-16 text-sm text-zinc-600">
+                  <p className="text-sm text-zinc-600 sm:min-h-16">
                     {formatDisplayText(journal.materialCovered) || "Materi belum diisi"}
                   </p>
                   {journal.homework ? (
@@ -337,66 +339,72 @@ export default async function HomePage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <Card className="liquid-glass">
-          <CardHeader>
-            <CardTitle>{isPortal ? "Ringkasan Belajar" : "Ringkasan Operasional"}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 text-sm text-zinc-600 sm:grid-cols-2">
-              {buildSummaryItems({
-                activePackages,
-                attendance,
-                db,
-                isPortal,
-                schedules,
-                visibleJournals,
-              }).map((item) => (
-                <div className="rounded-2xl border border-white/45 bg-white/42 p-3" key={item}>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="liquid-glass">
-          <CardHeader>
-            <CardTitle>Billing</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-[22px] border border-white/45 bg-zinc-950 p-5 text-white shadow-xl">
-              <p className="text-sm text-white/65">Invoice unpaid</p>
-              <p className="mt-2 text-2xl font-semibold">{openInvoices.length}</p>
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <span className="text-sm text-white/70">Total belum dibayar</span>
-                <span className="text-lg font-semibold">{formatCurrency(sumInvoices(openInvoices))}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[20px] border border-white/45 bg-white/42 p-4">
-                <Clock3 className="mb-3 size-5 text-amber-600" />
-                <p className="text-2xl font-semibold">{openInvoices.length}</p>
-                <p className="text-xs text-zinc-500">invoice unpaid</p>
-              </div>
-              <div className="rounded-[20px] border border-white/45 bg-white/42 p-4">
-                <CheckCircle2 className="mb-3 size-5 text-emerald-600" />
-                <p className="text-2xl font-semibold">{paidInvoices.length}</p>
-                <p className="text-xs text-zinc-500">invoice paid</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
     </AppShell>
   );
 }
 
-function MetricPill({ label, value }: { label: string; value: number }) {
+function AttendancePieChart({
+  completionPercent,
+  summary,
+  total,
+}: {
+  completionPercent: number;
+  summary: ReturnType<typeof summarizeAttendance>;
+  total: number;
+}) {
+  const segments = [
+    { label: "Hadir", value: summary.present, color: "#10b981" },
+    { label: "Terlambat", value: summary.late, color: "#0ea5e9" },
+    { label: "Sakit", value: summary.sick, color: "#f59e0b" },
+    { label: "Izin", value: summary.permission, color: "#8b5cf6" },
+    { label: "Absen", value: summary.absent, color: "#f43f5e" },
+    { label: "Reschedule", value: summary.rescheduled, color: "#f97316" },
+  ];
+
   return (
-    <div className="rounded-2xl border border-white/40 bg-white/35 px-3 py-2">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
+    <div className="rounded-[22px] border border-white/45 bg-white/42 p-4">
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-sm text-zinc-500">Progress kehadiran</p>
+          <p className="mt-1 text-3xl font-semibold leading-none">{completionPercent}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-zinc-500">Total sesi</p>
+          <p className="mt-1 text-xl font-semibold leading-none">{total}</p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {segments.map((segment) => {
+          const percent = total > 0 ? (segment.value / total) * 100 : 0;
+
+          return (
+            <div key={segment.label}>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
+                  <span className="truncate text-sm font-medium text-zinc-700">{segment.label}</span>
+                </span>
+                <span className="text-sm font-semibold text-zinc-900">
+                  {segment.value}
+                  <span className="ml-1 text-xs font-normal text-zinc-500">
+                    {Math.round(percent)}%
+                  </span>
+                </span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-white/50 shadow-inner">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    backgroundColor: segment.color,
+                    width: `${percent}%`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -414,42 +422,6 @@ function summarizeAttendance(attendance: StudentAttendance[]) {
 
 function countStatus(attendance: StudentAttendance[], status: string) {
   return attendance.filter((row) => row.status === status).length;
-}
-
-function buildSummaryItems({
-  activePackages,
-  attendance,
-  db,
-  isPortal,
-  schedules,
-  visibleJournals,
-}: {
-  activePackages: LessonPackage[];
-  attendance: StudentAttendance[];
-  db: Awaited<ReturnType<typeof readDatabase>>;
-  isPortal: boolean;
-  schedules: CourseSchedule[];
-  visibleJournals: LessonJournal[];
-}) {
-  if (isPortal) {
-    return [
-      `${activePackages.length} paket les aktif`,
-      `${schedules.filter((schedule) => schedule.lessonMode === "Studio").length} sesi studio`,
-      `${schedules.filter((schedule) => schedule.lessonMode === "Home Visit").length} sesi home visit`,
-      `${visibleJournals.length} journal bisa dilihat`,
-      `${attendance.filter((row) => row.confirmed).length} attendance sudah final`,
-      `${attendance.filter((row) => row.status === "Rescheduled").length} sesi rescheduled`,
-    ];
-  }
-
-  return [
-    `${db.instruments.filter((instrument) => instrument.isActive).length} instrumen aktif`,
-    `${db.instructors.filter((instructor) => instructor.portalEnabled).length} instructor portal aktif`,
-    `${schedules.filter((schedule) => schedule.lessonMode === "Studio").length} jadwal studio`,
-    `${schedules.filter((schedule) => schedule.lessonMode === "Home Visit").length} jadwal home visit`,
-    `${visibleJournals.length} journal confirmed`,
-    `${db.rooms.filter((room) => room.isActive).length} studio room aktif`,
-  ];
 }
 
 function sumInvoices(invoices: Invoice[]) {

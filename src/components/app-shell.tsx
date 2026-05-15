@@ -103,15 +103,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0">
           <div className="sticky top-3 z-20 mb-3 lg:hidden">
-            <Button
+            <button
               aria-label="Buka menu"
-              className="shadow-[0_16px_50px_rgba(15,23,42,.14)]"
+              className="grid size-9 place-items-center text-zinc-800 transition-colors hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
               onClick={() => setMobileMenuOpen(true)}
-              size="icon"
-              variant="glass"
+              type="button"
             >
               <Menu className="size-5" />
-            </Button>
+            </button>
           </div>
           <div className="space-y-4">{children}</div>
         </section>
