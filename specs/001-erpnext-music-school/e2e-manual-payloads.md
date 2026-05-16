@@ -154,7 +154,8 @@ Resource: `courses`
     "instrumentId": "inst-violin",
     "courseLevel": "Beginner",
     "durationMinutes": 60,
-    "defaultFee": 900000
+    "packageAFee": 350000,
+    "packageBFee": 700000
   },
   {
     "id": "course-piano-beginner",
@@ -162,7 +163,8 @@ Resource: `courses`
     "instrumentId": "inst-piano",
     "courseLevel": "Beginner",
     "durationMinutes": 60,
-    "defaultFee": 850000
+    "packageAFee": 350000,
+    "packageBFee": 700000
   },
   {
     "id": "course-vocal-intermediate",
@@ -170,7 +172,8 @@ Resource: `courses`
     "instrumentId": "inst-vocal",
     "courseLevel": "Intermediate",
     "durationMinutes": 60,
-    "defaultFee": 800000
+    "packageAFee": 350000,
+    "packageBFee": 700000
   }
 ]
 ```
@@ -182,24 +185,17 @@ Resource: `rooms`
 ```json
 [
   {
-    "id": "room-strings-1",
-    "roomName": "Strings Room 1",
+    "id": "room-a",
+    "roomName": "Studio A",
     "capacity": 2,
-    "instrumentIds": ["inst-violin"],
+    "instrumentIds": ["inst-violin", "inst-piano", "inst-vocal", "inst-guitar", "inst-drums"],
     "isActive": true
   },
   {
-    "id": "room-piano-1",
-    "roomName": "Piano Room 1",
+    "id": "room-b",
+    "roomName": "Studio B",
     "capacity": 2,
-    "instrumentIds": ["inst-piano"],
-    "isActive": true
-  },
-  {
-    "id": "room-vocal-1",
-    "roomName": "Vocal Room 1",
-    "capacity": 2,
-    "instrumentIds": ["inst-vocal"],
+    "instrumentIds": ["inst-violin", "inst-piano", "inst-vocal", "inst-guitar", "inst-drums"],
     "isActive": true
   }
 ]
@@ -250,7 +246,13 @@ Payload Student fokus ke profil murid. Instrument dan lesson mode dipilih saat m
 
 Resource: `lesson-packages`
 
-Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis. Di UI, `instrumentId` otomatis dari Course, sedangkan `lessonMode` dipilih per package.
+Payload Lesson Package di bawah membuat schedules dan attendance otomatis.
+
+- `lessonCount: 4` = Paket A, 4x per bulan, seminggu 1x.
+- `lessonCount: 8` = Paket B, 8x per bulan, seminggu 2x. Pilih tepat 2 `availabilitySlotId`.
+- `availabilitySlotId` memakai slot per jam, contoh suffix `-0900` untuk 09:00 - 10:00.
+- `lessonDays`, `fromTime`, dan `toTime` otomatis mengikuti availability slot yang dipilih.
+- Di UI, `instrumentId` otomatis dari Course, sedangkan `lessonMode` dipilih per package.
 
 ```json
 [
@@ -259,15 +261,13 @@ Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis. Di 
     "studentId": "student-luna",
     "courseId": "course-violin-beginner",
     "instructorId": "instructor-sari",
+    "availabilitySlotId": ["availability-sari-saturday-studio-0900"],
     "instrumentId": "inst-violin",
     "billingPeriod": "2026-05",
     "lessonStartDate": "2026-05-15",
-    "lessonDays": ["6"],
     "lessonCount": 4,
-    "fromTime": "09:00",
-    "toTime": "10:00",
     "lessonMode": "Studio",
-    "studioRoomId": "room-strings-1",
+    "studioRoomId": "room-a",
     "status": "Active"
   },
   {
@@ -275,15 +275,13 @@ Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis. Di 
     "studentId": "student-ayu",
     "courseId": "course-piano-beginner",
     "instructorId": "instructor-budi",
+    "availabilitySlotId": ["availability-budi-monday-studio-1500", "availability-budi-saturday-studio-1500"],
     "instrumentId": "inst-piano",
     "billingPeriod": "2026-05",
-    "lessonStartDate": "2026-05-01",
-    "lessonDays": ["1"],
-    "lessonCount": 4,
-    "fromTime": "15:00",
-    "toTime": "16:00",
+    "lessonStartDate": "2026-05-03",
+    "lessonCount": 8,
     "lessonMode": "Studio",
-    "studioRoomId": "room-piano-1",
+    "studioRoomId": "room-b",
     "status": "Active"
   },
   {
@@ -291,13 +289,11 @@ Payload Lesson Package di bawah membuat 4 schedules dan attendance otomatis. Di 
     "studentId": "student-nara",
     "courseId": "course-vocal-intermediate",
     "instructorId": "instructor-maya",
+    "availabilitySlotId": ["availability-maya-wednesday-home-1900"],
     "instrumentId": "inst-vocal",
     "billingPeriod": "2026-05",
     "lessonStartDate": "2026-05-15",
-    "lessonDays": ["3"],
     "lessonCount": 4,
-    "fromTime": "19:00",
-    "toTime": "20:00",
     "lessonMode": "Home Visit",
     "homeVisitAddress": "Jl. Melodi No. 22, Jakarta Selatan",
     "status": "Active"
@@ -309,7 +305,7 @@ Schedule yang otomatis dibuat:
 
 ```text
 package-luna-2026-05 -> 2026-05-16, 2026-05-23, 2026-05-30, 2026-06-06
-package-ayu-2026-05  -> 2026-05-04, 2026-05-11, 2026-05-18, 2026-05-25
+package-ayu-2026-05  -> 2026-05-03, 2026-05-04, 2026-05-10, 2026-05-11, 2026-05-17, 2026-05-18, 2026-05-24, 2026-05-25
 package-nara-2026-05 -> 2026-05-20, 2026-05-27, 2026-06-03, 2026-06-10
 ```
 
@@ -332,15 +328,13 @@ Resource: `lesson-packages`
   "studentId": "student-ayu",
   "courseId": "course-piano-beginner",
   "instructorId": "instructor-budi",
+  "availabilitySlotId": ["availability-budi-monday-studio-1500"],
   "instrumentId": "inst-piano",
   "billingPeriod": "2026-06",
   "lessonStartDate": "2026-06-01",
-  "lessonDays": ["1"],
   "lessonCount": 4,
-  "fromTime": "15:00",
-  "toTime": "16:00",
   "lessonMode": "Studio",
-  "studioRoomId": "room-piano-1",
+  "studioRoomId": "room-b",
   "status": "Active"
 }
 ```
