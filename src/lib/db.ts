@@ -233,7 +233,14 @@ async function ensureHourlyInstructorAvailabilitySetup() {
         const fromTime = minutesToTime(start);
         const toTime = minutesToTime(start + 60);
         const id = `${String(row.id || row._id)}-${fromTime.replace(":", "")}`;
-        const { _id: _oldId, id: _oldRecordId, fromTime: _oldFromTime, toTime: _oldToTime, ...hourlyBase } = row;
+        const {
+          _id: _oldId,
+          id: _oldRecordId,
+          fromTime: _oldFromTime,
+          toTime: _oldToTime,
+          updatedAt: _oldUpdatedAt,
+          ...hourlyBase
+        } = row;
 
         hourlySlots.push(
           db.collection("instructor-availability").updateOne(
