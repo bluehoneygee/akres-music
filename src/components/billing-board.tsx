@@ -159,7 +159,7 @@ export function BillingBoard() {
                           {formatDisplayText(line.course?.courseName ?? line.invoice.lessonPackage)}
                         </p>
                         <p className="text-xs text-zinc-500">
-                          {String(line.lessonPackage?.lessonCount ?? 4)} sessions
+                          {formatPackageName(line.lessonPackage?.lessonCount)}
                         </p>
                       </td>
                       <td className="px-4 py-3">{formatDisplayText(line.invoice.billingPeriod)}</td>
@@ -255,6 +255,10 @@ function formatCurrency(value: number) {
     maximumFractionDigits: 0,
     style: "currency",
   }).format(value);
+}
+
+function formatPackageName(value: unknown) {
+  return Number(value) === 8 ? "Paket B - 8 sessions" : "Paket A - 4 sessions";
 }
 
 function formatDateTime(value: unknown) {

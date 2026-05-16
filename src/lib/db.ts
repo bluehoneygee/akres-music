@@ -133,6 +133,7 @@ async function ensureDemoRecords() {
   }
 
   await ensureStudioRoomSetup();
+  await ensureHourlyInstructorAvailabilitySetup();
 
   for (const lessonPackage of seedDatabase["lesson-packages"]) {
     const existingPackage = await db
@@ -206,6 +207,70 @@ async function ensureStudioRoomSetup() {
   );
 }
 
+async function ensureHourlyInstructorAvailabilitySetup() {
+  const db = await getMongoDb();
+  const now = new Date().toISOString();
+  const availabilityRows = await db
+    .collection("instructor-availability")
+    .find({ active: { $ne: false } })
+    .toArray();
+
+  await Promise.all(
+    availabilityRows.map(async (row) => {
+      const fromMinutes = timeToMinutes(String(row.fromTime || ""));
+      const toMinutes = timeToMinutes(String(row.toTime || ""));
+
+      if (
+        !Number.isFinite(fromMinutes) ||
+        !Number.isFinite(toMinutes) ||
+        toMinutes - fromMinutes <= 60
+      ) {
+        return;
+      }
+
+      const hourlySlots = [];
+      for (let start = fromMinutes; start + 60 <= toMinutes; start += 30) {
+        const fromTime = minutesToTime(start);
+        const toTime = minutesToTime(start + 60);
+        const id = `${String(row.id || row._id)}-${fromTime.replace(":", "")}`;
+        const { _id: _oldId, id: _oldRecordId, fromTime: _oldFromTime, toTime: _oldToTime, ...hourlyBase } = row;
+
+        hourlySlots.push(
+          db.collection("instructor-availability").updateOne(
+            { id },
+            {
+              $setOnInsert: {
+                _id: id,
+                ...hourlyBase,
+                id,
+                fromTime,
+                toTime,
+                active: true,
+                createdAt: row.createdAt ?? now,
+              },
+              $set: {
+                updatedAt: now,
+              },
+            },
+            { upsert: true },
+          ),
+        );
+      }
+
+      await Promise.all(hourlySlots);
+      await db.collection("instructor-availability").updateOne(
+        { id: row.id },
+        {
+          $set: {
+            active: false,
+            updatedAt: now,
+          },
+        },
+      );
+    }),
+  );
+}
+
 function fromMongo<T extends Document>(record: T): Omit<T, "_id"> & { id: string } {
   const { _id, ...rest } = record;
   return {
@@ -252,6 +317,10 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
     return createLessonPackageWithSchedules(payload, now);
   }
 
+  if (resource === "instructor-availability") {
+    payload = normalizeInstructorAvailabilityPayload(payload);
+  }
+
   const id = String(payload.id || `${resource}-${crypto.randomUUID()}`);
   const record = {
     _id: id,
@@ -272,6 +341,22 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
 
   await (await collection(resource)).insertOne(record as Document);
   return fromMongo(record);
+}
+
+function normalizeInstructorAvailabilityPayload(payload: Record<string, unknown>) {
+  const fromTime = String(payload.fromTime || "");
+  const toTime = String(payload.toTime || nextHour(fromTime));
+
+  if (timeToMinutes(toTime) - timeToMinutes(fromTime) !== 60) {
+    throw new Error("Instructor availability harus per 1 jam.");
+  }
+
+  return {
+    ...payload,
+    fromTime,
+    toTime,
+    active: payload.active ?? true,
+  };
 }
 
 async function createLessonPackageWithSchedules(
@@ -311,6 +396,8 @@ async function ensureInvoiceForLessonPackage(
   const course = await db.collection("courses").findOne<{
     courseName?: string;
     defaultFee?: number;
+    packageAFee?: number;
+    packageBFee?: number;
   }>({ id: String(lessonPackage.courseId || "") });
   const invoiceId = `invoice-${lessonPackageId}`;
   const billingPeriod = String(lessonPackage.billingPeriod || "");
@@ -327,7 +414,7 @@ async function ensureInvoiceForLessonPackage(
         courseId: String(lessonPackage.courseId || ""),
         billingPeriod,
         lessonPackage: course?.courseName || "Lesson Package",
-        amount: Number(course?.defaultFee || 0),
+        amount: getLessonPackageAmount(course, Number(lessonPackage.lessonCount || 4)),
         dueDate: "",
         paidAt: "",
         status: "Unpaid",
@@ -348,23 +435,68 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
   const studentId = String(payload.studentId || "");
   const instructorId = String(payload.instructorId || "");
   const billingPeriod = String(payload.billingPeriod || payload.scheduleMonth || "");
-  const lessonStartDate = String(payload.lessonStartDate || "");
-  const lessonDays = toStringArray(payload.lessonDays);
-  const fromTime = String(payload.fromTime || "");
-  const toTime = String(payload.toTime || "");
+  const availabilitySlotIds = toStringArray(payload.availabilitySlotId);
+  const availableDates = toStringArray(payload.availableDate).sort();
   const instrumentId = String(payload.instrumentId || (await findCourseInstrumentId(courseId)) || "");
   const lessonMode = String(payload.lessonMode || "Studio");
+  const lessonCount = normalizeLessonCount(payload.lessonCount);
+  const availabilitySlots = await findSelectedInstructorAvailabilitySlots(
+    instructorId,
+    availabilitySlotIds,
+    lessonCount,
+  );
+  const lessonDays = availabilitySlots.length > 0
+    ? Array.from(new Set(availabilitySlots.map((slot) => String(slot.dayOfWeek))))
+    : toStringArray(payload.lessonDays);
+  const scheduleSlotTimes = availabilitySlots.map((slot) => ({
+    availabilitySlotId: String(slot.id || ""),
+    dayOfWeek: String(slot.dayOfWeek || ""),
+    fromTime: String(slot.fromTime || ""),
+    toTime: String(slot.toTime || ""),
+  }));
+  const fromTime = String(payload.fromTime || scheduleSlotTimes[0]?.fromTime || "");
+  const toTime = String(payload.toTime || scheduleSlotTimes[0]?.toTime || "");
+  const lessonStartDate =
+    availableDates[0] ||
+    String(payload.lessonStartDate || "") ||
+    firstLessonDateInMonth(billingPeriod, lessonDays);
 
   if (!courseId || !studentId || !instructorId || !instrumentId || !billingPeriod || !lessonStartDate || !fromTime || !toTime || lessonDays.length === 0) {
     throw new Error("Lesson package needs student, course, instructor, instrument, billing period, start date, lesson days, and time.");
+  }
+
+  if (lessonCount === 8 && new Set(lessonDays).size < 2) {
+    throw new Error("Paket B perlu minimal 2 lesson days karena jadwalnya 2x per minggu.");
+  }
+
+  if (availabilitySlots.length > 0 && new Set(availabilitySlots.map((slot) => String(slot.dayOfWeek))).size !== availabilitySlots.length) {
+    throw new Error("Availability slots harus dari hari yang berbeda.");
+  }
+
+  if (availabilitySlotIds.length > 0 && availableDates.length !== (lessonCount === 8 ? 2 : 1)) {
+    throw new Error(
+      lessonCount === 8
+        ? "Paket B harus memilih tepat 2 available dates."
+        : "Paket A harus memilih tepat 1 available date.",
+    );
+  }
+
+  const pastAvailableDate = availableDates.find((date) => date < todayDateString());
+  if (pastAvailableDate) {
+    throw new Error(`Available date ${pastAvailableDate} sudah lewat. Pilih tanggal hari ini atau setelahnya.`);
+  }
+
+  if (availableDates.length > 0 && new Set(availableDates.map(dateToDayOfWeek)).size !== availableDates.length) {
+    throw new Error("Available dates harus dari hari yang berbeda.");
   }
 
   await assertInstructorSlotAvailable({
     instructorId,
     lessonStartDate,
     lessonDays,
-    lessonCount: Number(payload.lessonCount || 4),
+    lessonCount,
     fromTime,
+    scheduleSlotTimes,
     toTime,
   });
 
@@ -372,9 +504,10 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     lessonMode,
     lessonStartDate,
     lessonDays,
-    lessonCount: Number(payload.lessonCount || 4),
+    lessonCount,
     studioRoomId: String(payload.studioRoomId || ""),
     fromTime,
+    scheduleSlotTimes,
     toTime,
   });
 
@@ -387,14 +520,116 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     billingPeriod,
     lessonStartDate,
     lessonDays,
-    lessonCount: payload.lessonCount || 4,
+    lessonCount,
     fromTime,
     toTime,
+    scheduleSlotTimes,
     lessonMode,
     studioRoomId: String(payload.studioRoomId || ""),
     homeVisitAddress: String(payload.homeVisitAddress || ""),
     status: String(payload.status || "Active"),
   };
+}
+
+function normalizeLessonCount(value: unknown) {
+  const lessonCount = Number(value || 4);
+  return lessonCount === 8 ? 8 : 4;
+}
+
+type ScheduleSlotTime = {
+  availabilitySlotId?: string;
+  dayOfWeek: string;
+  fromTime: string;
+  toTime: string;
+};
+
+async function findSelectedInstructorAvailabilitySlots(
+  instructorId: string,
+  availabilitySlotIds: string[],
+  lessonCount: number,
+): Promise<Document[]> {
+  const requiredSlotCount = lessonCount === 8 ? 2 : 1;
+  if (availabilitySlotIds.length === 0) return [];
+
+  if (availabilitySlotIds.length !== requiredSlotCount) {
+    throw new Error(
+      lessonCount === 8
+        ? "Paket B harus memilih tepat 2 availability slots."
+        : "Paket A harus memilih tepat 1 availability slot.",
+    );
+  }
+
+  const db = await getMongoDb();
+  const slots = await db
+    .collection("instructor-availability")
+    .find({
+      id: { $in: availabilitySlotIds },
+      instructorId,
+      active: { $ne: false },
+    })
+    .toArray();
+
+  if (slots.length !== availabilitySlotIds.length) {
+    throw new Error("Availability slot tidak valid untuk instructor yang dipilih.");
+  }
+
+  const slotsById = new Map(slots.map((slot) => [String(slot.id || ""), slot]));
+  const sortedSlots: Document[] = [];
+
+  availabilitySlotIds.forEach((slotId) => {
+    const slot = slotsById.get(slotId);
+    if (slot) sortedSlots.push(slot);
+  });
+
+  return sortedSlots;
+}
+
+function getLessonPackageAmount(
+  course: { defaultFee?: number; packageAFee?: number; packageBFee?: number } | null,
+  lessonCount: number,
+) {
+  const packageAFee = Number(course?.packageAFee ?? course?.defaultFee ?? 0);
+  if (lessonCount === 8) return Number(course?.packageBFee ?? packageAFee * 2);
+
+  return packageAFee;
+}
+
+function firstLessonDateInMonth(monthValue: string, lessonDays: string[]) {
+  if (!/^\d{4}-\d{2}$/.test(monthValue) || lessonDays.length === 0) return "";
+
+  const [year, month] = monthValue.split("-").map(Number);
+  const current = new Date(Date.UTC(year, month - 1, 1));
+  const today = todayDateString();
+  const selectedDays = new Set(
+    lessonDays.map(Number).filter((dayOfWeek) => dayOfWeek >= 0 && dayOfWeek <= 6),
+  );
+
+  while (current.getUTCMonth() === month - 1) {
+    const currentDate = current.toISOString().slice(0, 10);
+
+    if (currentDate >= today && selectedDays.has(current.getUTCDay())) {
+      return currentDate;
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return "";
+}
+
+function todayDateString() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function dateToDayOfWeek(date: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? String(new Date(`${date}T00:00:00.000Z`).getUTCDay())
+    : "";
 }
 
 async function assertStudioRoomSlotAvailable({
@@ -403,6 +638,7 @@ async function assertStudioRoomSlotAvailable({
   lessonDays,
   lessonMode,
   lessonStartDate,
+  scheduleSlotTimes = [],
   studioRoomId,
   toTime,
 }: {
@@ -411,6 +647,7 @@ async function assertStudioRoomSlotAvailable({
   lessonDays: string[];
   lessonMode: string;
   lessonStartDate: string;
+  scheduleSlotTimes?: ScheduleSlotTime[];
   studioRoomId: string;
   toTime: string;
 }) {
@@ -432,14 +669,16 @@ async function assertStudioRoomSlotAvailable({
     })
     .toArray();
 
-  const conflict = existingSchedules.find((schedule) =>
-    rangesOverlap(
-      fromTime,
-      toTime,
+  const conflict = existingSchedules.find((schedule) => {
+    const slotTime = slotTimeForDate(String(schedule.scheduleDate || ""), scheduleSlotTimes, fromTime, toTime);
+
+    return rangesOverlap(
+      slotTime.fromTime,
+      slotTime.toTime,
       String(schedule.fromTime || ""),
       String(schedule.toTime || ""),
-    ),
-  );
+    );
+  });
 
   if (conflict) {
     throw new Error(
@@ -497,6 +736,7 @@ function pickLessonPackageSchedulePayload(payload: Record<string, unknown>) {
     lessonStartDate: String(payload.lessonStartDate || ""),
     lessonDays: payload.lessonDays,
     lessonCount: payload.lessonCount || 4,
+    scheduleSlotTimes: payload.scheduleSlotTimes,
     fromTime: String(payload.fromTime || ""),
     toTime: String(payload.toTime || ""),
     lessonMode: String(payload.lessonMode || "Studio"),
@@ -521,9 +761,16 @@ function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
       : [];
   const dates = packageDates.length > 0 ? packageDates : [singleDate];
   const baseId = String(payload.id || `schedules-${crypto.randomUUID()}`);
+  const scheduleSlotTimes = toScheduleSlotTimes(payload.scheduleSlotTimes);
 
   return dates.map((scheduleDate, index) => {
     const id = index === 0 ? baseId : `${baseId}-${index + 1}`;
+    const slotTime = slotTimeForDate(
+      scheduleDate,
+      scheduleSlotTimes,
+      String(payload.fromTime || ""),
+      String(payload.toTime || ""),
+    );
 
     return {
       _id: id,
@@ -534,6 +781,8 @@ function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
       lessonStartDate,
       lessonDays,
       lessonCount,
+      fromTime: slotTime.fromTime,
+      toTime: slotTime.toTime,
       privateLesson: true,
       scheduleStatus: String(payload.scheduleStatus || "Scheduled"),
       originalScheduleId: String(payload.originalScheduleId || ""),
@@ -660,12 +909,54 @@ function expandPackageLessonDates(
   return dates;
 }
 
+function toScheduleSlotTimes(value: unknown): ScheduleSlotTime[] {
+  if (!Array.isArray(value)) return [];
+
+  const slotTimes: ScheduleSlotTime[] = [];
+
+  value.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+
+    const record = item as Record<string, unknown>;
+    const slotTime = {
+      availabilitySlotId: String(record.availabilitySlotId || ""),
+      dayOfWeek: String(record.dayOfWeek || ""),
+      fromTime: String(record.fromTime || ""),
+      toTime: String(record.toTime || ""),
+    };
+
+    if (slotTime.dayOfWeek && slotTime.fromTime && slotTime.toTime) {
+      slotTimes.push(slotTime);
+    }
+  });
+
+  return slotTimes;
+}
+
+function slotTimeForDate(
+  date: string,
+  scheduleSlotTimes: ScheduleSlotTime[],
+  fallbackFromTime: string,
+  fallbackToTime: string,
+) {
+  const dayOfWeek = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? String(new Date(`${date}T00:00:00.000Z`).getUTCDay())
+    : "";
+  const slotTime = scheduleSlotTimes.find((slot) => slot.dayOfWeek === dayOfWeek);
+
+  return {
+    fromTime: slotTime?.fromTime || fallbackFromTime,
+    toTime: slotTime?.toTime || fallbackToTime,
+  };
+}
+
 async function assertInstructorSlotAvailable({
   instructorId,
   lessonStartDate,
   lessonDays,
   lessonCount,
   fromTime,
+  scheduleSlotTimes = [],
   toTime,
 }: {
   instructorId: string;
@@ -673,6 +964,7 @@ async function assertInstructorSlotAvailable({
   lessonDays: string[];
   lessonCount: number;
   fromTime: string;
+  scheduleSlotTimes?: ScheduleSlotTime[];
   toTime: string;
 }) {
   const dates = expandPackageLessonDates(lessonStartDate, lessonDays, lessonCount);
@@ -690,12 +982,13 @@ async function assertInstructorSlotAvailable({
 
   const unavailableDate = dates.find((date) => {
     const dayOfWeek = String(new Date(`${date}T00:00:00.000Z`).getUTCDay());
+    const slotTime = slotTimeForDate(date, scheduleSlotTimes, fromTime, toTime);
 
     return !availability.some((slot) => {
       return (
         String(slot.dayOfWeek) === dayOfWeek &&
-        timeToMinutes(String(slot.fromTime || "")) <= timeToMinutes(fromTime) &&
-        timeToMinutes(String(slot.toTime || "")) >= timeToMinutes(toTime)
+        timeToMinutes(String(slot.fromTime || "")) <= timeToMinutes(slotTime.fromTime) &&
+        timeToMinutes(String(slot.toTime || "")) >= timeToMinutes(slotTime.toTime)
       );
     });
   });
@@ -713,14 +1006,16 @@ async function assertInstructorSlotAvailable({
     })
     .toArray();
 
-  const conflict = existingSchedules.find((schedule) =>
-    rangesOverlap(
-      fromTime,
-      toTime,
+  const conflict = existingSchedules.find((schedule) => {
+    const slotTime = slotTimeForDate(String(schedule.scheduleDate || ""), scheduleSlotTimes, fromTime, toTime);
+
+    return rangesOverlap(
+      slotTime.fromTime,
+      slotTime.toTime,
       String(schedule.fromTime || ""),
       String(schedule.toTime || ""),
-    ),
-  );
+    );
+  });
 
   if (conflict) {
     throw new Error(
@@ -749,6 +1044,20 @@ function timeToMinutes(value: string) {
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
 
   return hours * 60 + minutes;
+}
+
+function minutesToTime(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function nextHour(value: string) {
+  const minutes = timeToMinutes(value);
+  if (!Number.isFinite(minutes)) return "";
+
+  return minutesToTime(minutes + 60);
 }
 
 function formatDate(value: Date) {

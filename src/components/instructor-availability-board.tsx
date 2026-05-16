@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { lessonDayOptions } from "@/lib/options";
+import { hourlyLessonSlotOptions, lessonDayOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
@@ -91,7 +91,7 @@ export function InstructorAvailabilityBoard() {
           instructorId: selectedInstructorId,
           dayOfWeek: draft.dayOfWeek,
           fromTime: draft.fromTime,
-          toTime: draft.toTime,
+          toTime: nextHour(draft.fromTime),
           lessonMode: "Both",
           active: true,
         }),
@@ -403,30 +403,28 @@ function AvailabilityFormModal({
             </select>
           </label>
 
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
-                From
-              </span>
-              <input
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                onChange={(event) => onDraftChange({ ...draft, fromTime: event.target.value })}
-                type="time"
-                value={draft.fromTime}
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
-                To
-              </span>
-              <input
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                onChange={(event) => onDraftChange({ ...draft, toTime: event.target.value })}
-                type="time"
-                value={draft.toTime}
-              />
-            </label>
-          </div>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+              Time slot
+            </span>
+            <select
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  fromTime: event.target.value,
+                  toTime: nextHour(event.target.value),
+                })
+              }
+              value={draft.fromTime}
+            >
+              {hourlyLessonSlotOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <p className="rounded-2xl border border-white/45 bg-white/42 px-3 py-2 text-xs text-zinc-500">
             Mode Studio atau Home Visit dipilih saat membuat Lesson Package.
@@ -639,4 +637,11 @@ function monthTitle(value: Date) {
 function studentName(student?: Row) {
   if (!student) return "";
   return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
+}
+
+function nextHour(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "";
+
+  return `${String(hours + 1).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }

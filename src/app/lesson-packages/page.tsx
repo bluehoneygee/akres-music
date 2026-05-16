@@ -3,6 +3,7 @@ import { ResourcePage } from "@/components/resource-page";
 import {
   lessonDayOptions,
   lessonModeOptions,
+  lessonPackageSessionOptions,
   lessonPackageStatusOptions,
 } from "@/lib/options";
 
@@ -10,8 +11,15 @@ export default function LessonPackagesPage() {
   return (
     <AppShell>
       <ResourcePage
-        description="Paket les privat 4 sesi. Buat paket baru saat murid mulai atau memperpanjang les, lalu sistem otomatis membuat schedules dan attendance."
+        description="Paket les privat bulanan. Pilih Paket A untuk 4 sesi per bulan atau Paket B untuk 8 sesi per bulan, lalu sistem otomatis membuat schedules dan attendance."
         fields={[
+          {
+            key: "lessonCount",
+            label: "Package",
+            type: "select",
+            options: lessonPackageSessionOptions,
+            required: true,
+          },
           {
             key: "courseId",
             label: "Course",
@@ -51,7 +59,7 @@ export default function LessonPackagesPage() {
           },
           {
             key: "availabilitySlotId",
-            label: "Available slot",
+            label: "Available slots",
             type: "relation",
             relation: {
               resource: "instructor-availability",
@@ -62,12 +70,14 @@ export default function LessonPackagesPage() {
               optionField: "instructorId",
               mode: "equals",
             },
+            multiple: true,
             writeOnly: true,
           },
           {
             key: "availableDate",
             label: "Available date",
             type: "select",
+            multiple: true,
             availabilityDateFrom: {
               monthField: "billingPeriod",
               slotField: "availabilitySlotId",
@@ -88,13 +98,14 @@ export default function LessonPackagesPage() {
             options: lessonDayOptions,
             multiple: true,
             deriveFrom: { sourceField: "availabilitySlotId", sourceOptionField: "dayOfWeek" },
+            hidden: true,
           },
-          { key: "lessonCount", label: "Lesson count", type: "number" },
           {
             key: "fromTime",
             label: "From",
             type: "time",
             deriveFrom: { sourceField: "availabilitySlotId", sourceOptionField: "fromTime" },
+            hidden: true,
             required: true,
           },
           {
@@ -102,6 +113,7 @@ export default function LessonPackagesPage() {
             label: "To",
             type: "time",
             deriveFrom: { sourceField: "availabilitySlotId", sourceOptionField: "toTime" },
+            hidden: true,
             required: true,
           },
           {
@@ -115,7 +127,7 @@ export default function LessonPackagesPage() {
             key: "studioRoomId",
             label: "Studio Room",
             type: "relation",
-            relation: { resource: "rooms", labelFields: ["roomName"] },
+            relation: { resource: "rooms", labelFields: ["roomName"], activeOnly: true },
             visibleWhen: { field: "lessonMode", value: "Studio" },
             relationFilter: {
               sourceField: "instrumentId",

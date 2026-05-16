@@ -20,6 +20,11 @@ export const lessonModeOptions = ["Studio", "Home Visit"].map((value) => ({
   value,
 }));
 
+export const lessonPackageSessionOptions = [
+  ["4", "Paket A - 4x per bulan"],
+  ["8", "Paket B - 8x per bulan"],
+].map(([value, label]) => ({ label, value }));
+
 export const lessonDayOptions = [
   ["1", "Monday"],
   ["2", "Tuesday"],
@@ -29,6 +34,26 @@ export const lessonDayOptions = [
   ["6", "Saturday"],
   ["0", "Sunday"],
 ].map(([value, label]) => ({ label, value }));
+
+export const hourlyLessonSlotOptions = Array.from({ length: 26 }, (_, index) => {
+  const fromMinutes = 8 * 60 + index * 30;
+  const toMinutes = fromMinutes + 60;
+  const fromTime = minutesToTime(fromMinutes);
+  const toTime = minutesToTime(toMinutes);
+
+  return {
+    label: `${fromTime} - ${toTime}`,
+    value: fromTime,
+    toTime,
+  };
+});
+
+function minutesToTime(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
 export const scheduleStatusOptions = [
   "Scheduled",

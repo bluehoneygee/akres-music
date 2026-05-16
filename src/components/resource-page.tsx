@@ -25,6 +25,7 @@ export type FieldConfig = {
     | "relation";
   options?: { label: string; value: string }[];
   relation?: {
+    activeOnly?: boolean;
     resource: ResourceName | "users";
     labelFields: string[];
     valueField?: string;
@@ -125,7 +126,9 @@ export function ResourcePage({
 
     const response = await fetch(`/api/${field.relation.resource}`, { cache: "no-store" });
     const json = (await response.json()) as { data?: UiRecord[] };
-    const records = Array.isArray(json.data) ? json.data : [];
+    const records = (Array.isArray(json.data) ? json.data : []).filter((record) =>
+      field.relation?.activeOnly ? record.isActive !== false : true,
+    );
     const valueField = field.relation.valueField ?? "id";
 
     return [
@@ -490,17 +493,88 @@ export function ResourcePage({
                         }
                         type="checkbox"
                       />
+                    ) : (field.type === "select" || field.type === "relation") && field.multiple ? (
+                      <div className="space-y-2">
+                        <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+                          {(
+                            field.type === "relation"
+                              ? getFieldOptions(field, draft, relationOptions, scheduleRows)
+                              : getSelectOptions(field, draft, relationOptions)
+                          ).map((option) => {
+                            const selectedValues = toMultiSelectValue(draft[field.key]);
+                            const checked = selectedValues.includes(option.value);
+                            const disabled = Boolean("disabled" in option && option.disabled);
+
+                            return (
+                              <button
+                                aria-pressed={checked}
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                                  checked
+                                    ? "border-zinc-950 bg-zinc-950 text-white"
+                                    : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                                } ${disabled ? "cursor-not-allowed opacity-45" : ""}`}
+                                disabled={disabled || !fieldVisible}
+                                key={option.value}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  setDraft((current) => {
+                                    const currentValues = toMultiSelectValue(current[field.key]);
+                                    const nextValue = getNextMultiSelectValue({
+                                      checked,
+                                      currentValues,
+                                      draft: current,
+                                      field,
+                                      option,
+                                      relationOptions,
+                                    });
+
+                                    if (!nextValue) return current;
+
+                                    const nextDraft = {
+                                      ...current,
+                                      [field.key]: nextValue,
+                                      ...clearHiddenDependentValues(fields, field.key, option.value),
+                                      ...clearFilteredDependentValues(fields, field.key),
+                                    };
+
+                                    return applyDerivedValues(fields, nextDraft, relationOptions);
+                                  });
+                                }}
+                                type="button"
+                              >
+                                <span
+                                  className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
+                                    checked
+                                      ? "border-white bg-white text-zinc-950"
+                                      : "border-zinc-300 bg-white/70 text-transparent"
+                                  }`}
+                                >
+                                  ✓
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {field.key === "availabilitySlotId" ? (
+                          <p className="text-xs text-zinc-500">
+                            Paket A pilih 1 slot. Paket B pilih 2 slot.
+                          </p>
+                        ) : null}
+                        {field.key === "availableDate" ? (
+                          <p className="text-xs text-zinc-500">
+                            Paket A pilih 1 tanggal. Paket B pilih 2 tanggal awal dari slot yang dipilih.
+                          </p>
+                        ) : null}
+                      </div>
                     ) : field.type === "select" || field.type === "relation" ? (
                       <div className="space-y-2">
                         <select
-                          className={`${field.multiple ? "min-h-28 py-2" : "h-11"} w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200`}
+                          className="h-11 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
                           disabled={!fieldVisible}
-                          multiple={field.multiple}
                           onChange={(event) =>
                             setDraft((current) => {
-                              const nextValue = field.multiple
-                                ? Array.from(event.target.selectedOptions, (option) => option.value)
-                                : event.target.value;
+                              const nextValue = event.target.value;
                               const nextDraft = {
                                 ...current,
                                 [field.key]: nextValue,
@@ -512,12 +586,10 @@ export function ResourcePage({
                             })
                           }
                           value={
-                            field.multiple
-                              ? toMultiSelectValue(draft[field.key])
-                              : String(draft[field.key] ?? "")
+                            String(draft[field.key] ?? "")
                           }
                         >
-                          {field.multiple ? null : <option value="">Select {field.label}</option>}
+                          <option value="">Select {field.label}</option>
                           {(
                             field.type === "relation"
                               ? getFieldOptions(field, draft, relationOptions, scheduleRows)
@@ -741,6 +813,79 @@ function clearFilteredDependentValues(fields: FieldConfig[], changedField: strin
   );
 }
 
+function getNextMultiSelectValue({
+  checked,
+  currentValues,
+  draft,
+  field,
+  option,
+  relationOptions,
+}: {
+  checked: boolean;
+  currentValues: string[];
+  draft: Record<string, RecordValue>;
+  field: FieldConfig;
+  option: RelationOption | { label: string; value: string };
+  relationOptions: Record<string, RelationOption[]>;
+}) {
+  if (checked) return currentValues.filter((value) => value !== option.value);
+
+  const limit = Number(draft.lessonCount) === 8 ? 2 : 1;
+
+  if (field.key === "availabilitySlotId") {
+    const selectedOptions = currentValues
+      .map((value) => relationOptions[field.key]?.find((item) => item.value === value))
+      .filter(Boolean);
+    const optionDay = optionDayOfWeek(option);
+    const hasSameDay = selectedOptions.some((item) => optionDayOfWeek(item!) === optionDay);
+
+    if (hasSameDay) {
+      toast.error("Slot di hari yang sama sudah dipilih. Uncheck slot lama dulu.", {
+        id: "availability-slot-same-day",
+      });
+      return null;
+    }
+
+    if (currentValues.length >= limit) {
+      toast.error(limit === 2 ? "Paket B hanya bisa memilih 2 slots." : "Paket A hanya bisa memilih 1 slot.", {
+        id: "availability-slot-limit",
+      });
+      return null;
+    }
+
+    return [...currentValues, option.value];
+  }
+
+  if (field.key === "availableDate") {
+    const optionDay = optionDayOfWeek(option);
+    const selectedOptions = currentValues
+      .map((value) => ({ label: value, value }))
+      .filter((item) => optionDayOfWeek(item) !== optionDay);
+    const nextValues = [...selectedOptions.map((item) => item.value), option.value].sort();
+
+    if (nextValues.length > limit) {
+      toast.error(
+        limit === 2 ? "Paket B hanya bisa memilih 2 tanggal awal." : "Paket A hanya bisa memilih 1 tanggal awal.",
+        { id: "available-date-limit" },
+      );
+      return null;
+    }
+
+    return nextValues;
+  }
+
+  return [...currentValues, option.value];
+}
+
+function optionDayOfWeek(option: { label: string; record?: UiRecord; value: string }) {
+  if (option.record?.dayOfWeek !== undefined) return String(option.record.dayOfWeek);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(option.value)) {
+    return String(new Date(`${option.value}T00:00:00.000Z`).getUTCDay());
+  }
+
+  return "";
+}
+
 function applyDerivedValues(
   fields: FieldConfig[],
   draft: Record<string, RecordValue>,
@@ -758,14 +903,25 @@ function applyDerivedValues(
   const availabilityDateField = fields.find((field) => field.availabilityDateFrom);
   if (availabilityDateField) {
     const options = getAvailabilityDateOptions(availabilityDateField, nextDraft, relationOptions);
-    const currentDate = String(nextDraft[availabilityDateField.key] ?? "");
-    const nextDate = options.some((option) => option.value === currentDate)
-      ? currentDate
-      : options[0]?.value ?? "";
+    const optionValues = new Set(options.map((option) => option.value));
 
-    nextDraft[availabilityDateField.key] = nextDate;
-    if (fields.some((field) => field.key === "lessonStartDate")) {
-      nextDraft.lessonStartDate = nextDate;
+    if (availabilityDateField.multiple) {
+      const currentDates = toMultiSelectValue(nextDraft[availabilityDateField.key]);
+      const nextDates = currentDates.filter((date) => optionValues.has(date));
+
+      nextDraft[availabilityDateField.key] =
+        nextDates.length > 0 ? nextDates : options[0]?.value ? [options[0].value] : [];
+      if (fields.some((field) => field.key === "lessonStartDate")) {
+        nextDraft.lessonStartDate = toMultiSelectValue(nextDraft[availabilityDateField.key]).sort()[0] ?? "";
+      }
+    } else {
+      const currentDate = String(nextDraft[availabilityDateField.key] ?? "");
+      const nextDate = optionValues.has(currentDate) ? currentDate : options[0]?.value ?? "";
+
+      nextDraft[availabilityDateField.key] = nextDate;
+      if (fields.some((field) => field.key === "lessonStartDate")) {
+        nextDraft.lessonStartDate = nextDate;
+      }
     }
   } else if (
     fields.some((field) => field.key === "lessonStartDate") &&
@@ -811,15 +967,34 @@ function getAvailabilityDateOptions(
   if (!field.availabilityDateFrom) return [];
 
   const monthValue = String(draft[field.availabilityDateFrom.monthField] ?? "");
-  const slotId = String(draft[field.availabilityDateFrom.slotField] ?? "");
-  const slot = relationOptions[field.availabilityDateFrom.slotField]?.find(
-    (option) => option.value === slotId,
-  )?.record;
+  const slotIds = toMultiSelectValue(draft[field.availabilityDateFrom.slotField]);
+  const slotOptions = relationOptions[field.availabilityDateFrom.slotField] ?? [];
+  const slots = slotIds
+    .map((slotId) => slotOptions.find((option) => option.value === slotId)?.record)
+    .filter(Boolean);
+  const dates = slots.flatMap((slot) =>
+    datesInMonthForDay(monthValue, String(slot?.dayOfWeek ?? "")).map((date) => ({
+      label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}`,
+      value: date,
+    })),
+  );
+  const today = todayDateString();
+  const uniqueDates = new Map(
+    dates.filter((date) => date.value >= today).map((date) => [date.value, date]),
+  );
 
-  return datesInMonthForDay(monthValue, String(slot?.dayOfWeek ?? "")).map((date) => ({
-    label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}`,
-    value: date,
-  }));
+  return Array.from(uniqueDates.values()).sort((left, right) =>
+    left.value.localeCompare(right.value),
+  );
+}
+
+function todayDateString() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function getFieldOptions(
@@ -848,7 +1023,7 @@ function filterRelationOptions(
   if (!field.relationFilter) return options;
 
   const sourceValue = draft[field.relationFilter.sourceField];
-  if (!sourceValue) return options;
+  if (!sourceValue) return [];
 
   const sourceOptions = relationOptions[field.relationFilter.sourceField] ?? [];
   const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
@@ -856,7 +1031,7 @@ function filterRelationOptions(
     ? sourceRecord?.[field.relationFilter.sourceOptionField]
     : sourceValue;
 
-  if (!expectedValue) return options;
+  if (!expectedValue) return [];
 
   return options.filter((option) => {
     const optionValue = option.record[field.relationFilter!.optionField];
@@ -1043,8 +1218,28 @@ function getDerivedValue(
   if (!sourceValue) return field.multiple ? [] : "";
 
   const sourceOptions = relationOptions[field.deriveFrom.sourceField] ?? [];
-  const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
+  const sourceRecords = toMultiSelectValue(sourceValue)
+    .map((value) => sourceOptions.find((option) => option.value === value)?.record)
+    .filter(Boolean);
+  const sourceRecord = sourceRecords[0];
   const derivedValue = sourceRecord?.[field.deriveFrom.sourceOptionField];
+
+  if (sourceRecords.length > 1) {
+    const derivedValues = Array.from(
+      new Set(
+        sourceRecords
+          .map((record) => record?.[field.deriveFrom!.sourceOptionField])
+          .filter((value) => value !== undefined && value !== "")
+          .map(String),
+      ),
+    );
+
+    if (field.multiple) return derivedValues;
+    if (derivedValues.length === 1) return derivedValues[0];
+
+    const currentValue = String(draft[field.key] ?? "");
+    return currentValue || derivedValues[0] || "";
+  }
 
   if (Array.isArray(derivedValue)) return derivedValue.map(String);
   if (field.multiple) return derivedValue ? [String(derivedValue)] : [];

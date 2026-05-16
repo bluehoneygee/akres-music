@@ -65,6 +65,8 @@ export type Course = BaseRecord & {
   courseLevel: "Beginner" | "Intermediate" | "Advanced";
   lessonType: "Private";
   durationMinutes: number;
+  packageAFee?: number;
+  packageBFee?: number;
   defaultFee: number;
 };
 
