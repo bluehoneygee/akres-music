@@ -55,7 +55,7 @@ export type InstructorAvailability = BaseRecord & {
   dayOfWeek: string;
   fromTime: string;
   toTime: string;
-  lessonMode: "Studio" | "Home Visit";
+  lessonMode: "Both" | "Studio" | "Home Visit";
   active: boolean;
 };
 

@@ -132,6 +132,8 @@ async function ensureDemoRecords() {
     );
   }
 
+  await ensureStudioRoomSetup();
+
   for (const lessonPackage of seedDatabase["lesson-packages"]) {
     const existingPackage = await db
       .collection("lesson-packages")
@@ -164,6 +166,44 @@ async function ensureDemoRecords() {
     await ensureAttendanceForSchedules(scheduleRecords, now);
     await ensureInvoiceForLessonPackage(packageRecord, now);
   }
+}
+
+async function ensureStudioRoomSetup() {
+  const db = await getMongoDb();
+  const now = new Date().toISOString();
+  const legacyRoomMap: Record<string, string> = {
+    "room-strings-1": "room-a",
+    "room-vocal-1": "room-a",
+    "room-piano-1": "room-b",
+    "room-guitar-1": "room-b",
+    "room-drums-1": "room-b",
+  };
+  const legacyRoomIds = Object.keys(legacyRoomMap);
+
+  await db.collection("rooms").updateMany(
+    { id: { $in: legacyRoomIds } },
+    {
+      $set: {
+        isActive: false,
+        updatedAt: now,
+      },
+    },
+  );
+
+  await Promise.all(
+    Object.entries(legacyRoomMap).map(([legacyRoomId, studioRoomId]) =>
+      Promise.all([
+        db.collection("lesson-packages").updateMany(
+          { studioRoomId: legacyRoomId },
+          { $set: { studioRoomId, updatedAt: now } },
+        ),
+        db.collection("schedules").updateMany(
+          { studioRoomId: legacyRoomId },
+          { $set: { studioRoomId, updatedAt: now } },
+        ),
+      ]),
+    ),
+  );
 }
 
 function fromMongo<T extends Document>(record: T): Omit<T, "_id"> & { id: string } {
@@ -326,7 +366,16 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     lessonCount: Number(payload.lessonCount || 4),
     fromTime,
     toTime,
+  });
+
+  await assertStudioRoomSlotAvailable({
     lessonMode,
+    lessonStartDate,
+    lessonDays,
+    lessonCount: Number(payload.lessonCount || 4),
+    studioRoomId: String(payload.studioRoomId || ""),
+    fromTime,
+    toTime,
   });
 
   return {
@@ -346,6 +395,57 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
     homeVisitAddress: String(payload.homeVisitAddress || ""),
     status: String(payload.status || "Active"),
   };
+}
+
+async function assertStudioRoomSlotAvailable({
+  fromTime,
+  lessonCount,
+  lessonDays,
+  lessonMode,
+  lessonStartDate,
+  studioRoomId,
+  toTime,
+}: {
+  fromTime: string;
+  lessonCount: number;
+  lessonDays: string[];
+  lessonMode: string;
+  lessonStartDate: string;
+  studioRoomId: string;
+  toTime: string;
+}) {
+  if (lessonMode !== "Studio") return;
+  if (!studioRoomId) {
+    throw new Error("Pilih Studio Room untuk lesson mode Studio.");
+  }
+
+  const dates = expandPackageLessonDates(lessonStartDate, lessonDays, lessonCount);
+  if (dates.length === 0) return;
+
+  const db = await getMongoDb();
+  const existingSchedules = await db
+    .collection("schedules")
+    .find({
+      studioRoomId,
+      scheduleDate: { $in: dates },
+      scheduleStatus: { $ne: "Cancelled" },
+    })
+    .toArray();
+
+  const conflict = existingSchedules.find((schedule) =>
+    rangesOverlap(
+      fromTime,
+      toTime,
+      String(schedule.fromTime || ""),
+      String(schedule.toTime || ""),
+    ),
+  );
+
+  if (conflict) {
+    throw new Error(
+      `Studio room sudah booked pada ${String(conflict.scheduleDate || "")}, ${String(conflict.fromTime || "")} - ${String(conflict.toTime || "")}.`,
+    );
+  }
 }
 
 async function findCourseInstrumentId(courseId: string) {
@@ -567,7 +667,6 @@ async function assertInstructorSlotAvailable({
   lessonCount,
   fromTime,
   toTime,
-  lessonMode,
 }: {
   instructorId: string;
   lessonStartDate: string;
@@ -575,7 +674,6 @@ async function assertInstructorSlotAvailable({
   lessonCount: number;
   fromTime: string;
   toTime: string;
-  lessonMode: string;
 }) {
   const dates = expandPackageLessonDates(lessonStartDate, lessonDays, lessonCount);
   if (dates.length === 0) return;
@@ -594,10 +692,8 @@ async function assertInstructorSlotAvailable({
     const dayOfWeek = String(new Date(`${date}T00:00:00.000Z`).getUTCDay());
 
     return !availability.some((slot) => {
-      const slotMode = String(slot.lessonMode || "");
       return (
         String(slot.dayOfWeek) === dayOfWeek &&
-        (!slotMode || slotMode === lessonMode) &&
         timeToMinutes(String(slot.fromTime || "")) <= timeToMinutes(fromTime) &&
         timeToMinutes(String(slot.toTime || "")) >= timeToMinutes(toTime)
       );

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { lessonDayOptions, lessonModeOptions } from "@/lib/options";
+import { lessonDayOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
@@ -25,7 +25,6 @@ export function InstructorAvailabilityBoard() {
     dayOfWeek: "1",
     fromTime: "09:00",
     toTime: "10:00",
-    lessonMode: "Studio",
   });
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState("");
@@ -93,7 +92,7 @@ export function InstructorAvailabilityBoard() {
           dayOfWeek: draft.dayOfWeek,
           fromTime: draft.fromTime,
           toTime: draft.toTime,
-          lessonMode: draft.lessonMode,
+          lessonMode: "Both",
           active: true,
         }),
       });
@@ -341,7 +340,6 @@ function AvailabilityFormModal({
     dayOfWeek: string;
     fromTime: string;
     toTime: string;
-    lessonMode: string;
   };
   instructors: Row[];
   onClose: () => void;
@@ -349,7 +347,6 @@ function AvailabilityFormModal({
     dayOfWeek: string;
     fromTime: string;
     toTime: string;
-    lessonMode: string;
   }) => void;
   onInstructorChange: (value: string) => void;
   onSubmit: () => Promise<void>;
@@ -431,22 +428,9 @@ function AvailabilityFormModal({
             </label>
           </div>
 
-          <label className="space-y-1.5">
-            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
-              Mode
-            </span>
-            <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              onChange={(event) => onDraftChange({ ...draft, lessonMode: event.target.value })}
-              value={draft.lessonMode}
-            >
-              {lessonModeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <p className="rounded-2xl border border-white/45 bg-white/42 px-3 py-2 text-xs text-zinc-500">
+            Mode Studio atau Home Visit dipilih saat membuat Lesson Package.
+          </p>
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
@@ -512,7 +496,7 @@ function DayDetailModal({
                     <p className="text-sm font-semibold">
                       {String(slot.fromTime)} - {String(slot.toTime)}
                     </p>
-                    <p className="text-xs text-emerald-700">{formatDisplayText(slot.lessonMode)}</p>
+                    <p className="text-xs text-emerald-700">Instructor free</p>
                   </div>
                   <Button
                     aria-label="Delete availability"

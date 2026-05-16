@@ -55,7 +55,7 @@ export default function LessonPackagesPage() {
             type: "relation",
             relation: {
               resource: "instructor-availability",
-              labelFields: ["dayOfWeek", "fromTime", "toTime", "lessonMode"],
+              labelFields: ["dayOfWeek", "fromTime", "toTime"],
             },
             relationFilter: {
               sourceField: "instructorId",
@@ -109,7 +109,6 @@ export default function LessonPackagesPage() {
             label: "Lesson mode",
             type: "select",
             options: lessonModeOptions,
-            deriveFrom: { sourceField: "availabilitySlotId", sourceOptionField: "lessonMode" },
             required: true,
           },
           {
@@ -122,6 +121,14 @@ export default function LessonPackagesPage() {
               sourceField: "instrumentId",
               optionField: "instrumentIds",
               mode: "includes",
+            },
+            roomAvailabilityFrom: {
+              startDateField: "lessonStartDate",
+              lessonDaysField: "lessonDays",
+              lessonCountField: "lessonCount",
+              fromTimeField: "fromTime",
+              toTimeField: "toTime",
+              lessonModeField: "lessonMode",
             },
           },
           {

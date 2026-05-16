@@ -43,6 +43,14 @@ export type FieldConfig = {
     monthField: string;
     slotField: string;
   };
+  roomAvailabilityFrom?: {
+    fromTimeField: string;
+    lessonCountField: string;
+    lessonDaysField: string;
+    lessonModeField: string;
+    startDateField: string;
+    toTimeField: string;
+  };
   autoSelectSingleOption?: boolean;
   multiple?: boolean;
   visibleWhen?: {
@@ -62,7 +70,13 @@ export type FieldConfig = {
 
 type RecordValue = string | number | boolean | string[];
 type UiRecord = Record<string, RecordValue> & { id: string };
-type RelationOption = { label: string; record: UiRecord; value: string };
+type RelationOption = {
+  disabled?: boolean;
+  label: string;
+  record: UiRecord;
+  unavailableReason?: string;
+  value: string;
+};
 
 export function ResourcePage({
   title,
@@ -97,6 +111,7 @@ export function ResourcePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
+  const [scheduleRows, setScheduleRows] = useState<UiRecord[]>([]);
   const fieldsSignature = useMemo(() => JSON.stringify(fields), [fields]);
   const formFields = fields.filter(
     (field) => !field.hidden && (!field.hideOnCreate || editingId),
@@ -180,6 +195,31 @@ export function ResourcePage({
   }, [fieldsSignature, fields, fetchRelationOptions]);
 
   useEffect(() => {
+    if (!fields.some((field) => field.roomAvailabilityFrom)) return;
+
+    let mounted = true;
+
+    async function loadSchedulesForAvailability() {
+      try {
+        const response = await fetch("/api/schedules", { cache: "no-store" });
+        const json = (await response.json()) as { data?: UiRecord[] };
+
+        if (mounted) {
+          setScheduleRows(Array.isArray(json.data) ? json.data : []);
+        }
+      } catch {
+        if (mounted) setScheduleRows([]);
+      }
+    }
+
+    void loadSchedulesForAvailability();
+
+    return () => {
+      mounted = false;
+    };
+  }, [fieldsSignature, fields]);
+
+  useEffect(() => {
     setDraft((current) => {
       const updates = Object.fromEntries(
         fields
@@ -199,9 +239,11 @@ export function ResourcePage({
               return [field.key, current[field.key]];
             }
 
-            const options = getFieldOptions(field, current, relationOptions);
+            const options = getFieldOptions(field, current, relationOptions, scheduleRows);
             const currentValue = current[field.key];
-            const optionValues = new Set(options.map((option) => option.value));
+            const optionValues = new Set(
+              options.filter((option) => !option.disabled).map((option) => option.value),
+            );
 
             if (field.multiple && Array.isArray(currentValue)) {
               return [field.key, currentValue.filter((value) => optionValues.has(String(value)))];
@@ -215,9 +257,9 @@ export function ResourcePage({
               field.autoSelectSingleOption &&
               !field.multiple &&
               !currentValue &&
-              options.length === 1
+              options.filter((option) => !option.disabled).length === 1
             ) {
-              return [field.key, options[0].value];
+              return [field.key, options.find((option) => !option.disabled)?.value ?? ""];
             }
 
             return [field.key, currentValue];
@@ -229,7 +271,7 @@ export function ResourcePage({
       );
       return changed ? { ...current, ...updates } : current;
     });
-  }, [fieldsSignature, fields, relationOptions]);
+  }, [fieldsSignature, fields, relationOptions, scheduleRows]);
 
   async function saveRecord() {
     const method = editingId ? "PUT" : "POST";
@@ -478,14 +520,24 @@ export function ResourcePage({
                           {field.multiple ? null : <option value="">Select {field.label}</option>}
                           {(
                             field.type === "relation"
-                              ? getFieldOptions(field, draft, relationOptions)
+                              ? getFieldOptions(field, draft, relationOptions, scheduleRows)
                               : getSelectOptions(field, draft, relationOptions)
                           ).map((option) => (
-                            <option key={option.value} value={option.value}>
+                            <option disabled={Boolean("disabled" in option && option.disabled)} key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
+                        {field.roomAvailabilityFrom &&
+                        isFieldVisible(field, draft) &&
+                        getFieldOptions(field, draft, relationOptions, scheduleRows).length > 0 &&
+                        getFieldOptions(field, draft, relationOptions, scheduleRows).every(
+                          (option) => option.disabled,
+                        ) ? (
+                          <p className="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-800">
+                            Semua studio sudah booked untuk slot ini. Ganti tanggal, jam, atau instructor.
+                          </p>
+                        ) : null}
                         {field.quickCreate ? (
                           <Button
                             onClick={(event) => {
@@ -774,9 +826,25 @@ function getFieldOptions(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
   relationOptions: Record<string, RelationOption[]>,
+  scheduleRows: UiRecord[] = [],
 ) {
   const options = relationOptions[field.key] ?? [];
 
+  const relationFilteredOptions = field.relationFilter
+    ? filterRelationOptions(field, draft, relationOptions, options)
+    : options;
+
+  if (!field.roomAvailabilityFrom) return relationFilteredOptions;
+
+  return filterRoomAvailabilityOptions(field, draft, relationFilteredOptions, scheduleRows);
+}
+
+function filterRelationOptions(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+  options: RelationOption[],
+) {
   if (!field.relationFilter) return options;
 
   const sourceValue = draft[field.relationFilter.sourceField];
@@ -806,12 +874,67 @@ function getFieldOptions(
   });
 }
 
+function filterRoomAvailabilityOptions(
+  field: FieldConfig,
+  draft: Record<string, RecordValue>,
+  options: RelationOption[],
+  scheduleRows: UiRecord[],
+) {
+  if (!field.roomAvailabilityFrom) return options;
+
+  const config = field.roomAvailabilityFrom;
+  const lessonMode = String(draft[config.lessonModeField] ?? "");
+  const lessonStartDate = String(draft[config.startDateField] ?? "");
+  const lessonDays = toMultiSelectValue(draft[config.lessonDaysField]);
+  const lessonCount = Number(draft[config.lessonCountField] || 4);
+  const fromTime = String(draft[config.fromTimeField] ?? "");
+  const toTime = String(draft[config.toTimeField] ?? "");
+
+  if (lessonMode !== "Studio") return options;
+  if (!lessonStartDate || lessonDays.length === 0 || !fromTime || !toTime) return options;
+
+  const dates = expandLessonDates(lessonStartDate, lessonDays, lessonCount);
+  if (dates.length === 0) return options;
+
+  return options.map((option) => {
+    const roomSchedules = scheduleRows.filter(
+      (schedule) =>
+        String(schedule.studioRoomId ?? "") === option.value &&
+        String(schedule.lessonMode ?? "") === "Studio" &&
+        String(schedule.scheduleStatus ?? "") !== "Cancelled" &&
+        dates.includes(String(schedule.scheduleDate ?? "")),
+    );
+
+    const conflict = roomSchedules.find((schedule) =>
+      rangesOverlap(
+        fromTime,
+        toTime,
+        String(schedule.fromTime ?? ""),
+        String(schedule.toTime ?? ""),
+      ),
+    );
+
+    if (!conflict) {
+      return {
+        ...option,
+        label: `${option.label} · Available`,
+      };
+    }
+
+    return {
+      ...option,
+      disabled: true,
+      label: `${option.label} · Booked`,
+      unavailableReason: `${String(conflict.scheduleDate ?? "")}, ${String(conflict.fromTime ?? "")} - ${String(conflict.toTime ?? "")}`,
+    };
+  });
+}
+
 function formatRelationOptionLabel(field: FieldConfig, record: UiRecord, valueField: string) {
   if (field.relation?.resource === "instructor-availability") {
     return [
       lessonDayLabel(record.dayOfWeek),
       `${String(record.fromTime ?? "")} - ${String(record.toTime ?? "")}`,
-      formatDisplayText(record.lessonMode),
     ]
       .filter(Boolean)
       .join(" · ");
@@ -857,6 +980,56 @@ function datesInMonthForDay(monthValue: string, dayOfWeekValue: string) {
   }
 
   return dates;
+}
+
+function expandLessonDates(
+  lessonStartDate: string,
+  lessonDays: string[],
+  lessonCount: number,
+) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lessonStartDate)) return [];
+
+  const [year, month, day] = lessonStartDate.split("-").map(Number);
+  const current = new Date(Date.UTC(year, month - 1, day));
+  const selectedDays = new Set(
+    lessonDays.map(Number).filter((dayOfWeek) => dayOfWeek >= 0 && dayOfWeek <= 6),
+  );
+  const maxDates = Number.isFinite(lessonCount) && lessonCount > 0 ? lessonCount : 4;
+  const dates: string[] = [];
+
+  if (Number.isNaN(current.getTime()) || selectedDays.size === 0) return [];
+
+  for (let attempts = 0; dates.length < maxDates && attempts < 370; attempts += 1) {
+    if (selectedDays.has(current.getUTCDay())) {
+      dates.push(current.toISOString().slice(0, 10));
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+function rangesOverlap(
+  leftFrom: string,
+  leftTo: string,
+  rightFrom: string,
+  rightTo: string,
+) {
+  const startA = timeToMinutes(leftFrom);
+  const endA = timeToMinutes(leftTo);
+  const startB = timeToMinutes(rightFrom);
+  const endB = timeToMinutes(rightTo);
+
+  if ([startA, endA, startB, endB].some((value) => Number.isNaN(value))) return false;
+  return startA < endB && startB < endA;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
+
+  return hours * 60 + minutes;
 }
 
 function getDerivedValue(
