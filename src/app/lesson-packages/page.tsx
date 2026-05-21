@@ -129,11 +129,6 @@ export default function LessonPackagesPage() {
             type: "relation",
             relation: { resource: "rooms", labelFields: ["roomName"], activeOnly: true },
             visibleWhen: { field: "lessonMode", value: "Studio" },
-            relationFilter: {
-              sourceField: "instrumentId",
-              optionField: "instrumentIds",
-              mode: "includes",
-            },
             roomAvailabilityFrom: {
               startDateField: "lessonStartDate",
               lessonDaysField: "lessonDays",

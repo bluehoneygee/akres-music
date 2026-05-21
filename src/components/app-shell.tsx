@@ -16,17 +16,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [role, setRole] = useState<string>();
   const [userName, setUserName] = useState("");
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSessionRole() {
-      const response = await fetch("/api/auth/session", { cache: "no-store" });
-      const session = (await response.json()) as { user?: { name?: string; email?: string; role?: string } };
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = (await response.json()) as { user?: { name?: string; email?: string; role?: string } };
 
-      if (mounted) {
-        setRole(session.user?.role ?? "Academic Staff");
-        setUserName(session.user?.name || session.user?.email || "User");
+        if (mounted) {
+          setRole(session.user?.role ?? "Academic Staff");
+          setUserName(session.user?.name || session.user?.email || "User");
+        }
+      } finally {
+        if (mounted) {
+          setSessionLoading(false);
+        }
       }
     }
 
@@ -38,6 +45,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navigation = getNavigationForRole(role);
+
+  if (sessionLoading) {
+    return (
+      <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
+        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="liquid-glass hidden h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-white/45 p-4 backdrop-blur-3xl lg:flex">
+            <div className="h-16 w-full animate-pulse rounded-2xl bg-white/55" />
+            <div className="mt-4 h-11 w-full animate-pulse rounded-2xl bg-white/45" />
+            <div className="mt-5 space-y-2">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <div className="h-10 w-full animate-pulse rounded-2xl bg-white/40" key={index} />
+              ))}
+            </div>
+          </aside>
+          <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0">
+            <div className="space-y-4">
+              <div className="h-28 w-full animate-pulse rounded-[28px] bg-white/45" />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div className="h-24 animate-pulse rounded-3xl bg-white/42" key={index} />
+                ))}
+              </div>
+              <div className="h-80 w-full animate-pulse rounded-[28px] bg-white/38" />
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
