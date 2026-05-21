@@ -6,6 +6,7 @@
   "scripts": {
     "db:up": "docker compose up -d mongo",
     "db:down": "docker compose down",
+    "seed": "node scripts/seed.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
