@@ -267,13 +267,18 @@ export function InstructorAvailabilityBoard() {
                             title={`${String(slot.fromTime)} - ${String(slot.toTime)}`}
                           />
                         ))}
-                        {bookedSlots.slice(0, 4).map((schedule) => (
-                          <span
-                            className="size-1.5 rounded-full bg-amber-500 sm:size-2"
-                            key={schedule.id}
-                            title={`${String(schedule.fromTime)} - ${String(schedule.toTime)}`}
-                          />
-                        ))}
+                        {bookedSlots.slice(0, 4).map((schedule) => {
+                          const mode = scheduleLessonMode(schedule);
+                          return (
+                            <span
+                              className={`size-1.5 rounded-full sm:size-2 ${
+                                mode === "Studio" ? "bg-sky-500" : "bg-violet-500"
+                              }`}
+                              key={schedule.id}
+                              title={`${String(schedule.fromTime)} - ${String(schedule.toTime)} • ${mode}`}
+                            />
+                          );
+                        })}
                         {totalItems > 8 ? (
                           <span className="text-[8px] font-semibold text-zinc-500">+{totalItems - 8}</span>
                         ) : null}
@@ -516,27 +521,45 @@ function DayDetailModal({
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="size-2.5 rounded-full bg-amber-500" />
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1 text-xs text-zinc-600">
+                <span className="size-2 rounded-full bg-sky-500" />
+                Studio
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-zinc-600">
+                <span className="size-2 rounded-full bg-violet-500" />
+                Home Visit
+              </span>
               <h3 className="text-sm font-semibold text-zinc-950">Booked schedules</h3>
             </div>
             {booked.length > 0 ? (
               booked.map((schedule) => {
                 const student = studentsById.get(String(schedule.studentId ?? ""));
                 const course = coursesById.get(String(schedule.courseId ?? ""));
+                const mode = scheduleLessonMode(schedule);
+                const tone =
+                  mode === "Studio"
+                    ? "border-sky-200/70 bg-sky-50/90 text-sky-950"
+                    : "border-violet-200/70 bg-violet-50/90 text-violet-950";
+                const subTone = mode === "Studio" ? "text-sky-700" : "text-violet-700";
 
                 return (
                   <div
-                    className="rounded-2xl border border-amber-200/70 bg-amber-50/90 px-3 py-2 text-amber-950"
+                    className={`rounded-2xl border px-3 py-2 ${tone}`}
                     key={schedule.id}
                   >
-                    <p className="text-sm font-semibold">
-                      {String(schedule.fromTime)} - {String(schedule.toTime)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-amber-700">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold">
+                        {String(schedule.fromTime)} - {String(schedule.toTime)}
+                      </p>
+                      <Badge className="h-5 rounded-md px-1.5 text-[10px]" variant="secondary">
+                        {mode}
+                      </Badge>
+                    </div>
+                    <p className={`mt-0.5 text-xs ${subTone}`}>
                       {studentName(student) || "Booked schedule"}
                     </p>
-                    <p className="text-xs text-amber-700">{formatDisplayText(course?.courseName)}</p>
+                    <p className={`text-xs ${subTone}`}>{formatDisplayText(course?.courseName)}</p>
                   </div>
                 );
               })
@@ -644,4 +667,11 @@ function nextHour(value: string) {
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "";
 
   return `${String(hours + 1).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function scheduleLessonMode(schedule: Row) {
+  const mode = String(schedule.lessonMode ?? "").trim();
+  if (mode === "Studio") return "Studio";
+  if (mode === "Home Visit") return "Home Visit";
+  return String(schedule.homeVisitAddress ?? "").trim() ? "Home Visit" : "Studio";
 }

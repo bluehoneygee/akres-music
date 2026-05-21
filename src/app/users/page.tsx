@@ -6,16 +6,25 @@ export default function UsersPage() {
   return (
     <AppShell>
       <ResourcePage
-        description="Kelola akun login seperti ERPNext: staff, guru, murid, dan orang tua."
+        description="Kelola akun login seperti: staff, guru, murid, dan orang tua."
         fields={[
           { key: "email", label: "Email", required: true },
           { key: "password", label: "Password", writeOnly: true },
-          { key: "role", label: "Role", type: "select", options: roleOptions, required: true },
+          {
+            key: "role",
+            label: "Role",
+            type: "select",
+            options: roleOptions,
+            required: true,
+          },
           {
             key: "studentId",
             label: "Student",
             type: "relation",
-            relation: { resource: "students", labelFields: ["firstName", "lastName"] },
+            relation: {
+              resource: "students",
+              labelFields: ["firstName", "lastName"],
+            },
             visibleWhen: { field: "role", value: "Student Portal User" },
           },
           {
@@ -29,7 +38,10 @@ export default function UsersPage() {
             key: "instructorId",
             label: "Instructor",
             type: "relation",
-            relation: { resource: "instructors", labelFields: ["instructorName"] },
+            relation: {
+              resource: "instructors",
+              labelFields: ["instructorName"],
+            },
             visibleWhen: { field: "role", value: "Music Instructor" },
           },
         ]}

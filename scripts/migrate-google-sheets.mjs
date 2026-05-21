@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 
+import bcrypt from "bcryptjs";
 import { MongoClient } from "mongodb";
 
 const VISIT_SHEET_ID = "12jlALFEA8W4Djp4LoAlYDVL5QrY2eFwElu2NmacUX_4";
 const VISIT_GID = "0";
 const STUDIO_SHEET_ID = "1jas5CHNELGXlLb6_UKTWHSkSe0h4BP1B";
 const STUDIO_GID = "1054954740";
+const INSTRUCTOR_SHEET_GID = "1783242614";
 
 const DAY_MAP = {
   SENIN: "Monday",
@@ -24,6 +26,11 @@ const COURSE_FEE = {
   violin: 350000,
   guitar: 350000,
   drums: 350000,
+};
+
+const STUDIO_INSTRUCTORS = {
+  "room-a": { id: "instructor-mr-reza", instructorName: "Mr. Reza", email: "reza.teacher@akres.test" },
+  "room-b": { id: "instructor-mr-daniel", instructorName: "Mr. Daniel", email: "daniel.teacher@akres.test" },
 };
 
 function requireEnv(name) {
@@ -181,6 +188,27 @@ function parseStudioRows(rows) {
   return result.filter((row) => row.day && row.timeRange && row.studentName);
 }
 
+function parseInstructorRows(rows) {
+  const result = [];
+  let currentDay = "";
+  for (const row of rows.slice(1)) {
+    if (!row.some((cell) => cell)) continue;
+    if (row[0]) currentDay = row[0];
+    const timeRange = row[1] ?? "";
+    const studentName = row[2] ?? "";
+    const location = row[3] ?? "";
+    if (!currentDay || !timeRange || !studentName) continue;
+    if (/^closed$/i.test(studentName) || /^kosong$/i.test(studentName)) continue;
+    result.push({
+      day: currentDay,
+      timeRange,
+      studentName,
+      location,
+    });
+  }
+  return result;
+}
+
 async function upsert(collection, id, data) {
   const { id: _ignoredId, createdAt, ...rest } = data;
   await collection.updateOne(
@@ -204,14 +232,28 @@ async function main() {
   const uri = requireEnv("MONGODB_URI");
   const dbName = requireEnv("MONGODB_DB");
   const billingPeriod = process.env.MIGRATION_BILLING_PERIOD ?? new Date().toISOString().slice(0, 7);
+  const defaultPassword = process.env.MIGRATION_DEFAULT_PASSWORD ?? "admin123";
 
   const [visitCsv, studioCsv] = await Promise.all([
     fetchCsv(VISIT_SHEET_ID, VISIT_GID),
     fetchCsv(STUDIO_SHEET_ID, STUDIO_GID),
   ]);
+  const instructorCsv = await fetchCsv(STUDIO_SHEET_ID, INSTRUCTOR_SHEET_GID).catch(() => "");
 
   const visitRows = parseVisitRows(parseCsv(visitCsv));
   const studioRows = parseStudioRows(parseCsv(studioCsv));
+  const instructorRows = instructorCsv ? parseInstructorRows(parseCsv(instructorCsv)) : [];
+  const instructorScheduleMap = new Map();
+  const defaultStudioInstructorName = process.env.MIGRATION_INSTRUCTOR_NAME ?? "Mr. Daniel";
+  for (const row of instructorRows) {
+    const key = `${slugify(row.studentName)}|${DAY_MAP[String(row.day).toUpperCase()] ?? "Monday"}|${
+      parseRange(row.timeRange).fromTime
+    }`;
+    instructorScheduleMap.set(key, {
+      instructorName: defaultStudioInstructorName,
+      location: row.location,
+    });
+  }
 
   const client = new MongoClient(uri);
   await client.connect();
@@ -275,14 +317,16 @@ async function main() {
       }
       instructors.set(iid, existing);
     }
-    instructors.set("instructor-studio-pool", {
-      id: "instructor-studio-pool",
-      instructorName: "Studio Pool",
-      instrumentIds: ["inst-piano"],
-      levelFrom: "Beginner",
-      levelTo: "Advanced",
-      portalEnabled: false,
-    });
+    for (const studioInstructor of Object.values(STUDIO_INSTRUCTORS)) {
+      instructors.set(studioInstructor.id, {
+        id: studioInstructor.id,
+        instructorName: studioInstructor.instructorName,
+        instrumentIds: ["inst-piano"],
+        levelFrom: "Beginner",
+        levelTo: "Advanced",
+        portalEnabled: true,
+      });
+    }
 
     for (const instructor of instructors.values()) {
       await upsert(db.collection("instructors"), instructor.id, instructor);
@@ -386,13 +430,34 @@ async function main() {
       const day = DAY_MAP[String(row.day).toUpperCase()] ?? "Monday";
       const { fromTime, toTime } = parseRange(row.timeRange);
       const lessonStartDate = nextDateForDay(day);
+      const scheduleKey = `${slugify(studentName)}|${day}|${fromTime}`;
+      const scheduledInstructor = instructorScheduleMap.get(scheduleKey);
+      const fallbackStudioInstructor =
+        STUDIO_INSTRUCTORS[row.roomId] ?? (row.roomId === "room-a" ? STUDIO_INSTRUCTORS["room-a"] : STUDIO_INSTRUCTORS["room-b"]);
+      const selectedInstructor = scheduledInstructor
+        ? {
+            id: `instructor-${slugify(scheduledInstructor.instructorName)}`,
+            instructorName: scheduledInstructor.instructorName,
+            email: `${slugify(scheduledInstructor.instructorName.replace(/^mr\.?\s*|^ms\.?\s*/i, ""))}.teacher@akres.test`,
+          }
+        : fallbackStudioInstructor;
+      if (!instructors.has(selectedInstructor.id)) {
+        instructors.set(selectedInstructor.id, {
+          id: selectedInstructor.id,
+          instructorName: selectedInstructor.instructorName,
+          instrumentIds: ["inst-piano"],
+          levelFrom: "Beginner",
+          levelTo: "Advanced",
+          portalEnabled: true,
+        });
+      }
       const lpId = `lp-studio-${shortHash(`${sid}-${day}-${fromTime}-${row.roomId}`)}`;
 
       lessonPackages.push({
         id: lpId,
         studentId: sid,
         courseId: "course-piano-private",
-        instructorId: "instructor-studio-pool",
+        instructorId: selectedInstructor.id,
         instrumentId: "inst-piano",
         billingPeriod,
         lessonStartDate,
@@ -413,6 +478,70 @@ async function main() {
 
     for (const student of students.values()) {
       await upsert(db.collection("students"), student.id, student);
+    }
+
+    const passwordHash = await bcrypt.hash(defaultPassword, 12);
+
+    await upsert(db.collection("users"), "user-admin-akres", {
+      id: "user-admin-akres",
+      email: "admin@akres.test",
+      emailVerified: null,
+      name: "Administrator Akres",
+      role: "System Manager",
+      studentId: "",
+      guardianId: "",
+      instructorId: "",
+      passwordHash,
+    });
+
+    for (const instructor of instructors.values()) {
+      const normalized = slugify(instructor.instructorName.replace(/^mr\.?\s*|^ms\.?\s*/i, ""));
+      const email =
+        Object.values(STUDIO_INSTRUCTORS).find((item) => item.id === instructor.id)?.email ??
+        `${normalized}.teacher@akres.test`;
+      await upsert(db.collection("users"), `user-${slugify(email)}`, {
+        id: `user-${slugify(email)}`,
+        email,
+        emailVerified: null,
+        name: instructor.instructorName,
+        role: "Music Instructor",
+        studentId: "",
+        guardianId: "",
+        instructorId: instructor.id,
+        passwordHash,
+      });
+    }
+
+    for (const guardian of guardians.values()) {
+      const guardianSlug = guardian.id.replace(/^guardian-/, "");
+      const email = `${guardianSlug}.parent@akres.test`;
+      await upsert(db.collection("users"), `user-${slugify(email)}`, {
+        id: `user-${slugify(email)}`,
+        email,
+        emailVerified: null,
+        name: guardian.guardianName,
+        role: "Parent Portal User",
+        studentId: "",
+        guardianId: guardian.id,
+        instructorId: "",
+        passwordHash,
+      });
+    }
+
+    for (const student of students.values()) {
+      const studentName = `${student.firstName} ${student.lastName}`.trim();
+      const email = `${slugify(studentName)}.student@akres.test`;
+      await upsert(db.collection("users"), `user-${slugify(email)}`, {
+        id: `user-${slugify(email)}`,
+        email,
+        emailVerified: null,
+        name: studentName || student.firstName,
+        role: "Student Portal User",
+        studentId: student.id,
+        guardianId: "",
+        instructorId: "",
+        passwordHash,
+      });
     }
 
     for (const pkg of lessonPackages) {

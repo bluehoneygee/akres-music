@@ -4,8 +4,8 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Akres Music Academic Dashboard",
-  description: "Dashboard akademik sekolah musik berbasis spesifikasi ERPNext Akres.",
+  title: "Akres Music Academic",
+  description: "Sistem akademik sekolah musik berbasis spesifikasi ERPNext Akres.",
 };
 
 export default function RootLayout({

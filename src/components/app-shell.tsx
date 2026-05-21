@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Music2, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -46,17 +46,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="liquid-glass flex h-full max-w-[340px] flex-col rounded-[28px] border border-white/40 bg-white/70 p-4 shadow-2xl backdrop-blur-3xl">
             <div className="mb-5 flex items-start justify-between gap-3">
               <Brand />
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                <Button
-                  aria-label="Tutup menu"
-                  onClick={() => setMobileMenuOpen(false)}
-                  size="icon"
-                  variant="glass"
-                >
-                  <X className="size-5" />
-                </Button>
-              </div>
+              <Button
+                aria-label="Tutup menu"
+                onClick={() => setMobileMenuOpen(false)}
+                size="icon"
+                variant="glass"
+              >
+                <X className="size-5" />
+              </Button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">
               <NavigationList
@@ -81,9 +78,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto grid h-full w-full max-w-[1500px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="liquid-glass hidden h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-white/45 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex">
           <div className="shrink-0">
-            <div className="mb-5 flex items-start justify-between gap-3">
+            <div className="mb-5">
               <Brand />
-              <ThemeToggle />
             </div>
             <Greeting role={role} userName={userName} />
           </div>
@@ -164,13 +160,19 @@ function NavigationList({
 
 function Brand() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-12 place-items-center rounded-2xl bg-zinc-950 text-white shadow-xl">
-        <Music2 className="size-6" />
+    <div className="flex items-start gap-3">
+      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/60 bg-white p-0 shadow-xl">
+        <img
+          alt="Akres Music Logo"
+          className="h-full w-full object-contain"
+          src="/akres-logo-full.png?v=7"
+        />
       </div>
-      <div>
-        <p className="text-lg font-semibold">Akres Music</p>
-        <p className="text-xs text-zinc-500">Academic Console</p>
+      <div className="min-w-0">
+        <p className="truncate text-base font-semibold leading-tight">Akres Music Academy</p>
+        <div className="mt-2">
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );
