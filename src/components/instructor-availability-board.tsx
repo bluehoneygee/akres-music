@@ -228,8 +228,8 @@ export function InstructorAvailabilityBoard() {
               <div className="grid grid-cols-7 gap-1">
                 {monthCells.map(({ date, day, inMonth }) => {
                   const dateKey = formatDate(date);
-                  const availableSlots = availabilityByDay[day] ?? [];
                   const bookedSlots = schedulesByDate[dateKey] ?? [];
+                  const availableSlots = availableSlotsForDate(availabilityByDay[day] ?? [], bookedSlots);
                   const totalItems = availableSlots.length + bookedSlots.length;
 
                   return (
@@ -294,7 +294,10 @@ export function InstructorAvailabilityBoard() {
 
       {selectedCell ? (
         <DayDetailModal
-          availability={availabilityByDay[selectedCell.day] ?? []}
+          availability={availableSlotsForDate(
+            availabilityByDay[selectedCell.day] ?? [],
+            schedulesByDate[selectedDate] ?? [],
+          )}
           booked={schedulesByDate[selectedDate] ?? []}
           coursesById={coursesById}
           date={selectedCell.date}
@@ -674,4 +677,31 @@ function scheduleLessonMode(schedule: Row) {
   if (mode === "Studio") return "Studio";
   if (mode === "Home Visit") return "Home Visit";
   return String(schedule.homeVisitAddress ?? "").trim() ? "Home Visit" : "Studio";
+}
+
+function availableSlotsForDate(availabilitySlots: Row[], bookedSlots: Row[]) {
+  if (availabilitySlots.length === 0) return [];
+  if (bookedSlots.length === 0) return availabilitySlots;
+
+  return availabilitySlots.filter((slot) => {
+    const slotFrom = String(slot.fromTime ?? "");
+    const slotTo = String(slot.toTime ?? "");
+    return !bookedSlots.some((booked) =>
+      rangesOverlap(
+        slotFrom,
+        slotTo,
+        String(booked.fromTime ?? ""),
+        String(booked.toTime ?? ""),
+      ),
+    );
+  });
+}
+
+function rangesOverlap(
+  fromLeft: string,
+  toLeft: string,
+  fromRight: string,
+  toRight: string,
+) {
+  return fromLeft < toRight && fromRight < toLeft;
 }

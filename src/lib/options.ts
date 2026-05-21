@@ -15,6 +15,12 @@ export const levelOptions = ["Beginner", "Intermediate", "Advanced"].map((value)
   value,
 }));
 
+export const learningGoalOptions = [
+  ["Music for Fun/Hobby", "Music for Fun/Hobby"],
+  ["Music Perfomer", "Music Perfomer"],
+  ["Music for Education", "Music for Education"],
+].map(([value, label]) => ({ label, value }));
+
 export const lessonModeOptions = ["Studio", "Home Visit"].map((value) => ({
   label: value,
   value,

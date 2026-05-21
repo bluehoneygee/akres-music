@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
-import { levelOptions } from "@/lib/options";
+import { learningGoalOptions, levelOptions } from "@/lib/options";
 
 export default function StudentsPage() {
   return (
@@ -11,7 +11,13 @@ export default function StudentsPage() {
           { key: "firstName", label: "First name", required: true },
           { key: "lastName", label: "Last name", required: true },
           { key: "skillLevel", label: "Skill level", type: "select", options: levelOptions, required: true },
-          { key: "learningGoal", label: "Learning goal" },
+          {
+            key: "learningGoal",
+            label: "Learning goal",
+            type: "select",
+            options: learningGoalOptions,
+            required: true,
+          },
           {
             key: "guardianIds",
             label: "Guardians",
