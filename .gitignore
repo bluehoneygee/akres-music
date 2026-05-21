@@ -13,6 +13,7 @@ dist/
 .env
 .env.staging
 .env.production
+.env.seed
 .env*.local
 
 # Logs
@@ -35,3 +36,4 @@ coverage/
 
 # Local file-backed API data
 data/db.json
+.vercel
