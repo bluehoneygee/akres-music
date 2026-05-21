@@ -54,7 +54,9 @@ async function seed() {
   const marker = db.collection("_meta");
 
   await ensureDefaultUsers();
-  await ensureDemoRecords();
+  if (shouldSeedDemoData()) {
+    await ensureDemoRecords();
+  }
 
   await marker.updateOne(
     { key: "seeded" },
@@ -63,12 +65,21 @@ async function seed() {
   );
 }
 
+function shouldSeedDemoData() {
+  if (process.env.SEED_DEMO_DATA) {
+    return process.env.SEED_DEMO_DATA === "true";
+  }
+
+  return process.env.NODE_ENV !== "production";
+}
+
 async function ensureDefaultUsers() {
   const db = await getMongoDb();
   const passwordHash = await bcrypt.hash("admin123", 12);
+  const users = shouldSeedDemoData() ? seedUsers : seedUsers.slice(0, 1);
 
   await Promise.all(
-    seedUsers.map((user) =>
+    users.map((user) =>
       db.collection("users").updateOne(
         { email: user.email },
         {
