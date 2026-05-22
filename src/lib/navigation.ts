@@ -54,8 +54,8 @@ export const appNavigation = [
     roles: ["System Manager", "Academic Staff"],
   },
   {
-    label: "Instructor Availability",
-    href: "/instructor-availability",
+    label: "Instructor Calendar",
+    href: "/instructor-calendar",
     icon: CalendarClock,
     roles: ["System Manager", "Academic Staff"],
   },
@@ -70,6 +70,12 @@ export const appNavigation = [
     href: "/guardians",
     icon: Users,
     roles: ["System Manager", "Academic Staff"],
+  },
+  {
+    label: "Student Calendar",
+    href: "/student-calendar",
+    icon: CalendarClock,
+    roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
   },
   {
     label: "Lesson Packages",
