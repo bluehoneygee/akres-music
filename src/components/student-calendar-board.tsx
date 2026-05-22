@@ -54,6 +54,7 @@ export function StudentCalendarBoard() {
   const coursesById = useMemo(() => mapById(courses), [courses]);
   const instructorsById = useMemo(() => mapById(instructors), [instructors]);
   const roomsById = useMemo(() => mapById(rooms), [rooms]);
+  const schedulesById = useMemo(() => mapById(schedules), [schedules]);
   const calendarCells = useMemo(
     () => (viewMode === "month" ? buildMonthCells(cursorDate) : buildWeekCells(cursorDate)),
     [cursorDate, viewMode],
@@ -207,9 +208,7 @@ export function StudentCalendarBoard() {
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {daySchedules.slice(0, 5).map((schedule) => (
                           <span
-                            className={`size-1.5 rounded-full sm:size-2 ${
-                              String(schedule.lessonMode || "") === "Studio" ? "bg-sky-500" : "bg-violet-500"
-                            }`}
+                            className={`size-1.5 rounded-full sm:size-2 ${scheduleDotClass(schedule)}`}
                             key={schedule.id}
                             title={`${String(schedule.fromTime || "")} - ${String(schedule.toTime || "")}`}
                           />
@@ -235,6 +234,7 @@ export function StudentCalendarBoard() {
           onClose={() => setSelectedDate("")}
           roomsById={roomsById}
           schedules={schedulesByDate[selectedDate] ?? []}
+          schedulesById={schedulesById}
           studentsById={studentsById}
         />
       ) : null}
@@ -249,6 +249,7 @@ function DayDetailModal({
   onClose,
   roomsById,
   schedules,
+  schedulesById,
   studentsById,
 }: {
   coursesById: Map<string, Row>;
@@ -257,6 +258,7 @@ function DayDetailModal({
   onClose: () => void;
   roomsById: Map<string, Row>;
   schedules: Row[];
+  schedulesById: Map<string, Row>;
   studentsById: Map<string, Row>;
 }) {
   return (
@@ -279,6 +281,7 @@ function DayDetailModal({
               const course = coursesById.get(String(schedule.courseId || ""));
               const instructor = instructorsById.get(String(schedule.instructorId || ""));
               const room = roomsById.get(String(schedule.studioRoomId || ""));
+              const originalSchedule = schedulesById.get(String(schedule.originalScheduleId || ""));
               const mode = String(schedule.lessonMode || "");
               return (
                 <div className="rounded-2xl border border-white/60 bg-white/55 p-3" key={schedule.id}>
@@ -286,10 +289,20 @@ function DayDetailModal({
                     <p className="text-sm font-semibold text-zinc-900">
                       {String(schedule.fromTime || "-")} - {String(schedule.toTime || "-")}
                     </p>
-                    <Badge className="h-5 rounded-md px-1.5 text-[10px]" variant="secondary">
+                    <Badge
+                      className={`h-5 rounded-md px-1.5 text-[10px] ${scheduleStatusBadgeClass(schedule)}`}
+                      variant="secondary"
+                    >
                       {formatDisplayText(String(schedule.scheduleStatus || "Scheduled"))}
                     </Badge>
                   </div>
+                  {schedule.originalScheduleId ? (
+                    <p className="mt-1 text-[11px] italic text-zinc-500">
+                      Rescheduled from {originalSchedule
+                        ? `${String(originalSchedule.scheduleDate || "-")}, ${String(originalSchedule.fromTime || "-")} - ${String(originalSchedule.toTime || "-")}`
+                        : "original session"}
+                    </p>
+                  ) : null}
                   <div className="mt-1 flex flex-col gap-1 text-xs text-zinc-700">
                     <p className="inline-flex items-center gap-1">
                       <UserRound className="size-3.5" />
@@ -435,4 +448,19 @@ function studentDisplayName(student: Row | undefined) {
   if (fullName) return fullName;
   const name = String(student.name || "").trim();
   return name;
+}
+
+function scheduleDotClass(schedule: Row) {
+  const status = String(schedule.scheduleStatus || "");
+  if (status === "Rescheduled") return "bg-amber-500";
+  if (status === "Cancelled") return "bg-zinc-300";
+  return String(schedule.lessonMode || "") === "Studio" ? "bg-sky-500" : "bg-violet-500";
+}
+
+function scheduleStatusBadgeClass(schedule: Row) {
+  const status = String(schedule.scheduleStatus || "");
+  if (status === "Rescheduled") return "bg-amber-100 text-amber-800";
+  if (status === "Cancelled") return "bg-zinc-200 text-zinc-700";
+  if (status === "Completed") return "bg-emerald-100 text-emerald-800";
+  return "bg-sky-100 text-sky-800";
 }

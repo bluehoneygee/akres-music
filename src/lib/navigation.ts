@@ -84,12 +84,6 @@ export const appNavigation = [
     roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
   },
   {
-    label: "Schedules",
-    href: "/schedules",
-    icon: CalendarDays,
-    roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
-  },
-  {
     label: "Attendance",
     href: "/attendance",
     icon: BookOpenCheck,

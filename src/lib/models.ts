@@ -123,7 +123,7 @@ export type StudentAttendance = BaseRecord & {
   courseScheduleId: string;
   instrumentId: string;
   date: string;
-  status: "Pending" | "Present" | "Absent" | "Sick" | "Permission" | "Rescheduled";
+  status: "Pending" | "Present" | "Absent" | "Rescheduled";
   absenceReason: string;
   makeupRequired: boolean;
   makeupScheduleId: string;
@@ -144,7 +144,7 @@ export type InstructorAttendance = BaseRecord & {
   courseScheduleId: string;
   attendanceDate: string;
   instrumentId: string;
-  status: "Pending" | "Present" | "Absent" | "Rescheduled" | "Substitute" | "Cancelled";
+  status: "Pending" | "Present" | "Absent" | "Rescheduled";
   substituteInstructorId: string;
   rescheduleRequired: boolean;
   rescheduleScheduleId: string;

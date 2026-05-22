@@ -1051,6 +1051,7 @@ async function ensureAttendanceForSchedules(
               pendingRescheduleDate: "",
               pendingRescheduleFromTime: "",
               pendingRescheduleToTime: "",
+              pendingRescheduleStudioRoomId: "",
               parentNotified: false,
               absenceAlertKey: "",
               confirmed: false,
@@ -1081,6 +1082,7 @@ async function ensureAttendanceForSchedules(
               pendingRescheduleDate: "",
               pendingRescheduleFromTime: "",
               pendingRescheduleToTime: "",
+              pendingRescheduleStudioRoomId: "",
               notes: "",
               confirmed: false,
               confirmedByUserId: "",
@@ -1339,6 +1341,14 @@ function formatDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function addOneMonthFromDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function updateRecord(
   resource: ResourceName,
   id: string,
@@ -1452,6 +1462,7 @@ async function syncScheduleStatusFromAttendance(
           pendingRescheduleDate: "",
           pendingRescheduleFromTime: "",
           pendingRescheduleToTime: "",
+          pendingRescheduleStudioRoomId: "",
           updatedAt,
         },
       },
@@ -1484,6 +1495,7 @@ async function syncScheduleStatusFromAttendance(
           pendingRescheduleDate: "",
           pendingRescheduleFromTime: "",
           pendingRescheduleToTime: "",
+          pendingRescheduleStudioRoomId: "",
           updatedAt,
         },
       },
@@ -1494,7 +1506,7 @@ async function syncScheduleStatusFromAttendance(
 
   if (
     resource === "student-attendance" &&
-    ["Absent", "Sick", "Permission", "Rescheduled"].includes(attendanceStatus) &&
+    attendanceStatus === "Rescheduled" &&
     !attendance.makeupScheduleId &&
     attendance.pendingRescheduleDate
   ) {
@@ -1504,7 +1516,7 @@ async function syncScheduleStatusFromAttendance(
 
   if (
     resource === "instructor-attendance" &&
-    ["Absent", "Cancelled"].includes(attendanceStatus) &&
+    attendanceStatus === "Rescheduled" &&
     !attendance.rescheduleScheduleId &&
     attendance.pendingRescheduleDate
   ) {
@@ -1517,15 +1529,16 @@ async function syncScheduleStatusFromAttendance(
   if (resource === "student-attendance") {
     if (attendanceStatus === "Pending") scheduleStatus = "Scheduled";
     if (attendanceStatus === "Present") scheduleStatus = "Completed";
-    if (["Absent", "Sick", "Permission", "Rescheduled"].includes(attendanceStatus)) {
+    if (attendanceStatus === "Rescheduled") {
       scheduleStatus = "Rescheduled";
     }
+    if (attendanceStatus === "Absent") scheduleStatus = "Completed";
   }
 
   if (resource === "instructor-attendance") {
-    if (["Cancelled", "Absent", "Rescheduled"].includes(attendanceStatus)) {
-      scheduleStatus = "Rescheduled";
-    }
+    if (attendanceStatus === "Pending") scheduleStatus = "Scheduled";
+    if (attendanceStatus === "Present" || attendanceStatus === "Absent") scheduleStatus = "Completed";
+    if (attendanceStatus === "Rescheduled") scheduleStatus = "Rescheduled";
   }
 
   if (!scheduleId || !scheduleStatus) return;
@@ -1542,7 +1555,7 @@ async function syncScheduleStatusFromAttendance(
 
   if (
     resource === "instructor-attendance" &&
-    (attendanceStatus === "Cancelled" || attendanceStatus === "Absent")
+    attendanceStatus === "Rescheduled"
   ) {
     await db.collection("student-attendance").updateOne(
       { courseScheduleId: scheduleId },
@@ -1551,8 +1564,7 @@ async function syncScheduleStatusFromAttendance(
           status: "Rescheduled",
           makeupRequired: true,
           makeupScheduleId: String(attendance.rescheduleScheduleId || ""),
-          absenceReason:
-            attendanceStatus === "Absent" ? "Instructor Absent" : "Instructor Cancelled",
+          absenceReason: "Instructor Rescheduled",
           updatedAt,
         },
       },
@@ -1576,6 +1588,9 @@ async function createConfirmedRescheduleSchedule(
   const pendingDate = String(attendance.pendingRescheduleDate || "");
   const pendingFromTime = String(attendance.pendingRescheduleFromTime || originalSchedule.fromTime || "");
   const pendingToTime = String(attendance.pendingRescheduleToTime || originalSchedule.toTime || "");
+  const pendingStudioRoomId = String(
+    attendance.pendingRescheduleStudioRoomId || originalSchedule.studioRoomId || "",
+  );
   const scheduleId = `reschedule-${String(originalSchedule.id)}`;
 
   await assertRescheduleSlotAvailable({
@@ -1583,8 +1598,9 @@ async function createConfirmedRescheduleSchedule(
     originalScheduleId: String(originalSchedule.id || ""),
     studentId: String(originalSchedule.studentId || ""),
     instructorId: String(originalSchedule.instructorId || ""),
+    lessonStartDate: String(originalSchedule.lessonStartDate || ""),
     lessonMode: String(originalSchedule.lessonMode || "Studio"),
-    studioRoomId: String(originalSchedule.studioRoomId || ""),
+    studioRoomId: pendingStudioRoomId,
     scheduleDate: pendingDate,
     fromTime: pendingFromTime,
     toTime: pendingToTime,
@@ -1603,6 +1619,7 @@ async function createConfirmedRescheduleSchedule(
     scheduleStatus: "Scheduled",
     originalScheduleId: String(originalSchedule.id || ""),
     rescheduleReason: `Rescheduled from ${String(originalSchedule.scheduleDate || "")}`,
+    studioRoomId: pendingStudioRoomId,
     createdAt: now,
     updatedAt: now,
   };
@@ -1624,6 +1641,7 @@ async function createConfirmedRescheduleSchedule(
             pendingRescheduleDate: "",
             pendingRescheduleFromTime: "",
             pendingRescheduleToTime: "",
+            pendingRescheduleStudioRoomId: "",
             updatedAt: now,
           },
         },
@@ -1652,6 +1670,7 @@ async function createConfirmedRescheduleSchedule(
           pendingRescheduleDate: "",
           pendingRescheduleFromTime: "",
           pendingRescheduleToTime: "",
+          pendingRescheduleStudioRoomId: "",
           updatedAt: now,
         },
       },
@@ -1666,6 +1685,7 @@ async function assertRescheduleSlotAvailable({
   originalScheduleId,
   studentId,
   instructorId,
+  lessonStartDate,
   lessonMode,
   studioRoomId,
   scheduleDate,
@@ -1676,6 +1696,7 @@ async function assertRescheduleSlotAvailable({
   originalScheduleId: string;
   studentId: string;
   instructorId: string;
+  lessonStartDate: string;
   lessonMode: string;
   studioRoomId: string;
   scheduleDate: string;
@@ -1684,6 +1705,10 @@ async function assertRescheduleSlotAvailable({
 }) {
   if (!scheduleDate || !fromTime || !toTime) {
     throw new Error("Reschedule harus mengisi tanggal dan jam pengganti.");
+  }
+  const maxRescheduleDate = addOneMonthFromDate(lessonStartDate || scheduleDate);
+  if (maxRescheduleDate && scheduleDate > maxRescheduleDate) {
+    throw new Error(`Reschedule tidak boleh melewati ${maxRescheduleDate}.`);
   }
 
   const db = await getMongoDb();

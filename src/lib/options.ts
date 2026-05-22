@@ -77,8 +77,6 @@ export const studentAttendanceStatusOptions = [
   "Pending",
   "Present",
   "Absent",
-  "Sick",
-  "Permission",
   "Rescheduled",
 ].map((value) => ({ label: value, value }));
 
@@ -87,8 +85,6 @@ export const instructorAttendanceStatusOptions = [
   "Present",
   "Absent",
   "Rescheduled",
-  "Substitute",
-  "Cancelled",
 ].map((value) => ({ label: value, value }));
 
 export const progressRatingOptions = ["Needs Work", "Improving", "Good", "Excellent"].map(

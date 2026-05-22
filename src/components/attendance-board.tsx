@@ -55,6 +55,8 @@ export function AttendanceBoard() {
   const [schedules, setSchedules] = useState<Row[]>([]);
   const [attendance, setAttendance] = useState<Row[]>([]);
   const [instructorAttendance, setInstructorAttendance] = useState<Row[]>([]);
+  const [instructorAvailability, setInstructorAvailability] = useState<Row[]>([]);
+  const [studioRooms, setStudioRooms] = useState<Row[]>([]);
   const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [selectedStudentSession, setSelectedStudentSession] = useState<SelectedSession | null>(null);
@@ -72,6 +74,8 @@ export function AttendanceBoard() {
         studentRows,
         courseRows,
         instructorRows,
+        instructorAvailabilityRows,
+        studioRoomRows,
         scheduleRows,
         attendanceRows,
         instructorAttendanceRows,
@@ -80,6 +84,8 @@ export function AttendanceBoard() {
           fetchRows("students"),
           fetchRows("courses"),
           fetchRows("instructors"),
+          fetchRows("instructor-availability"),
+          fetchRows("rooms"),
           fetchRows("schedules"),
           fetchRows("student-attendance"),
           fetchRows("instructor-attendance"),
@@ -89,6 +95,8 @@ export function AttendanceBoard() {
       setStudents(studentRows);
       setCourses(courseRows);
       setInstructors(instructorRows);
+      setInstructorAvailability(instructorAvailabilityRows);
+      setStudioRooms(studioRoomRows);
       setSchedules(scheduleRows);
       setAttendance(attendanceRows);
       setInstructorAttendance(instructorAttendanceRows);
@@ -273,11 +281,13 @@ export function AttendanceBoard() {
     attendanceRow,
     fromTime,
     rescheduleDate,
+    studioRoomId,
     toTime,
   }: {
     attendanceRow: Row;
     fromTime: string;
     rescheduleDate: string;
+    studioRoomId: string;
     toTime: string;
   }) {
     if (!rescheduleDate || !fromTime || !toTime) {
@@ -294,6 +304,7 @@ export function AttendanceBoard() {
         pendingRescheduleDate: rescheduleDate,
         pendingRescheduleFromTime: fromTime,
         pendingRescheduleToTime: toTime,
+        pendingRescheduleStudioRoomId: studioRoomId,
       });
       await loadData();
       toast.success("Draft instructor reschedule saved");
@@ -401,6 +412,7 @@ export function AttendanceBoard() {
                   <SessionCard
                     attendance={attendanceRow}
                     key={String(schedule.id)}
+                    originalSchedule={schedulesById.get(String(schedule.originalScheduleId ?? "")) ?? null}
                     onOpen={() =>
                       setSelectedStudentSession({
                         attendance: attendanceRow,
@@ -462,6 +474,7 @@ export function AttendanceBoard() {
                   <InstructorSessionCard
                     attendance={attendanceRow}
                     key={String(schedule.id)}
+                    originalSchedule={schedulesById.get(String(schedule.originalScheduleId ?? "")) ?? null}
                     onOpen={() =>
                       setSelectedInstructorSession({
                         attendance: attendanceRow,
@@ -483,9 +496,12 @@ export function AttendanceBoard() {
         <StudentAttendanceModal
           attendance={selectedStudentAttendance}
           disabled={savingId === selectedStudentAttendance?.id}
+          instructorAvailability={instructorAvailability}
           onClose={() => setSelectedStudentSession(null)}
           onUpdate={updateAttendance}
           schedule={selectedStudentSession.schedule}
+          schedules={schedules}
+          studioRooms={studioRooms}
           schedulesById={schedulesById}
           sessionNumber={selectedStudentSession.sessionNumber}
         />
@@ -494,11 +510,13 @@ export function AttendanceBoard() {
         <InstructorAttendanceModal
           attendance={selectedInstructorAttendance}
           disabled={savingId === selectedInstructorAttendance?.id}
-          instructors={instructors}
+          instructorAvailability={instructorAvailability}
           onClose={() => setSelectedInstructorSession(null)}
           onCreateRescheduleSession={createInstructorRescheduleSession}
           onUpdate={updateInstructorAttendance}
           schedule={selectedInstructorSession.schedule}
+          schedules={schedules}
+          studioRooms={studioRooms}
           schedulesById={schedulesById}
           sessionNumber={selectedInstructorSession.sessionNumber}
         />
@@ -559,11 +577,13 @@ function SessionRail({ children, sessionCount }: { children: ReactNode; sessionC
 
 function SessionCard({
   attendance,
+  originalSchedule,
   onOpen,
   schedule,
   sessionNumber,
 }: {
   attendance: Row | null;
+  originalSchedule: Row | null;
   onOpen: () => void;
   schedule: Row;
   sessionNumber: number;
@@ -601,6 +621,11 @@ function SessionCard({
             <Badge className="max-w-[84px] truncate px-1 py-0 text-[8px] sm:max-w-[110px] sm:px-2.5 sm:py-0.5 sm:text-xs" variant={statusVariant(status)}>
               {formatDisplayText(status)}
             </Badge>
+            {schedule.originalScheduleId ? (
+              <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
+                Rescheduled from {originalSchedule ? scheduleDateTime(originalSchedule) : "original session"}
+              </p>
+            ) : null}
             {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
             {shouldShowFinalityWarning(status, confirmed) ? (
               <FinalityIndicator confirmed={false} />
@@ -615,25 +640,31 @@ function SessionCard({
 function StudentAttendanceModal({
   attendance,
   disabled,
+  instructorAvailability,
   onClose,
   onUpdate,
   schedule,
+  schedules,
+  studioRooms,
   schedulesById,
   sessionNumber,
 }: {
   attendance: Row | null;
   disabled: boolean;
+  instructorAvailability: Row[];
   onClose: () => void;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
   schedule: Row;
+  schedules: Row[];
+  studioRooms: Row[];
   schedulesById: Map<string, Row>;
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
   const isDraftReschedule = Boolean(schedule.isDraftReschedule);
-  const needsReason = status !== "Present" && status !== "Pending";
+  const needsReason = status === "Rescheduled";
   const confirmed = Boolean(attendance?.confirmed);
-  const requiresReschedule = ["Absent", "Sick", "Permission", "Rescheduled"].includes(status);
+  const requiresReschedule = status === "Rescheduled";
   const pendingReschedule = pendingRescheduleLabel(attendance);
   const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
     !requiresReschedule || Boolean(attendance?.makeupScheduleId || pendingReschedule)
@@ -678,7 +709,7 @@ function StudentAttendanceModal({
               onChange={(event) => {
                 const nextStatus = event.target.value;
                 const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
-                const opensReplacement = ["Absent", "Sick", "Permission"].includes(nextStatus);
+                const opensReplacement = nextStatus === "Rescheduled";
 
                 if (opensReplacement && !attendance.makeupScheduleId && !pendingReschedule) {
                   setReplacementStatus(nextStatus);
@@ -786,12 +817,16 @@ function StudentAttendanceModal({
       {attendance && replacementOpen ? (
         <ReplacementScheduleModal
           attendance={attendance}
+          instructorAvailability={instructorAvailability}
           defaultFromTime={rescheduleFromTime}
           defaultReason={String(attendance.absenceReason ?? "")}
           defaultStatus={replacementStatus}
           defaultToTime={rescheduleToTime}
           onClose={() => setReplacementOpen(false)}
-          onSave={async ({ fromTime, reason, rescheduleDate: nextDate, status: nextStatus, toTime }) => {
+          schedule={schedule}
+          schedules={schedules}
+          studioRooms={studioRooms}
+          onSave={async ({ fromTime, reason, rescheduleDate: nextDate, status: nextStatus, toTime, studioRoomId }) => {
             await onUpdate(attendance.id, {
               ...attendance,
               status: nextStatus,
@@ -800,6 +835,7 @@ function StudentAttendanceModal({
               pendingRescheduleDate: nextDate,
               pendingRescheduleFromTime: fromTime,
               pendingRescheduleToTime: toTime,
+              pendingRescheduleStudioRoomId: studioRoomId,
             });
             setRescheduleFromTime(fromTime);
             setRescheduleToTime(toTime);
@@ -877,14 +913,19 @@ function RescheduleBadge({ label, value }: { label: string; value: string }) {
 }
 
 function ReplacementScheduleModal({
+  instructorAvailability,
   defaultFromTime,
   defaultReason,
   defaultStatus,
   defaultToTime,
   onClose,
   onSave,
+  schedule,
+  schedules,
+  studioRooms,
 }: {
   attendance: Row;
+  instructorAvailability: Row[];
   defaultFromTime: string;
   defaultReason: string;
   defaultStatus: string;
@@ -895,16 +936,57 @@ function ReplacementScheduleModal({
     reason: string;
     rescheduleDate: string;
     status: string;
+    studioRoomId: string;
     toTime: string;
   }) => Promise<void>;
+  schedule: Row;
+  schedules: Row[];
+  studioRooms: Row[];
 }) {
   const [status, setStatus] = useState(defaultStatus);
   const [reason, setReason] = useState(defaultReason);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [fromTime, setFromTime] = useState(defaultFromTime);
   const [toTime, setToTime] = useState(defaultToTime);
-  const replacementStatusOptions = studentAttendanceStatusOptions.filter((option) =>
-    ["Absent", "Sick", "Permission"].includes(option.value),
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [studioRoomId, setStudioRoomId] = useState(String(schedule.studioRoomId ?? ""));
+  const replacementStatusOptions = studentAttendanceStatusOptions.filter(
+    (option) => option.value === "Rescheduled",
+  );
+  const slotOptions = useMemo(
+    () => buildRescheduleSlotOptions({ availabilityRows: instructorAvailability, schedule }),
+    [instructorAvailability, schedule],
+  );
+  const selectedSlotData = slotOptions.find((slot) => slot.value === selectedSlot);
+  const dateOptions = useMemo(
+    () => buildRescheduleDateOptions({ schedule, schedules, selectedSlot: selectedSlotData }),
+    [schedule, schedules, selectedSlotData],
+  );
+  const selectedDateData = dateOptions.find((option) => option.value === rescheduleDate);
+  const isStudioMode = String(schedule.lessonMode ?? "").toLowerCase() === "studio";
+  const needsStudioOverride = isStudioMode && Boolean(selectedDateData?.conflicts.studio);
+  const availableStudioRooms = useMemo(
+    (): StudioRoomOption[] =>
+      studioRooms
+        .filter((room) => String(room.active ?? true) !== "false")
+        .map((room) => {
+          const id = String(room.id ?? "");
+          const booked = isStudioRoomBooked({
+            schedules,
+            roomId: id,
+            date: rescheduleDate,
+            fromTime,
+            toTime,
+            skipScheduleId: String(schedule.id ?? ""),
+            skipOriginalScheduleId: String(schedule.originalScheduleId ?? ""),
+          });
+          return {
+            id,
+            label: booked ? `${formatDisplayText(room.roomName)} (Booked)` : formatDisplayText(room.roomName),
+            disabled: booked,
+          };
+        }),
+    [fromTime, rescheduleDate, schedule.id, schedule.originalScheduleId, schedules, studioRooms, toTime],
   );
 
   return (
@@ -950,35 +1032,77 @@ function ReplacementScheduleModal({
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
-              Replacement date
+              Replacement slot
             </span>
-            <input
+            <select
               className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              onChange={(event) => setRescheduleDate(event.target.value)}
-              type="date"
-              value={rescheduleDate}
-            />
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedSlot(value);
+                setRescheduleDate("");
+                const selected = slotOptions.find((slot) => slot.value === value);
+                if (!selected) return;
+                setFromTime(selected.fromTime);
+                setToTime(selected.toTime);
+              }}
+              value={selectedSlot}
+            >
+              <option value="">Select replacement slot</option>
+              {slotOptions.map((slot) => (
+                <option key={slot.value} value={slot.value}>
+                  {slot.label}
+                </option>
+              ))}
+            </select>
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+              Available date
+            </span>
+            <select
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              disabled={!selectedSlot}
+              onChange={(event) => {
+                const value = event.target.value;
+                setRescheduleDate(value);
+                if (!value) return;
+                const nextDate = dateOptions.find((option) => option.value === value);
+                if (!nextDate?.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
+                  setStudioRoomId(String(schedule.studioRoomId ?? ""));
+                }
+              }}
+              value={rescheduleDate}
+            >
+              <option value="">Select available date</option>
+              {dateOptions.map((option) => (
+                <option disabled={option.disabled} key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {isStudioMode && rescheduleDate ? (
             <label className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">From</span>
-              <input
+              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
+                Studio room
+              </span>
+              <select
                 className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                onChange={(event) => setFromTime(event.target.value)}
-                type="time"
-                value={fromTime}
-              />
+                onChange={(event) => setStudioRoomId(event.target.value)}
+                value={studioRoomId}
+              >
+                <option value="">Select studio room</option>
+                {availableStudioRooms.map((room) => (
+                  <option disabled={room.disabled} key={room.id} value={room.id}>
+                    {room.label}
+                  </option>
+                ))}
+              </select>
+              {needsStudioOverride ? (
+                <p className="text-[11px] text-amber-700">Room asal sudah terpakai di jam ini. Pilih room lain.</p>
+              ) : null}
             </label>
-            <label className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">To</span>
-              <input
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                onChange={(event) => setToTime(event.target.value)}
-                type="time"
-                value={toTime}
-              />
-            </label>
-          </div>
+          ) : null}
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
@@ -986,15 +1110,22 @@ function ReplacementScheduleModal({
             Cancel
           </Button>
           <Button
-            onClick={() =>
+            onClick={() => {
+              if (needsStudioOverride && !studioRoomId) {
+                toast.error("Pilih studio room pengganti dulu");
+                return;
+              }
               void onSave({
                 fromTime,
                 reason,
                 rescheduleDate,
                 status,
+                studioRoomId: String(schedule.lessonMode ?? "").toLowerCase() === "studio"
+                  ? (studioRoomId || String(schedule.studioRoomId ?? ""))
+                  : "",
                 toTime,
-              })
-            }
+              });
+            }}
             type="button"
           >
             Save Replacement
@@ -1059,11 +1190,13 @@ function shouldShowFinalityWarning(status: string, confirmed: boolean) {
 
 function InstructorSessionCard({
   attendance,
+  originalSchedule,
   onOpen,
   schedule,
   sessionNumber,
 }: {
   attendance: Row | null;
+  originalSchedule: Row | null;
   onOpen: () => void;
   schedule: Row;
   sessionNumber: number;
@@ -1092,6 +1225,11 @@ function InstructorSessionCard({
           <Badge className="max-w-[84px] truncate px-1 py-0 text-[8px] sm:max-w-[110px] sm:px-2.5 sm:py-0.5 sm:text-xs" variant={instructorStatusVariant(status)}>
             {formatDisplayText(status)}
           </Badge>
+          {schedule.originalScheduleId ? (
+            <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
+              Rescheduled from {originalSchedule ? scheduleDateTime(originalSchedule) : "original session"}
+            </p>
+          ) : null}
           {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
           {shouldShowFinalityWarning(status, confirmed) ? (
             <FinalityIndicator confirmed={false} />
@@ -1133,33 +1271,37 @@ function PackageSelector({
 function InstructorAttendanceModal({
   attendance,
   disabled,
-  instructors,
+  instructorAvailability,
   onClose,
   onCreateRescheduleSession,
   onUpdate,
   schedule,
+  schedules,
+  studioRooms,
   schedulesById,
   sessionNumber,
 }: {
   attendance: Row | null;
   disabled: boolean;
-  instructors: Row[];
+  instructorAvailability: Row[];
   onClose: () => void;
   onCreateRescheduleSession: (payload: {
     attendanceRow: Row;
     fromTime: string;
     rescheduleDate: string;
+    studioRoomId: string;
     toTime: string;
   }) => Promise<void>;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
   schedule: Row;
+  schedules: Row[];
+  studioRooms: Row[];
   schedulesById: Map<string, Row>;
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
-  const needsSubstitute = status === "Substitute";
   const confirmed = Boolean(attendance?.confirmed);
-  const requiresReschedule = ["Absent", "Cancelled"].includes(status);
+  const requiresReschedule = status === "Rescheduled";
   const pendingReschedule = pendingRescheduleLabel(attendance);
   const linkedReschedule = schedulesById.get(String(attendance?.rescheduleScheduleId ?? ""));
   const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
@@ -1169,6 +1311,51 @@ function InstructorAttendanceModal({
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
   const [rescheduleToTime, setRescheduleToTime] = useState(String(schedule.toTime ?? ""));
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [studioRoomId, setStudioRoomId] = useState(String(schedule.studioRoomId ?? ""));
+  const slotOptions = useMemo(
+    () => buildRescheduleSlotOptions({ availabilityRows: instructorAvailability, schedule }),
+    [instructorAvailability, schedule],
+  );
+  const selectedSlotData = slotOptions.find((slot) => slot.value === selectedSlot);
+  const dateOptions = useMemo(
+    () => buildRescheduleDateOptions({ schedule, schedules, selectedSlot: selectedSlotData }),
+    [schedule, schedules, selectedSlotData],
+  );
+  const selectedDateData = dateOptions.find((option) => option.value === rescheduleDate);
+  const isStudioMode = String(schedule.lessonMode ?? "").toLowerCase() === "studio";
+  const needsStudioOverride = isStudioMode && Boolean(selectedDateData?.conflicts.studio);
+  const availableStudioRooms = useMemo(
+    (): StudioRoomOption[] =>
+      studioRooms
+        .filter((room) => String(room.active ?? true) !== "false")
+        .map((room) => {
+          const id = String(room.id ?? "");
+          const booked = isStudioRoomBooked({
+            schedules,
+            roomId: id,
+            date: rescheduleDate,
+            fromTime: rescheduleFromTime,
+            toTime: rescheduleToTime,
+            skipScheduleId: String(schedule.id ?? ""),
+            skipOriginalScheduleId: String(schedule.originalScheduleId ?? ""),
+          });
+          return {
+            id,
+            label: booked ? `${formatDisplayText(room.roomName)} (Booked)` : formatDisplayText(room.roomName),
+            disabled: booked,
+          };
+        }),
+    [
+      rescheduleDate,
+      rescheduleFromTime,
+      rescheduleToTime,
+      schedule.id,
+      schedule.originalScheduleId,
+      schedules,
+      studioRooms,
+    ],
+  );
 
   return (
     <AttendanceModalShell
@@ -1189,12 +1376,11 @@ function InstructorAttendanceModal({
             onChange={(event) => {
               const nextStatus = event.target.value;
               const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
-              const needsReschedule = ["Absent", "Cancelled"].includes(nextStatus);
+              const needsReschedule = nextStatus === "Rescheduled";
               void onUpdate(attendance.id, {
                 ...attendance,
                 status: nextStatus,
-                substituteInstructorId:
-                  nextStatus === "Substitute" ? attendance.substituteInstructorId : "",
+                substituteInstructorId: "",
                 rescheduleRequired: clearsReschedule ? false : needsReschedule || attendance.rescheduleRequired,
                 rescheduleScheduleId: clearsReschedule ? "" : attendance.rescheduleScheduleId,
               });
@@ -1221,39 +1407,79 @@ function InstructorAttendanceModal({
             <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
           ) : attendance.rescheduleRequired ? (
             <div className="grid gap-2">
-              <input
+              <select
                 className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                 disabled={controlDisabled}
-                onChange={(event) => setRescheduleDate(event.target.value)}
-                type="date"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedSlot(value);
+                  setRescheduleDate("");
+                  const selected = slotOptions.find((slot) => slot.value === value);
+                  if (!selected) return;
+                  setRescheduleFromTime(selected.fromTime);
+                  setRescheduleToTime(selected.toTime);
+                }}
+                value={selectedSlot}
+              >
+                <option value="">Select replacement slot</option>
+                {slotOptions.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                disabled={!selectedSlot || controlDisabled}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setRescheduleDate(value);
+                  const nextDate = dateOptions.find((option) => option.value === value);
+                  if (!nextDate?.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
+                    setStudioRoomId(String(schedule.studioRoomId ?? ""));
+                  }
+                }}
                 value={rescheduleDate}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
+              >
+                <option value="">Select available date</option>
+                {dateOptions.map((option) => (
+                  <option disabled={option.disabled} key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {isStudioMode && rescheduleDate ? (
+                <select
                   className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
                   disabled={controlDisabled}
-                  onChange={(event) => setRescheduleFromTime(event.target.value)}
-                  type="time"
-                  value={rescheduleFromTime}
-                />
-                <input
-                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                  disabled={controlDisabled}
-                  onChange={(event) => setRescheduleToTime(event.target.value)}
-                  type="time"
-                  value={rescheduleToTime}
-                />
-              </div>
+                  onChange={(event) => setStudioRoomId(event.target.value)}
+                  value={studioRoomId}
+                >
+                  <option value="">Select studio room</option>
+                  {availableStudioRooms.map((room) => (
+                    <option disabled={room.disabled} key={room.id} value={room.id}>
+                      {room.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <Button
                 disabled={controlDisabled}
-                onClick={() =>
+                onClick={() => {
+                  if (needsStudioOverride && !studioRoomId) {
+                    toast.error("Pilih studio room pengganti dulu");
+                    return;
+                  }
                   void onCreateRescheduleSession({
                     attendanceRow: attendance,
                     fromTime: rescheduleFromTime,
                     rescheduleDate,
+                    studioRoomId: String(schedule.lessonMode ?? "").toLowerCase() === "studio"
+                      ? (studioRoomId || String(schedule.studioRoomId ?? ""))
+                      : "",
                     toTime: rescheduleToTime,
-                  })
-                }
+                  });
+                }}
                 size="sm"
                 type="button"
                 variant="glass"
@@ -1267,29 +1493,7 @@ function InstructorAttendanceModal({
             </p>
           ) : null}
 
-          {needsSubstitute ? (
-            <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              disabled={controlDisabled}
-              onChange={(event) =>
-                void onUpdate(attendance.id, {
-                  ...attendance,
-                  substituteInstructorId: event.target.value,
-                  status: "Substitute",
-                })
-              }
-              value={String(attendance.substituteInstructorId ?? "")}
-            >
-              <option value="">Select substitute</option>
-              {instructors
-                .filter((instructor) => instructor.id !== attendance.instructorId)
-                .map((instructor) => (
-                  <option key={instructor.id} value={instructor.id}>
-                    {formatDisplayText(instructor.instructorName)}
-                  </option>
-                ))}
-            </select>
-          ) : null}
+          
 
           <input
             className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
@@ -1519,25 +1723,233 @@ function originalSessionCount(sessions: SessionRow[]) {
 function statusVariant(status: string) {
   if (status === "Present") return "success";
   if (status === "Pending") return "outline";
-  if (status === "Permission" || status === "Rescheduled") return "warning";
+  if (status === "Rescheduled") return "warning";
   return "danger";
 }
 
 function instructorStatusVariant(status: string) {
   if (status === "Present") return "success";
   if (status === "Pending") return "outline";
-  if (status === "Substitute" || status === "Rescheduled") return "warning";
+  if (status === "Rescheduled") return "warning";
   return "danger";
 }
 
 function statusDotClass(status: string) {
   if (status === "Present") return "bg-emerald-500";
   if (status === "Pending") return "bg-zinc-300";
-  if (status === "Permission" || status === "Rescheduled" || status === "Substitute") {
+  if (status === "Rescheduled") {
     return "bg-amber-500";
   }
 
   return "bg-rose-500";
+}
+
+type RescheduleSlotOption = {
+  value: string;
+  label: string;
+  dayOfWeek: number;
+  fromTime: string;
+  toTime: string;
+};
+
+type RescheduleDateOption = {
+  value: string;
+  label: string;
+  date: string;
+  conflicts: {
+    instructor: boolean;
+    student: boolean;
+    studio: boolean;
+  };
+  disabled: boolean;
+};
+
+type StudioRoomOption = {
+  id: string;
+  label: string;
+  disabled: boolean;
+};
+
+function buildRescheduleSlotOptions({
+  availabilityRows,
+  schedule
+}: {
+  availabilityRows: Row[];
+  schedule: Row;
+}): RescheduleSlotOption[] {
+  const instructorId = String(schedule.instructorId ?? "");
+  const availability = availabilityRows
+    .filter(
+      (row) =>
+        String(row.instructorId ?? "") === instructorId &&
+        Boolean(row.dayOfWeek) &&
+        Boolean(row.fromTime) &&
+        Boolean(row.toTime),
+    )
+    .map((row) => ({
+      dayOfWeek: dayNameToIndex(String(row.dayOfWeek ?? "")),
+      fromTime: String(row.fromTime ?? ""),
+      toTime: String(row.toTime ?? ""),
+    }))
+    .filter((row) => row.dayOfWeek >= 0 && row.fromTime && row.toTime);
+
+  const unique = new Map<string, RescheduleSlotOption>();
+  availability.forEach((slot) => {
+    const key = `${slot.dayOfWeek}|${slot.fromTime}|${slot.toTime}`;
+    if (unique.has(key)) return;
+    unique.set(key, {
+      value: key,
+      dayOfWeek: slot.dayOfWeek,
+      fromTime: slot.fromTime,
+      toTime: slot.toTime,
+      label: `${dayIndexToName(slot.dayOfWeek)} · ${slot.fromTime}-${slot.toTime}`,
+    });
+  });
+
+  return [...unique.values()].sort((left, right) => left.value.localeCompare(right.value));
+}
+
+function buildRescheduleDateOptions({
+  schedule,
+  schedules,
+  selectedSlot,
+}: {
+  schedule: Row;
+  schedules: Row[];
+  selectedSlot: RescheduleSlotOption | undefined;
+}): RescheduleDateOption[] {
+  if (!selectedSlot) return [];
+  const instructorId = String(schedule.instructorId ?? "");
+  const studentId = String(schedule.studentId ?? "");
+  const lessonMode = String(schedule.lessonMode ?? "");
+  const studioRoomId = String(schedule.studioRoomId ?? "");
+  const skipIds = new Set([String(schedule.id ?? ""), String(schedule.originalScheduleId ?? "")]);
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const maxRescheduleDate = getMaxRescheduleDate(schedule);
+  const endDate = maxRescheduleDate && maxRescheduleDate < startDate ? startDate : (maxRescheduleDate ?? startDate);
+  const options: RescheduleDateOption[] = [];
+
+  for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
+    if (cursor.getDay() !== selectedSlot.dayOfWeek) continue;
+    const date = formatDateOnly(cursor);
+    const fromTime = selectedSlot.fromTime;
+    const toTime = selectedSlot.toTime;
+    const conflicts = { instructor: false, student: false, studio: false };
+
+    schedules.forEach((existing) => {
+      const existingId = String(existing.id ?? "");
+      if (skipIds.has(existingId)) return;
+      if (String(existing.scheduleDate ?? "") !== date) return;
+      if (String(existing.scheduleStatus ?? "").toLowerCase() === "cancelled") return;
+      if (
+        !rangesOverlap(
+          fromTime,
+          toTime,
+          String(existing.fromTime ?? ""),
+          String(existing.toTime ?? ""),
+        )
+      ) return;
+
+      if (String(existing.instructorId ?? "") === instructorId) conflicts.instructor = true;
+      if (studentId && String(existing.studentId ?? "") === studentId) conflicts.student = true;
+      if (
+        lessonMode.toLowerCase() === "studio" &&
+        studioRoomId &&
+        String(existing.lessonMode ?? "").toLowerCase() === "studio" &&
+        String(existing.studioRoomId ?? "") === studioRoomId
+      ) {
+        conflicts.studio = true;
+      }
+    });
+
+    const reasons: string[] = [];
+    if (conflicts.instructor && conflicts.student) {
+      reasons.push("Booked (student + instructor)");
+    } else if (conflicts.instructor) {
+      reasons.push("Booked (instructor)");
+    } else if (conflicts.student) {
+      reasons.push("Booked (student)");
+    }
+    const disabled = conflicts.instructor || conflicts.student;
+    const label = reasons.length > 0 ? `${date} (${reasons.join(" · ")})` : date;
+
+    options.push({ value: date, label, date, conflicts, disabled });
+  }
+
+  return options;
+}
+
+function getMaxRescheduleDate(schedule: Row) {
+  const sourceDate = String(schedule.lessonStartDate ?? "") || String(schedule.scheduleDate ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sourceDate)) return null;
+  const [year, month, day] = sourceDate.split("-").map(Number);
+  const result = new Date(year, month - 1, day);
+  result.setMonth(result.getMonth() + 1);
+  return result;
+}
+
+function dayNameToIndex(dayName: string) {
+  const normalized = dayName.toLowerCase();
+  if (/^[0-6]$/.test(normalized)) return Number(normalized);
+  if (normalized === "sunday") return 0;
+  if (normalized === "monday") return 1;
+  if (normalized === "tuesday") return 2;
+  if (normalized === "wednesday") return 3;
+  if (normalized === "thursday") return 4;
+  if (normalized === "friday") return 5;
+  if (normalized === "saturday") return 6;
+  return -1;
+}
+
+function dayIndexToName(dayIndex: number) {
+  const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return names[dayIndex] ?? "-";
+}
+
+function formatDateOnly(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function rangesOverlap(startA: string, endA: string, startB: string, endB: string) {
+  return startA < endB && endA > startB;
+}
+
+function isStudioRoomBooked({
+  schedules,
+  roomId,
+  date,
+  fromTime,
+  toTime,
+  skipScheduleId,
+  skipOriginalScheduleId,
+}: {
+  schedules: Row[];
+  roomId: string;
+  date: string;
+  fromTime: string;
+  toTime: string;
+  skipScheduleId: string;
+  skipOriginalScheduleId: string;
+}) {
+  if (!roomId || !date || !fromTime || !toTime) return false;
+  return schedules.some((row) => {
+    const id = String(row.id ?? "");
+    if (id === skipScheduleId || id === skipOriginalScheduleId) return false;
+    if (String(row.scheduleStatus ?? "").toLowerCase() === "cancelled") return false;
+    if (String(row.lessonMode ?? "").toLowerCase() !== "studio") return false;
+    if (String(row.studioRoomId ?? "") !== roomId) return false;
+    if (String(row.scheduleDate ?? "") !== date) return false;
+    return rangesOverlap(
+      fromTime,
+      toTime,
+      String(row.fromTime ?? ""),
+      String(row.toTime ?? ""),
+    );
+  });
 }
 
 function Info({
