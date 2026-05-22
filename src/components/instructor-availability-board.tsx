@@ -24,8 +24,8 @@ export function InstructorAvailabilityBoard() {
   const [draft, setDraft] = useState({
     dayOfWeek: "1",
     fromTime: "09:00",
-    toTime: "10:00",
   });
+  const [selectedSlotValues, setSelectedSlotValues] = useState<string[]>(["09:00"]);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [cursorDate, setCursorDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState("");
@@ -75,12 +75,26 @@ export function InstructorAvailabilityBoard() {
     availability.filter((row) => row.instructorId === selectedInstructorId && row.active !== false),
     "dayOfWeek",
   );
+  const existingSlotValuesForDraftDay = useMemo(() => {
+    const rows = availabilityByDay[draft.dayOfWeek] ?? [];
+    return new Set(rows.map((row) => String(row.fromTime || "")));
+  }, [availabilityByDay, draft.dayOfWeek]);
+
+  useEffect(() => {
+    setSelectedSlotValues((current) => {
+      const next = current.filter((value) => !existingSlotValuesForDraftDay.has(value));
+      if (next.length === current.length && next.every((value, index) => value === current[index])) {
+        return current;
+      }
+      return next;
+    });
+  }, [existingSlotValuesForDraftDay]);
   const schedulesByDate = groupByDate(
     schedules.filter((row) => row.instructorId === selectedInstructorId),
   );
 
   async function createAvailability() {
-    if (!selectedInstructorId || !draft.dayOfWeek || !draft.fromTime || !draft.toTime) {
+    if (!selectedInstructorId || !draft.dayOfWeek || selectedSlotValues.length === 0) {
       toast.error("Lengkapi instructor, hari, dan jam availability");
       return;
     }
@@ -88,24 +102,33 @@ export function InstructorAvailabilityBoard() {
     setSaving(true);
 
     try {
-      const response = await fetch("/api/instructor-availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          instructorId: selectedInstructorId,
-          dayOfWeek: draft.dayOfWeek,
-          fromTime: draft.fromTime,
-          toTime: nextHour(draft.fromTime),
-          lessonMode: "Both",
-          active: true,
+      const responses = await Promise.all(
+        selectedSlotValues.map(async (fromTime) => {
+          const response = await fetch("/api/instructor-availability", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              instructorId: selectedInstructorId,
+              dayOfWeek: draft.dayOfWeek,
+              fromTime,
+              toTime: nextHour(fromTime),
+              lessonMode: "Both",
+              active: true,
+            }),
+          });
+          const json = (await response.json()) as { error?: string };
+          if (!response.ok) {
+            throw new Error(json.error ?? `Unable to create availability for ${fromTime}`);
+          }
+          return response;
         }),
-      });
-      const json = (await response.json()) as { error?: string };
+      );
 
-      if (!response.ok) throw new Error(json.error ?? "Unable to create availability");
-
-      toast.success("Availability saved");
+      if (responses.length > 0) {
+        toast.success(`${responses.length} availability slot saved`);
+      }
       setAvailabilityFormOpen(false);
+      setSelectedSlotValues([draft.fromTime]);
       await loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to create availability");
@@ -340,11 +363,14 @@ export function InstructorAvailabilityBoard() {
       {availabilityFormOpen ? (
         <AvailabilityFormModal
           draft={draft}
+          existingSlotValuesForDraftDay={existingSlotValuesForDraftDay}
           instructors={instructors}
           onClose={() => setAvailabilityFormOpen(false)}
           onDraftChange={setDraft}
           onInstructorChange={setSelectedInstructorId}
+          onSlotsChange={setSelectedSlotValues}
           onSubmit={createAvailability}
+          selectedSlotValues={selectedSlotValues}
           saving={saving}
           selectedInstructorId={selectedInstructorId}
         />
@@ -366,28 +392,32 @@ async function fetchRows(resource: string) {
 
 function AvailabilityFormModal({
   draft,
+  existingSlotValuesForDraftDay,
   instructors,
   onClose,
   onDraftChange,
   onInstructorChange,
+  onSlotsChange,
   onSubmit,
+  selectedSlotValues,
   saving,
   selectedInstructorId,
 }: {
   draft: {
     dayOfWeek: string;
     fromTime: string;
-    toTime: string;
   };
+  existingSlotValuesForDraftDay: Set<string>;
   instructors: Row[];
   onClose: () => void;
   onDraftChange: (value: {
     dayOfWeek: string;
     fromTime: string;
-    toTime: string;
   }) => void;
   onInstructorChange: (value: string) => void;
+  onSlotsChange: (value: string[]) => void;
   onSubmit: () => Promise<void>;
+  selectedSlotValues: string[];
   saving: boolean;
   selectedInstructorId: string;
 }) {
@@ -443,25 +473,41 @@ function AvailabilityFormModal({
 
           <label className="space-y-1.5">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
-              Time slot
+              Time slots
             </span>
-            <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              onChange={(event) =>
-                onDraftChange({
-                  ...draft,
-                  fromTime: event.target.value,
-                  toTime: nextHour(event.target.value),
-                })
-              }
-              value={draft.fromTime}
-            >
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-white/50 bg-white/58 p-2 backdrop-blur-xl">
               {hourlyLessonSlotOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <label
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm ${
+                    existingSlotValuesForDraftDay.has(option.value)
+                      ? "bg-zinc-100/75 text-zinc-400"
+                      : "text-zinc-900 hover:bg-white/65"
+                  }`}
+                  key={option.value}
+                >
+                  <input
+                    checked={selectedSlotValues.includes(option.value)}
+                    disabled={existingSlotValuesForDraftDay.has(option.value)}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        onSlotsChange([...selectedSlotValues, option.value]);
+                        onDraftChange({ ...draft, fromTime: option.value });
+                        return;
+                      }
+                      onSlotsChange(selectedSlotValues.filter((value) => value !== option.value));
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    {option.label}
+                    {existingSlotValuesForDraftDay.has(option.value) ? " (already added)" : ""}
+                  </span>
+                </label>
               ))}
-            </select>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Pilih beberapa slot sekaligus. Contoh: 09:00-10:00, 10:00-11:00, 11:00-12:00.
+            </p>
           </label>
 
           <p className="rounded-2xl border border-white/45 bg-white/42 px-3 py-2 text-xs text-zinc-500">

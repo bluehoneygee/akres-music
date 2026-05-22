@@ -513,6 +513,7 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
 
   if (resource === "instructor-availability") {
     payload = normalizeInstructorAvailabilityPayload(payload);
+    await assertInstructorAvailabilityNotDuplicate(payload);
   }
 
   const id = String(payload.id || `${resource}-${crypto.randomUUID()}`);
@@ -535,6 +536,28 @@ export async function createRecord(resource: ResourceName, payload: Record<strin
 
   await (await collection(resource)).insertOne(record as Document);
   return fromMongo(record);
+}
+
+async function assertInstructorAvailabilityNotDuplicate(payload: Record<string, unknown>) {
+  const db = await getMongoDb();
+  const instructorId = String(payload.instructorId || "");
+  const dayOfWeek = String(payload.dayOfWeek || "");
+  const fromTime = String(payload.fromTime || "");
+  const toTime = String(payload.toTime || "");
+
+  const duplicate = await db.collection("instructor-availability").findOne({
+    instructorId,
+    dayOfWeek,
+    fromTime,
+    toTime,
+    active: { $ne: false },
+  });
+
+  if (duplicate) {
+    throw new Error(
+      `Slot ${fromTime}-${toTime} di hari ${dayOfWeek} sudah ada untuk instructor ini.`,
+    );
+  }
 }
 
 function normalizeInstructorAvailabilityPayload(payload: Record<string, unknown>) {
@@ -686,6 +709,16 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
 
   await assertInstructorSlotAvailable({
     instructorId,
+    lessonStartDate,
+    lessonDays,
+    lessonCount,
+    fromTime,
+    scheduleSlotTimes,
+    toTime,
+  });
+
+  await assertStudentSlotAvailable({
+    studentId,
     lessonStartDate,
     lessonDays,
     lessonCount,
@@ -1214,6 +1247,54 @@ async function assertInstructorSlotAvailable({
   if (conflict) {
     throw new Error(
       `Instructor sudah terisi pada ${String(conflict.scheduleDate || "")}, ${String(conflict.fromTime || "")} - ${String(conflict.toTime || "")}.`,
+    );
+  }
+}
+
+async function assertStudentSlotAvailable({
+  studentId,
+  lessonStartDate,
+  lessonDays,
+  lessonCount,
+  fromTime,
+  scheduleSlotTimes = [],
+  toTime,
+}: {
+  studentId: string;
+  lessonStartDate: string;
+  lessonDays: string[];
+  lessonCount: number;
+  fromTime: string;
+  scheduleSlotTimes?: ScheduleSlotTime[];
+  toTime: string;
+}) {
+  const dates = expandPackageLessonDates(lessonStartDate, lessonDays, lessonCount);
+  if (dates.length === 0 || !studentId) return;
+
+  const db = await getMongoDb();
+  const existingSchedules = await db
+    .collection("schedules")
+    .find({
+      studentId,
+      scheduleDate: { $in: dates },
+      scheduleStatus: { $ne: "Cancelled" },
+    })
+    .toArray();
+
+  const conflict = existingSchedules.find((schedule) => {
+    const slotTime = slotTimeForDate(String(schedule.scheduleDate || ""), scheduleSlotTimes, fromTime, toTime);
+
+    return rangesOverlap(
+      slotTime.fromTime,
+      slotTime.toTime,
+      String(schedule.fromTime || ""),
+      String(schedule.toTime || ""),
+    );
+  });
+
+  if (conflict) {
+    throw new Error(
+      `Student sudah terjadwal pada ${String(conflict.scheduleDate || "")}, ${String(conflict.fromTime || "")} - ${String(conflict.toTime || "")}.`,
     );
   }
 }

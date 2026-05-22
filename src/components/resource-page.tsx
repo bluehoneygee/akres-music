@@ -198,7 +198,7 @@ export function ResourcePage({
   }, [fieldsSignature, fields, fetchRelationOptions]);
 
   useEffect(() => {
-    if (!fields.some((field) => field.roomAvailabilityFrom)) return;
+    if (!fields.some((field) => field.roomAvailabilityFrom || field.availabilityDateFrom)) return;
 
     let mounted = true;
 
@@ -499,7 +499,7 @@ export function ResourcePage({
                           {(
                             field.type === "relation"
                               ? getFieldOptions(field, draft, relationOptions, scheduleRows)
-                              : getSelectOptions(field, draft, relationOptions)
+                              : getSelectOptions(field, draft, relationOptions, scheduleRows)
                           ).map((option) => {
                             const selectedValues = toMultiSelectValue(draft[field.key]);
                             const checked = selectedValues.includes(option.value);
@@ -537,7 +537,7 @@ export function ResourcePage({
                                       ...clearFilteredDependentValues(fields, field.key),
                                     };
 
-                                    return applyDerivedValues(fields, nextDraft, relationOptions);
+                                    return applyDerivedValues(fields, nextDraft, relationOptions, scheduleRows);
                                   });
                                 }}
                                 type="button"
@@ -596,7 +596,7 @@ export function ResourcePage({
                                 ...clearFilteredDependentValues(fields, field.key),
                               };
 
-                              return applyDerivedValues(fields, nextDraft, relationOptions);
+                              return applyDerivedValues(fields, nextDraft, relationOptions, scheduleRows);
                             })
                           }
                           value={
@@ -607,7 +607,7 @@ export function ResourcePage({
                           {(
                             field.type === "relation"
                               ? getFieldOptions(field, draft, relationOptions, scheduleRows)
-                              : getSelectOptions(field, draft, relationOptions)
+                              : getSelectOptions(field, draft, relationOptions, scheduleRows)
                           ).map((option) => (
                             <option disabled={Boolean("disabled" in option && option.disabled)} key={option.value} value={option.value}>
                               {option.label}
@@ -653,6 +653,7 @@ export function ResourcePage({
                                   field.type === "number" ? Number(event.target.value) : event.target.value,
                               },
                               relationOptions,
+                              scheduleRows,
                             ),
                           )
                         }
@@ -904,6 +905,7 @@ function applyDerivedValues(
   fields: FieldConfig[],
   draft: Record<string, RecordValue>,
   relationOptions: Record<string, RelationOption[]>,
+  scheduleRows: UiRecord[] = [],
 ) {
   const updates = Object.fromEntries(
     fields
@@ -916,7 +918,7 @@ function applyDerivedValues(
 
   const availabilityDateField = fields.find((field) => field.availabilityDateFrom);
   if (availabilityDateField) {
-    const options = getAvailabilityDateOptions(availabilityDateField, nextDraft, relationOptions);
+    const options = getAvailabilityDateOptions(availabilityDateField, nextDraft, relationOptions, scheduleRows);
     const optionValues = new Set(options.map((option) => option.value));
 
     if (availabilityDateField.multiple) {
@@ -953,6 +955,7 @@ function applyDerivedValues(
       },
       nextDraft,
       relationOptions,
+      scheduleRows,
     );
 
     if (options[0]?.value) nextDraft.lessonStartDate = options[0].value;
@@ -965,9 +968,10 @@ function getSelectOptions(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
   relationOptions: Record<string, RelationOption[]>,
+  scheduleRows: UiRecord[] = [],
 ) {
   if (field.availabilityDateFrom) {
-    return getAvailabilityDateOptions(field, draft, relationOptions);
+    return getAvailabilityDateOptions(field, draft, relationOptions, scheduleRows);
   }
 
   return field.options ?? [];
@@ -977,6 +981,7 @@ function getAvailabilityDateOptions(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
   relationOptions: Record<string, RelationOption[]>,
+  scheduleRows: UiRecord[] = [],
 ) {
   if (!field.availabilityDateFrom) return [];
 
@@ -986,16 +991,77 @@ function getAvailabilityDateOptions(
   const slots = slotIds
     .map((slotId) => slotOptions.find((option) => option.value === slotId)?.record)
     .filter(Boolean);
-  const dates = slots.flatMap((slot) =>
-    datesInMonthForDay(monthValue, String(slot?.dayOfWeek ?? "")).map((date) => ({
-      label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}`,
-      value: date,
-    })),
-  );
+  const instructorId = String(draft.instructorId ?? "");
+  const studentId = String(draft.studentId ?? "");
+  const dates = slots.flatMap((slot) => {
+    const slotDayOfWeek = String(slot?.dayOfWeek ?? "");
+    const slotFromTime = String(slot?.fromTime ?? "");
+    const slotToTime = String(slot?.toTime ?? "");
+
+    return datesInMonthForDay(monthValue, slotDayOfWeek).map((date) => {
+      const conflictSchedules = scheduleRows.filter((schedule) => {
+        if (String(schedule.scheduleStatus ?? "") === "Cancelled") return false;
+        if (String(schedule.scheduleDate ?? "") !== date) return false;
+        const isInstructorConflict =
+          Boolean(instructorId) && String(schedule.instructorId ?? "") === instructorId;
+        const isStudentConflict =
+          Boolean(studentId) && String(schedule.studentId ?? "") === studentId;
+        if (!isInstructorConflict && !isStudentConflict) return false;
+        return rangesOverlap(
+          slotFromTime,
+          slotToTime,
+          String(schedule.fromTime ?? ""),
+          String(schedule.toTime ?? ""),
+        );
+      });
+
+      const conflictReasons = new Set<string>();
+      conflictSchedules.forEach((schedule) => {
+        if (instructorId && String(schedule.instructorId ?? "") === instructorId) {
+          conflictReasons.add("Instructor");
+        }
+        if (studentId && String(schedule.studentId ?? "") === studentId) {
+          conflictReasons.add("Student");
+        }
+      });
+      const reasonLabel =
+        conflictReasons.size === 0
+          ? ""
+          : conflictReasons.size === 2
+            ? "Instructor + Student"
+            : Array.from(conflictReasons)[0];
+      const conflictSchedule = conflictSchedules[0];
+
+      return {
+        disabled: conflictSchedules.length > 0,
+        label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}${conflictSchedule ? ` · Booked (${reasonLabel})` : ""}`,
+        unavailableReason: conflictSchedule
+          ? `${String(conflictSchedule.fromTime ?? "")} - ${String(conflictSchedule.toTime ?? "")}`
+          : undefined,
+        value: date,
+      };
+    });
+  });
   const today = todayDateString();
-  const uniqueDates = new Map(
-    dates.filter((date) => date.value >= today).map((date) => [date.value, date]),
-  );
+  const uniqueDates = new Map<string, { label: string; value: string; disabled?: boolean; unavailableReason?: string }>();
+  dates
+    .filter((date) => date.value >= today)
+    .forEach((date) => {
+      const current = uniqueDates.get(date.value);
+      if (!current) {
+        uniqueDates.set(date.value, date);
+        return;
+      }
+
+      uniqueDates.set(date.value, {
+        ...current,
+        disabled: Boolean(current.disabled) && Boolean(date.disabled),
+        label:
+          Boolean(current.disabled) && Boolean(date.disabled)
+            ? current.label
+            : `${current.label.replace(" · Booked", "")}`,
+      });
+    });
 
   return Array.from(uniqueDates.values()).sort((left, right) =>
     left.value.localeCompare(right.value),
