@@ -11,9 +11,14 @@ import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
 
-const operatingHours = {
-  from: "09:00",
-  to: "21:00",
+const weekdayOperatingHours = {
+  from: "10:00",
+  to: "19:00",
+};
+
+const weekendOperatingHours = {
+  from: "08:00",
+  to: "19:00",
 };
 
 export function StudioRoomBoard() {
@@ -157,7 +162,7 @@ export function StudioRoomBoard() {
             {monthCells.map(({ date, inMonth }) => {
               const dateKey = formatDate(date);
               const bookedSlots = schedulesByDate[dateKey] ?? [];
-              const availableBlocks = availableBlocksForDay(bookedSlots);
+              const availableBlocks = availableBlocksForDay(bookedSlots, date);
 
               return (
                 <button
@@ -223,7 +228,7 @@ function RoomDayDetailModal({
   room?: Row;
   studentsById: Map<string, Row>;
 }) {
-  const availableBlocks = availableBlocksForDay(booked);
+  const availableBlocks = availableBlocksForDay(booked, date);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/35 p-3 backdrop-blur-sm sm:items-center">
@@ -303,7 +308,8 @@ async function fetchRows(resource: string) {
   return Array.isArray(json.data) ? json.data : [];
 }
 
-function availableBlocksForDay(booked: Row[]) {
+function availableBlocksForDay(booked: Row[], date: Date) {
+  const operatingHours = getOperatingHours(date);
   const sorted = [...booked].sort((left, right) =>
     String(left.fromTime ?? "").localeCompare(String(right.fromTime ?? "")),
   );
@@ -328,6 +334,11 @@ function availableBlocksForDay(booked: Row[]) {
   }
 
   return blocks;
+}
+
+function getOperatingHours(date: Date) {
+  const day = date.getUTCDay();
+  return day === 0 || day === 6 ? weekendOperatingHours : weekdayOperatingHours;
 }
 
 function compareTimes(left: string, right: string) {

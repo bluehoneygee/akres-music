@@ -566,6 +566,20 @@ export function ResourcePage({
                             Paket A pilih 1 tanggal. Paket B pilih 2 tanggal awal dari slot yang dipilih.
                           </p>
                         ) : null}
+                        {field.quickCreate ? (
+                          <Button
+                            onClick={(event) => {
+                              event.preventDefault();
+                              openQuickCreate(field);
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="glass"
+                          >
+                            <Plus className="size-3.5" />
+                            Add {field.quickCreate.title}
+                          </Button>
+                        ) : null}
                       </div>
                     ) : field.type === "select" || field.type === "relation" ? (
                       <div className="space-y-2">

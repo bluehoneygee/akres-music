@@ -1316,14 +1316,30 @@ async function createConfirmedRescheduleSchedule(
 
   if (!originalSchedule) return "";
 
+  const pendingDate = String(attendance.pendingRescheduleDate || "");
+  const pendingFromTime = String(attendance.pendingRescheduleFromTime || originalSchedule.fromTime || "");
+  const pendingToTime = String(attendance.pendingRescheduleToTime || originalSchedule.toTime || "");
   const scheduleId = `reschedule-${String(originalSchedule.id)}`;
+
+  await assertRescheduleSlotAvailable({
+    scheduleId,
+    originalScheduleId: String(originalSchedule.id || ""),
+    studentId: String(originalSchedule.studentId || ""),
+    instructorId: String(originalSchedule.instructorId || ""),
+    lessonMode: String(originalSchedule.lessonMode || "Studio"),
+    studioRoomId: String(originalSchedule.studioRoomId || ""),
+    scheduleDate: pendingDate,
+    fromTime: pendingFromTime,
+    toTime: pendingToTime,
+  });
+
   const scheduleRecord = {
     ...originalSchedule,
     _id: scheduleId,
     id: scheduleId,
-    scheduleDate: String(attendance.pendingRescheduleDate || ""),
-    fromTime: String(attendance.pendingRescheduleFromTime || originalSchedule.fromTime || ""),
-    toTime: String(attendance.pendingRescheduleToTime || originalSchedule.toTime || ""),
+    scheduleDate: pendingDate,
+    fromTime: pendingFromTime,
+    toTime: pendingToTime,
     lessonStartDate: "",
     lessonDays: [],
     lessonCount: 1,
@@ -1386,6 +1402,137 @@ async function createConfirmedRescheduleSchedule(
   }
 
   return scheduleId;
+}
+
+async function assertRescheduleSlotAvailable({
+  scheduleId,
+  originalScheduleId,
+  studentId,
+  instructorId,
+  lessonMode,
+  studioRoomId,
+  scheduleDate,
+  fromTime,
+  toTime,
+}: {
+  scheduleId: string;
+  originalScheduleId: string;
+  studentId: string;
+  instructorId: string;
+  lessonMode: string;
+  studioRoomId: string;
+  scheduleDate: string;
+  fromTime: string;
+  toTime: string;
+}) {
+  if (!scheduleDate || !fromTime || !toTime) {
+    throw new Error("Reschedule harus mengisi tanggal dan jam pengganti.");
+  }
+
+  const db = await getMongoDb();
+  const dayOfWeek = String(new Date(`${scheduleDate}T00:00:00.000Z`).getUTCDay());
+
+  const availability = await db
+    .collection("instructor-availability")
+    .find({
+      instructorId,
+      dayOfWeek,
+      active: { $ne: false },
+    })
+    .toArray();
+
+  const isWithinInstructorAvailability = availability.some((slot) => {
+    return (
+      timeToMinutes(String(slot.fromTime || "")) <= timeToMinutes(fromTime) &&
+      timeToMinutes(String(slot.toTime || "")) >= timeToMinutes(toTime)
+    );
+  });
+
+  if (!isWithinInstructorAvailability) {
+    throw new Error(
+      `Instructor tidak available pada ${scheduleDate}, ${fromTime} - ${toTime}.`,
+    );
+  }
+
+  const instructorSchedules = await db
+    .collection("schedules")
+    .find({
+      id: { $nin: [scheduleId, originalScheduleId] },
+      instructorId,
+      scheduleDate,
+      scheduleStatus: { $ne: "Cancelled" },
+    })
+    .toArray();
+
+  const conflictingInstructorSchedule = instructorSchedules.find((schedule) =>
+    rangesOverlap(
+      fromTime,
+      toTime,
+      String(schedule.fromTime || ""),
+      String(schedule.toTime || ""),
+    ),
+  );
+
+  if (conflictingInstructorSchedule) {
+    throw new Error(
+      `Instructor sudah terisi pada ${scheduleDate}, ${fromTime} - ${toTime}.`,
+    );
+  }
+
+  if (studentId) {
+    const studentSchedules = await db
+      .collection("schedules")
+      .find({
+        id: { $nin: [scheduleId, originalScheduleId] },
+        studentId,
+        scheduleDate,
+        scheduleStatus: { $ne: "Cancelled" },
+      })
+      .toArray();
+
+    const conflictingStudentSchedule = studentSchedules.find((schedule) =>
+      rangesOverlap(
+        fromTime,
+        toTime,
+        String(schedule.fromTime || ""),
+        String(schedule.toTime || ""),
+      ),
+    );
+
+    if (conflictingStudentSchedule) {
+      throw new Error(
+        `Student sudah terjadwal pada ${scheduleDate}, ${fromTime} - ${toTime}.`,
+      );
+    }
+  }
+
+  if (lessonMode !== "Studio" || !studioRoomId) return;
+
+  const studioSchedules = await db
+    .collection("schedules")
+    .find({
+      id: { $nin: [scheduleId, originalScheduleId] },
+      lessonMode: "Studio",
+      studioRoomId,
+      scheduleDate,
+      scheduleStatus: { $ne: "Cancelled" },
+    })
+    .toArray();
+
+  const conflictingStudioSchedule = studioSchedules.find((schedule) =>
+    rangesOverlap(
+      fromTime,
+      toTime,
+      String(schedule.fromTime || ""),
+      String(schedule.toTime || ""),
+    ),
+  );
+
+  if (conflictingStudioSchedule) {
+    throw new Error(
+      `Studio room sudah booked pada ${scheduleDate}, ${fromTime} - ${toTime}.`,
+    );
+  }
 }
 
 export async function deleteRecord(resource: ResourceName, id: string) {
