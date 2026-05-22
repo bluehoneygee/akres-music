@@ -18,7 +18,8 @@ export function StudentCalendarBoard() {
   const [instructors, setInstructors] = useState<Row[]>([]);
   const [rooms, setRooms] = useState<Row[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [cursorDate, setCursorDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -53,16 +54,19 @@ export function StudentCalendarBoard() {
   const coursesById = useMemo(() => mapById(courses), [courses]);
   const instructorsById = useMemo(() => mapById(instructors), [instructors]);
   const roomsById = useMemo(() => mapById(rooms), [rooms]);
-  const monthCells = useMemo(() => buildMonthCells(monthDate), [monthDate]);
-  const selectedCell = selectedDate ? monthCells.find((cell) => formatDate(cell.date) === selectedDate) : null;
+  const calendarCells = useMemo(
+    () => (viewMode === "month" ? buildMonthCells(cursorDate) : buildWeekCells(cursorDate)),
+    [cursorDate, viewMode],
+  );
+  const selectedCell = selectedDate ? calendarCells.find((cell) => formatDate(cell.date) === selectedDate) : null;
   const schedulesByDate = useMemo(() => {
     const filtered = schedules.filter((row) => {
-      if (!inCurrentGridMonth(row, monthDate)) return false;
+      if (!isInCurrentPeriod(row, cursorDate, viewMode)) return false;
       if (!selectedStudentId) return true;
       return String(row.studentId || "") === selectedStudentId;
     });
     return groupByDate(filtered);
-  }, [schedules, monthDate, selectedStudentId]);
+  }, [schedules, cursorDate, selectedStudentId, viewMode]);
 
   return (
     <div className="space-y-2.5">
@@ -89,9 +93,35 @@ export function StudentCalendarBoard() {
                 ? formatDisplayText(studentDisplayName(studentsById.get(selectedStudentId)) || "Jadwal Bulanan Student")
                 : "Jadwal Bulanan Student"}
             </CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">{monthTitle(monthDate)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {viewMode === "month" ? monthTitle(cursorDate) : weekTitle(cursorDate)}
+            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="inline-flex rounded-xl border border-white/50 bg-white/58 p-0.5">
+              <button
+                className={`h-7 rounded-lg px-2 text-xs transition ${
+                  viewMode === "month"
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-white/70"
+                }`}
+                onClick={() => setViewMode("month")}
+                type="button"
+              >
+                Month
+              </button>
+              <button
+                className={`h-7 rounded-lg px-2 text-xs transition ${
+                  viewMode === "week"
+                    ? "bg-sky-500 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-white/70"
+                }`}
+                onClick={() => setViewMode("week")}
+                type="button"
+              >
+                Week
+              </button>
+            </div>
             <select
               aria-label="Select student"
               className="h-8 max-w-[160px] rounded-xl border border-white/50 bg-white/58 px-2.5 text-xs text-zinc-900 outline-none backdrop-blur-xl sm:max-w-[220px] sm:text-sm"
@@ -107,7 +137,7 @@ export function StudentCalendarBoard() {
             <Button
               aria-label="Previous month"
               className="size-8"
-              onClick={() => setMonthDate(addMonths(monthDate, -1))}
+              onClick={() => setCursorDate(viewMode === "month" ? addMonths(cursorDate, -1) : addDays(cursorDate, -7))}
               size="icon"
               type="button"
               variant="glass"
@@ -116,17 +146,17 @@ export function StudentCalendarBoard() {
             </Button>
             <Button
               className="h-8 px-2 text-xs"
-              onClick={() => setMonthDate(startOfMonth(new Date()))}
+              onClick={() => setCursorDate(startOfMonth(new Date()))}
               size="sm"
               type="button"
               variant="glass"
             >
-              {monthTitle(monthDate)}
+              {viewMode === "month" ? monthTitle(cursorDate) : weekTitle(cursorDate)}
             </Button>
             <Button
               aria-label="Next month"
               className="size-8"
-              onClick={() => setMonthDate(addMonths(monthDate, 1))}
+              onClick={() => setCursorDate(viewMode === "month" ? addMonths(cursorDate, 1) : addDays(cursorDate, 7))}
               size="icon"
               type="button"
               variant="glass"
@@ -151,7 +181,7 @@ export function StudentCalendarBoard() {
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
-                {monthCells.map(({ date, inMonth }) => {
+                {calendarCells.map(({ date, inMonth }) => {
                   const dateKey = formatDate(date);
                   const daySchedules = schedulesByDate[dateKey] ?? [];
 
@@ -311,6 +341,12 @@ function addMonths(value: Date, amount: number) {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + amount, 1));
 }
 
+function addDays(value: Date, amount: number) {
+  const date = new Date(value);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date;
+}
+
 function buildMonthCells(month: Date) {
   const firstDay = startOfWeek(startOfMonth(month));
   return Array.from({ length: 42 }).map((_, index) => {
@@ -319,6 +355,18 @@ function buildMonthCells(month: Date) {
     return {
       date,
       inMonth: date.getUTCMonth() === month.getUTCMonth(),
+    };
+  });
+}
+
+function buildWeekCells(cursorDate: Date) {
+  const firstDay = startOfWeek(cursorDate);
+  return Array.from({ length: 7 }).map((_, index) => {
+    const date = new Date(firstDay);
+    date.setUTCDate(firstDay.getUTCDate() + index);
+    return {
+      date,
+      inMonth: true,
     };
   });
 }
@@ -356,14 +404,25 @@ function groupByDate(rows: Row[]) {
   }, {});
 }
 
-function inCurrentGridMonth(row: Row, monthDate: Date) {
+function weekTitle(value: Date) {
+  const start = startOfWeek(value);
+  const end = addDays(start, 6);
+  return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function isInCurrentPeriod(row: Row, cursorDate: Date, viewMode: "month" | "week") {
   const value = String(row.scheduleDate || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
-  return (
-    date.getUTCMonth() === monthDate.getUTCMonth() &&
-    date.getUTCFullYear() === monthDate.getUTCFullYear()
-  );
+  if (viewMode === "month") {
+    return (
+      date.getUTCMonth() === cursorDate.getUTCMonth() &&
+      date.getUTCFullYear() === cursorDate.getUTCFullYear()
+    );
+  }
+  const weekStart = startOfWeek(cursorDate);
+  const weekEnd = addDays(weekStart, 6);
+  return date >= weekStart && date <= weekEnd;
 }
 
 function studentDisplayName(student: Row | undefined) {

@@ -26,7 +26,8 @@ export function InstructorAvailabilityBoard() {
     fromTime: "09:00",
     toTime: "10:00",
   });
-  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [cursorDate, setCursorDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState("");
   const [availabilityFormOpen, setAvailabilityFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -65,8 +66,11 @@ export function InstructorAvailabilityBoard() {
   const studentsById = useMemo(() => mapById(students), [students]);
   const coursesById = useMemo(() => mapById(courses), [courses]);
   const selectedInstructor = instructors.find((instructor) => instructor.id === selectedInstructorId);
-  const monthCells = useMemo(() => buildMonthCells(monthDate), [monthDate]);
-  const selectedCell = selectedDate ? monthCells.find((cell) => formatDate(cell.date) === selectedDate) : null;
+  const calendarCells = useMemo(
+    () => (viewMode === "month" ? buildMonthCells(cursorDate) : buildWeekCells(cursorDate)),
+    [cursorDate, viewMode],
+  );
+  const selectedCell = selectedDate ? calendarCells.find((cell) => formatDate(cell.date) === selectedDate) : null;
   const availabilityByDay = groupByDay(
     availability.filter((row) => row.instructorId === selectedInstructorId && row.active !== false),
     "dayOfWeek",
@@ -136,7 +140,7 @@ export function InstructorAvailabilityBoard() {
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">Academic workflow</p>
             <CardTitle className="mt-0.5 flex items-center gap-2 text-lg sm:text-xl">
               <CalendarClock className="size-5" />
-              Instructor Availability
+              Instructor Calendar
             </CardTitle>
           </div>
           <Button onClick={loadData} size="icon" variant="glass" aria-label="Refresh">
@@ -151,9 +155,35 @@ export function InstructorAvailabilityBoard() {
             <CardTitle className="truncate text-sm sm:text-base">
               {selectedInstructor ? formatDisplayText(selectedInstructor.instructorName) : "Instructor Schedule"}
             </CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">{monthTitle(monthDate)}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {viewMode === "month" ? monthTitle(cursorDate) : weekTitle(cursorDate)}
+            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="inline-flex rounded-xl border border-white/50 bg-white/58 p-0.5">
+              <button
+                className={`h-7 rounded-lg px-2 text-xs transition ${
+                  viewMode === "month"
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-white/70"
+                }`}
+                onClick={() => setViewMode("month")}
+                type="button"
+              >
+                Month
+              </button>
+              <button
+                className={`h-7 rounded-lg px-2 text-xs transition ${
+                  viewMode === "week"
+                    ? "bg-sky-500 text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-white/70"
+                }`}
+                onClick={() => setViewMode("week")}
+                type="button"
+              >
+                Week
+              </button>
+            </div>
             <select
               aria-label="Select instructor"
               className="h-8 max-w-[160px] rounded-xl border border-white/50 bg-white/58 px-2.5 text-xs text-zinc-900 outline-none backdrop-blur-xl sm:max-w-[220px] sm:text-sm"
@@ -178,7 +208,7 @@ export function InstructorAvailabilityBoard() {
             </Button>
             <Button
               aria-label="Previous month"
-              onClick={() => setMonthDate(addMonths(monthDate, -1))}
+              onClick={() => setCursorDate(viewMode === "month" ? addMonths(cursorDate, -1) : addDays(cursorDate, -7))}
               size="icon"
               className="size-8"
               type="button"
@@ -187,17 +217,17 @@ export function InstructorAvailabilityBoard() {
               <ChevronLeft className="size-4" />
             </Button>
             <Button
-              onClick={() => setMonthDate(startOfMonth(new Date()))}
+              onClick={() => setCursorDate(startOfMonth(new Date()))}
               size="sm"
               type="button"
               variant="glass"
               className="h-8 px-2 text-xs"
             >
-              {monthTitle(monthDate)}
+              {viewMode === "month" ? monthTitle(cursorDate) : weekTitle(cursorDate)}
             </Button>
             <Button
               aria-label="Next month"
-              onClick={() => setMonthDate(addMonths(monthDate, 1))}
+              onClick={() => setCursorDate(viewMode === "month" ? addMonths(cursorDate, 1) : addDays(cursorDate, 7))}
               size="icon"
               className="size-8"
               type="button"
@@ -208,7 +238,7 @@ export function InstructorAvailabilityBoard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 px-2 pb-2 sm:px-3 sm:pb-3">
-          {loading ? <p className="text-sm text-zinc-500">Loading availability...</p> : null}
+          {loading ? <p className="text-sm text-zinc-500">Loading instructor calendar...</p> : null}
           {!loading && !selectedInstructorId ? (
             <p className="text-sm text-zinc-500">Belum ada instructor.</p>
           ) : null}
@@ -226,7 +256,7 @@ export function InstructorAvailabilityBoard() {
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
-                {monthCells.map(({ date, day, inMonth }) => {
+                {calendarCells.map(({ date, day, inMonth }) => {
                   const dateKey = formatDate(date);
                   const bookedSlots = schedulesByDate[dateKey] ?? [];
                   const availableSlots = availableSlotsForDate(availabilityByDay[day] ?? [], bookedSlots);
@@ -648,6 +678,18 @@ function buildMonthCells(monthDate: Date) {
   });
 }
 
+function buildWeekCells(cursorDate: Date) {
+  const gridStart = startOfWeek(cursorDate);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(gridStart, index);
+    return {
+      date,
+      day: String(date.getUTCDay()),
+      inMonth: true,
+    };
+  });
+}
+
 function formatDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
@@ -658,6 +700,12 @@ function monthTitle(value: Date) {
     timeZone: "UTC",
     year: "numeric",
   });
+}
+
+function weekTitle(value: Date) {
+  const start = startOfWeek(value);
+  const end = addDays(start, 6);
+  return `${formatDate(start)} - ${formatDate(end)}`;
 }
 
 function studentName(student?: Row) {
