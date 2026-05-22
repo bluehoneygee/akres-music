@@ -22,6 +22,9 @@ jobs:
       AUTH_URL: ${{ vars.AUTH_URL }}
       MONGODB_DB: ${{ secrets.MONGODB_DB }}
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_ADMIN_NAME: ${{ secrets.SEED_ADMIN_NAME }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 

@@ -54,8 +54,12 @@ async function seed() {
   const marker = db.collection("_meta");
 
   await ensureDefaultUsers();
-  if (shouldSeedDemoData()) {
+  await ensureDefaultStudioRooms();
+  const seedProfile = getDemoSeedProfile();
+  if (seedProfile === "full") {
     await ensureDemoRecords();
+  } else if (seedProfile === "studio") {
+    await ensureStudioScheduleRecords();
   }
 
   await marker.updateOne(
@@ -65,18 +69,34 @@ async function seed() {
   );
 }
 
-function shouldSeedDemoData() {
-  if (process.env.SEED_DEMO_DATA) {
-    return process.env.SEED_DEMO_DATA === "true";
+function getDemoSeedProfile(): "none" | "studio" | "full" {
+  const profile = String(process.env.SEED_PROFILE || "").toLowerCase().trim();
+  if (profile === "none" || profile === "studio" || profile === "full") {
+    return profile;
   }
 
-  return process.env.NODE_ENV !== "production";
+  if (process.env.SEED_DEMO_DATA === "false") return "none";
+  if (process.env.SEED_DEMO_DATA === "true") return "full";
+
+  return "none";
 }
 
 async function ensureDefaultUsers() {
   const db = await getMongoDb();
-  const passwordHash = await bcrypt.hash("admin123", 12);
-  const users = shouldSeedDemoData() ? seedUsers : seedUsers.slice(0, 1);
+  const adminBootstrap = resolveAdminBootstrapConfig();
+  const passwordHash = await bcrypt.hash(adminBootstrap.password, 12);
+  const autoSeedAllUsers = process.env.AUTO_SEED_ALL_USERS === "true";
+  const adminTemplate = seedUsers[0];
+  const adminUser = {
+    ...adminTemplate,
+    email: adminBootstrap.email,
+    name: adminBootstrap.name,
+    role: "System Manager",
+    studentId: "",
+    guardianId: "",
+    instructorId: "",
+  };
+  const users = autoSeedAllUsers ? [adminUser, ...seedUsers.slice(1)] : [adminUser];
 
   await Promise.all(
     users.map((user) =>
@@ -96,6 +116,56 @@ async function ensureDefaultUsers() {
           },
           $set: {
             updatedAt: new Date().toISOString(),
+          },
+        },
+        { upsert: true },
+      ),
+    ),
+  );
+}
+
+function resolveAdminBootstrapConfig() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const envEmail = String(process.env.SEED_ADMIN_EMAIL || "").trim();
+  const envPassword = String(process.env.SEED_ADMIN_PASSWORD || "").trim();
+  const envName = String(process.env.SEED_ADMIN_NAME || "").trim();
+
+  if (isProduction && (!envEmail || !envPassword)) {
+    throw new Error(
+      "Missing SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD for production bootstrap.",
+    );
+  }
+
+  return {
+    email: envEmail || "admin@akres.test",
+    password: envPassword || "admin123",
+    name: envName || "Administrator Akres",
+  };
+}
+
+async function ensureDefaultStudioRooms() {
+  const db = await getMongoDb();
+  const now = new Date().toISOString();
+  const defaultRooms = [
+    { id: "room-a", roomName: "Studio A", capacity: 1, instrumentIds: [] as string[] },
+    { id: "room-b", roomName: "Studio B", capacity: 1, instrumentIds: [] as string[] },
+  ];
+
+  await Promise.all(
+    defaultRooms.map((room) =>
+      db.collection("rooms").updateOne(
+        { id: room.id },
+        {
+          $setOnInsert: {
+            _id: room.id,
+            createdAt: now,
+          },
+          $set: {
+            roomName: room.roomName,
+            capacity: room.capacity,
+            instrumentIds: room.instrumentIds,
+            isActive: true,
+            updatedAt: now,
           },
         },
         { upsert: true },
@@ -147,6 +217,112 @@ async function ensureDemoRecords() {
   await ensureHourlyInstructorAvailabilitySetup();
 
   for (const lessonPackage of seedDatabase["lesson-packages"]) {
+    const existingPackage = await db
+      .collection("lesson-packages")
+      .findOne({ id: lessonPackage.id });
+    const packageRecord = existingPackage ?? {
+      _id: lessonPackage.id,
+      ...lessonPackage,
+      createdAt: lessonPackage.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    if (!existingPackage) {
+      await db.collection("lesson-packages").insertOne(packageRecord as Document);
+    }
+
+    const scheduleRecords = buildScheduleRecords(
+      pickLessonPackageSchedulePayload(packageRecord),
+      now,
+    );
+
+    await Promise.all(
+      scheduleRecords.map((schedule) =>
+        db.collection("schedules").updateOne(
+          { id: schedule.id },
+          { $setOnInsert: schedule },
+          { upsert: true },
+        ),
+      ),
+    );
+    await ensureAttendanceForSchedules(scheduleRecords, now);
+    await ensureInvoiceForLessonPackage(packageRecord, now);
+  }
+}
+
+async function ensureStudioScheduleRecords() {
+  const db = await getMongoDb();
+  const now = new Date().toISOString();
+  const studioPackageLimit = Math.max(
+    1,
+    Number.parseInt(process.env.SEED_STUDIO_PACKAGE_LIMIT || "1", 10) || 1,
+  );
+  const studioPackages = seedDatabase["lesson-packages"]
+    .filter(
+    (lessonPackage) => String(lessonPackage.lessonMode || "") === "Studio",
+    )
+    .slice(0, studioPackageLimit);
+  const studentIds = new Set(studioPackages.map((pkg) => String(pkg.studentId || "")));
+  const courseIds = new Set(studioPackages.map((pkg) => String(pkg.courseId || "")));
+  const instructorIds = new Set(studioPackages.map((pkg) => String(pkg.instructorId || "")));
+  const instrumentIds = new Set(studioPackages.map((pkg) => String(pkg.instrumentId || "")));
+  const roomIds = new Set(studioPackages.map((pkg) => String(pkg.studioRoomId || "")).filter(Boolean));
+
+  const scopedRows: Record<ResourceName, Array<Record<string, unknown>>> = {
+    instruments: seedDatabase.instruments.filter((row) => instrumentIds.has(String(row.id || ""))),
+    rooms: seedDatabase.rooms.filter((row) => roomIds.has(String(row.id || ""))),
+    instructors: seedDatabase.instructors.filter((row) => instructorIds.has(String(row.id || ""))),
+    "instructor-availability": seedDatabase["instructor-availability"].filter((row) =>
+      instructorIds.has(String(row.instructorId || "")),
+    ),
+    students: seedDatabase.students.filter((row) => studentIds.has(String(row.id || ""))),
+    courses: seedDatabase.courses.filter((row) => courseIds.has(String(row.id || ""))),
+    guardians: [],
+    "lesson-packages": [],
+    schedules: [],
+    "student-attendance": [],
+    "instructor-attendance": [],
+    journals: [],
+    repertoires: [],
+    invoices: [],
+    notifications: [],
+  };
+
+  for (const resource of [
+    "instruments",
+    "rooms",
+    "instructors",
+    "instructor-availability",
+    "students",
+    "courses",
+  ] as const) {
+    const rows = scopedRows[resource];
+    await Promise.all(
+      rows.map((row) => {
+        const { updatedAt: _updatedAt, ...insertOnly } = row;
+
+        return db.collection(resource).updateOne(
+          { id: row.id },
+          {
+            $setOnInsert: {
+              _id: row.id,
+              ...insertOnly,
+              createdAt: row.createdAt ?? now,
+            },
+            $set: {
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        );
+      }),
+    );
+  }
+
+  await ensureStudioRoomSetup();
+  await ensureHourlyInstructorAvailabilitySetup();
+
+  for (const lessonPackage of studioPackages) {
     const existingPackage = await db
       .collection("lesson-packages")
       .findOne({ id: lessonPackage.id });
