@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ResourceName } from "@/lib/models";
+import { canAccessResource } from "@/lib/roles";
 import { formatDisplayText } from "@/lib/utils";
 
 export type FieldConfig = {
@@ -110,6 +111,7 @@ export function ResourcePage({
   const [quickCreateField, setQuickCreateField] = useState<FieldConfig | null>(null);
   const [quickCreateDraft, setQuickCreateDraft] = useState<Record<string, RecordValue>>({});
   const [loading, setLoading] = useState(true);
+  const [sessionRole, setSessionRole] = useState<string>("");
   const [error, setError] = useState("");
   const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
   const [scheduleRows, setScheduleRows] = useState<UiRecord[]>([]);
@@ -117,7 +119,18 @@ export function ResourcePage({
   const formFields = fields.filter(
     (field) => !field.hidden && (!field.hideOnCreate || editingId),
   );
-  const tableFields = fields.filter((field) => !field.writeOnly);
+  const isParentStudentsView = resource === "students" && sessionRole === "Parent Portal User";
+  const canWriteResource =
+    resource === "users"
+      ? canAccessResource({ role: sessionRole, resource: "users", action: "create" })
+      : canAccessResource({ role: sessionRole, resource, action: "create" }) &&
+        canAccessResource({ role: sessionRole, resource, action: "update" }) &&
+        canAccessResource({ role: sessionRole, resource, action: "delete" });
+  const tableFields = fields.filter(
+    (field) => !field.writeOnly && !(isParentStudentsView && field.key === "portalEnabled"),
+  );
+  const showActionsColumn = !isParentStudentsView && canWriteResource;
+  const canCreate = allowCreate && !isParentStudentsView && canWriteResource;
 
   const fetchRelationOptions = useCallback(async (field: FieldConfig): Promise<
     readonly [string, RelationOption[]]
@@ -169,6 +182,30 @@ export function ResourcePage({
   useEffect(() => {
     void loadRows();
   }, [resource]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSessionRole() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = (await response.json()) as { user?: { role?: string } };
+        if (mounted) {
+          setSessionRole(session.user?.role ?? "");
+        }
+      } catch {
+        if (mounted) {
+          setSessionRole("");
+        }
+      }
+    }
+
+    void loadSessionRole();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -380,11 +417,11 @@ export function ResourcePage({
           <div>
             <p className="text-xs font-medium uppercase text-zinc-500">Academic data</p>
             <CardTitle className="mt-1 text-2xl">{title}</CardTitle>
-            <p className="mt-2 text-sm text-zinc-500">{description}</p>
+            <p className="mt-2 whitespace-pre-line text-sm text-zinc-500">{description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">Live records</Badge>
-            {allowCreate ? (
+            {canCreate ? (
               <Button onClick={openCreateRecord} variant="glass">
                 <Plus className="size-4" />
                 Create record
@@ -419,7 +456,9 @@ export function ResourcePage({
                         {field.label}
                       </th>
                     ))}
-                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Actions</th>
+                    {showActionsColumn ? (
+                      <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Actions</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -433,20 +472,22 @@ export function ResourcePage({
                           {formatValue(row[field.key], field, relationOptions)}
                         </td>
                       ))}
-                      <td className="rounded-r-2xl px-3 py-3">
-                        <div className="flex justify-end gap-2">
-                          <Button onClick={() => editRow(row)} size="icon" variant="glass">
-                            <Edit3 className="size-4" />
-                          </Button>
-                          <Button
-                            onClick={() => setPendingDelete(row)}
-                            size="icon"
-                            variant="glass"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </td>
+                      {showActionsColumn ? (
+                        <td className="rounded-r-2xl px-3 py-3">
+                          <div className="flex justify-end gap-2">
+                            <Button onClick={() => editRow(row)} size="icon" variant="glass">
+                              <Edit3 className="size-4" />
+                            </Button>
+                            <Button
+                              onClick={() => setPendingDelete(row)}
+                              size="icon"
+                              variant="glass"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -1361,17 +1402,20 @@ function formatValue(
     const options = relationOptions[field.key] ?? [];
 
     if (Array.isArray(value)) {
+      const mappedLabels = value
+        .map((item) => options.find((option) => option.value === String(item))?.label)
+        .filter((label): label is string => Boolean(label));
+
       return (
-        value
-          .map((item) => options.find((option) => option.value === String(item))?.label ?? String(item))
-          .map(formatDisplayText)
+        mappedLabels
+          .map((item) => formatDisplayText(item))
           .join(", ") || "-"
       );
     }
 
     if (value === null || value === undefined || value === "") return "-";
 
-    return formatDisplayText(options.find((option) => option.value === String(value))?.label ?? String(value));
+    return formatDisplayText(options.find((option) => option.value === String(value))?.label ?? "-");
   }
 
   if (Array.isArray(value)) return value.map(formatDisplayText).join(", ") || "-";

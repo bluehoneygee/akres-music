@@ -22,7 +22,10 @@ export default function StudentsPage() {
             key: "guardianIds",
             label: "Guardians",
             type: "relation",
-            relation: { resource: "guardians", labelFields: ["guardianName"] },
+            relation: {
+              resource: "guardians",
+              labelFields: ["guardianName", "name", "firstName", "lastName"],
+            },
             multiple: true,
             quickCreate: {
               title: "Guardian",

@@ -53,6 +53,8 @@ export function JournalBoard() {
   const [drafts, setDrafts] = useState<Record<string, JournalDraft>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const [sessionRole, setSessionRole] = useState<string>("");
+  const isParentPortal = sessionRole === "Parent Portal User";
 
   async function loadData() {
     setLoading(true);
@@ -93,6 +95,23 @@ export function JournalBoard() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadSessionRole() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = (await response.json()) as { user?: { role?: string } };
+        if (mounted) setSessionRole(session.user?.role ?? "");
+      } catch {
+        if (mounted) setSessionRole("");
+      }
+    }
+    void loadSessionRole();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const lines = useMemo(() => {
@@ -242,7 +261,7 @@ export function JournalBoard() {
 
           {!loading && lines.length > 0 ? (
             <div className="overflow-x-auto no-scrollbar">
-              <table className="min-w-[1280px] text-left text-sm">
+              <table className={`${isParentPortal ? "min-w-[1120px]" : "min-w-[1280px]"} text-left text-sm`}>
                 <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500">
                   <tr>
                     <th className="px-4 py-3 font-medium">Session</th>
@@ -252,8 +271,8 @@ export function JournalBoard() {
                     <th className="px-4 py-3 font-medium">Technique</th>
                     <th className="px-4 py-3 font-medium">Homework</th>
                     <th className="px-4 py-3 font-medium">Progress</th>
-                    <th className="px-4 py-3 font-medium">Parent</th>
-                    <th className="px-4 py-3 font-medium">Action</th>
+                    {!isParentPortal ? <th className="px-4 py-3 font-medium">Parent</th> : null}
+                    {!isParentPortal ? <th className="px-4 py-3 font-medium">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -355,48 +374,52 @@ export function JournalBoard() {
                             ))}
                           </select>
                         </td>
-                        <td className="w-[100px] px-4 py-3">
-                          <input
-                            checked={draft.parentVisible}
-                            className="size-4 accent-zinc-950"
-                            disabled={isConfirmed}
-                            onChange={(event) =>
-                              updateDraft(line.attendance.id, { parentVisible: event.target.checked })
-                            }
-                            type="checkbox"
-                          />
-                        </td>
-                        <td className="w-[130px] px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {!isConfirmed ? (
-                              <IconAction
-                                ariaLabel="Save journal"
-                                disabled={savingId === line.attendance.id}
-                                onClick={() => void saveJournal(line)}
-                                tooltip="Save journal"
-                              >
-                                <Save className="size-4" />
-                              </IconAction>
-                            ) : null}
-                            {line.journal && !isConfirmed ? (
-                              <IconAction
-                                ariaLabel="Confirm journal"
-                                disabled={savingId === line.attendance.id}
-                                onClick={() => void confirmJournal(line)}
-                                tooltip="Confirm journal"
-                                variant="glass"
-                              >
-                                <CheckCircle2 className="size-4" />
-                              </IconAction>
-                            ) : null}
-                          </div>
-                          <div className="mt-2">
-                            {!line.journal ? (
-                              <p className="text-xs italic text-zinc-500">Save journal to confirm.</p>
-                            ) : null}
-                            {isConfirmed ? <ConfirmedText journal={line.journal} /> : null}
-                          </div>
-                        </td>
+                        {!isParentPortal ? (
+                          <td className="w-[100px] px-4 py-3">
+                            <input
+                              checked={draft.parentVisible}
+                              className="size-4 accent-zinc-950"
+                              disabled={isConfirmed}
+                              onChange={(event) =>
+                                updateDraft(line.attendance.id, { parentVisible: event.target.checked })
+                              }
+                              type="checkbox"
+                            />
+                          </td>
+                        ) : null}
+                        {!isParentPortal ? (
+                          <td className="w-[130px] px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {!isConfirmed ? (
+                                <IconAction
+                                  ariaLabel="Save journal"
+                                  disabled={savingId === line.attendance.id}
+                                  onClick={() => void saveJournal(line)}
+                                  tooltip="Save journal"
+                                >
+                                  <Save className="size-4" />
+                                </IconAction>
+                              ) : null}
+                              {line.journal && !isConfirmed ? (
+                                <IconAction
+                                  ariaLabel="Confirm journal"
+                                  disabled={savingId === line.attendance.id}
+                                  onClick={() => void confirmJournal(line)}
+                                  tooltip="Confirm journal"
+                                  variant="glass"
+                                >
+                                  <CheckCircle2 className="size-4" />
+                                </IconAction>
+                              ) : null}
+                            </div>
+                            <div className="mt-2">
+                              {!line.journal ? (
+                                <p className="text-xs italic text-zinc-500">Save journal to confirm.</p>
+                              ) : null}
+                              {isConfirmed ? <ConfirmedText journal={line.journal} /> : null}
+                            </div>
+                          </td>
+                        ) : null}
                       </tr>
                     );
                   })}

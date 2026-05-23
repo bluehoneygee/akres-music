@@ -16,7 +16,7 @@ export default function InstrumentsPage() {
             options: instrumentCategoryOptions,
             required: true,
           },
-          { key: "isActive", label: "Active", type: "checkbox" },
+          { key: "isActive", label: "Active", type: "checkbox", writeOnly: true },
         ]}
         resource="instruments"
         title="Instrument Master"

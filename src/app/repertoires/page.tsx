@@ -20,7 +20,7 @@ export default function RepertoiresPage() {
           { key: "level", label: "Level", type: "select", options: levelOptions, required: true },
           { key: "genre", label: "Genre" },
           { key: "notes", label: "Notes", type: "textarea" },
-          { key: "isActive", label: "Active", type: "checkbox" },
+          { key: "isActive", label: "Active", type: "checkbox", writeOnly: true },
         ]}
         resource="repertoires"
         title="Repertoire"

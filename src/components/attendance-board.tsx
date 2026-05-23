@@ -58,12 +58,14 @@ export function AttendanceBoard() {
   const [instructorAvailability, setInstructorAvailability] = useState<Row[]>([]);
   const [studioRooms, setStudioRooms] = useState<Row[]>([]);
   const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
+  const [sessionRole, setSessionRole] = useState<string>("");
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [selectedStudentSession, setSelectedStudentSession] = useState<SelectedSession | null>(null);
   const [selectedInstructorSession, setSelectedInstructorSession] = useState<SelectedSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
   const schedulesById = useMemo(() => mapById(schedules), [schedules]);
+  const readOnlyPortal = sessionRole === "Parent Portal User" || sessionRole === "Student Portal User";
 
   async function loadData() {
     setLoading(true);
@@ -109,6 +111,30 @@ export function AttendanceBoard() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSessionRole() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = (await response.json()) as { user?: { role?: string } };
+        if (mounted) {
+          setSessionRole(session.user?.role ?? "");
+        }
+      } catch {
+        if (mounted) {
+          setSessionRole("");
+        }
+      }
+    }
+
+    void loadSessionRole();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const studentPackageGroups = useMemo(() => {
@@ -352,6 +378,13 @@ export function AttendanceBoard() {
       </div>
 
       <div className="space-y-3">
+        {readOnlyPortal ? (
+          <Card className="liquid-glass">
+            <CardContent className="p-4 text-sm text-zinc-600">
+              Attendance mode read-only untuk akun portal.
+            </CardContent>
+          </Card>
+        ) : null}
         {loading ? (
           <Card className="liquid-glass">
             <CardContent className="p-5 text-sm text-zinc-500">Loading attendance...</CardContent>
@@ -492,13 +525,13 @@ export function AttendanceBoard() {
           );
         })}
       </div>
-      {selectedStudentSession ? (
-        <StudentAttendanceModal
-          attendance={selectedStudentAttendance}
-          disabled={savingId === selectedStudentAttendance?.id}
-          instructorAvailability={instructorAvailability}
-          onClose={() => setSelectedStudentSession(null)}
-          onUpdate={updateAttendance}
+        {selectedStudentSession ? (
+          <StudentAttendanceModal
+            attendance={selectedStudentAttendance}
+            disabled={readOnlyPortal || savingId === selectedStudentAttendance?.id}
+            instructorAvailability={instructorAvailability}
+            onClose={() => setSelectedStudentSession(null)}
+            onUpdate={updateAttendance}
           schedule={selectedStudentSession.schedule}
           schedules={schedules}
           studioRooms={studioRooms}
@@ -506,12 +539,12 @@ export function AttendanceBoard() {
           sessionNumber={selectedStudentSession.sessionNumber}
         />
       ) : null}
-      {selectedInstructorSession ? (
-        <InstructorAttendanceModal
-          attendance={selectedInstructorAttendance}
-          disabled={savingId === selectedInstructorAttendance?.id}
-          instructorAvailability={instructorAvailability}
-          onClose={() => setSelectedInstructorSession(null)}
+        {selectedInstructorSession ? (
+          <InstructorAttendanceModal
+            attendance={selectedInstructorAttendance}
+            disabled={readOnlyPortal || savingId === selectedInstructorAttendance?.id}
+            instructorAvailability={instructorAvailability}
+            onClose={() => setSelectedInstructorSession(null)}
           onCreateRescheduleSession={createInstructorRescheduleSession}
           onUpdate={updateInstructorAttendance}
           schedule={selectedInstructorSession.schedule}

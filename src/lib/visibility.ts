@@ -54,7 +54,7 @@ export async function filterRecordsForSession(
 
   if (role === "Student Portal User") {
     const studentIds = new Set([String(user.studentId ?? "")].filter(Boolean));
-    return filterStudentScoped(resource, records, studentIds);
+    return filterStudentScoped(resource, records, studentIds, db);
   }
 
   if (role === "Parent Portal User") {
@@ -65,7 +65,31 @@ export async function filterRecordsForSession(
       .project({ id: 1 })
       .toArray();
     const studentIds = new Set(students.map((student) => student.id));
-    return filterStudentScoped(resource, records, studentIds);
+    const scoped = await filterStudentScoped(resource, records, studentIds, db);
+    if (resource === "journals") {
+      return scoped.filter((row) => row.confirmed === true);
+    }
+    if (resource !== "student-attendance") return scoped;
+
+    return scoped.map((row) => {
+      if (row.confirmed === true) return row;
+
+      return {
+        ...row,
+        status: "Pending",
+        absenceReason: "",
+        makeupRequired: false,
+        makeupScheduleId: "",
+        pendingRescheduleDate: "",
+        pendingRescheduleFromTime: "",
+        pendingRescheduleToTime: "",
+        pendingRescheduleStudioRoomId: "",
+        confirmed: false,
+        confirmedAt: "",
+        confirmedBy: "",
+        confirmedByName: "",
+      };
+    });
   }
 
   return [];
@@ -79,13 +103,62 @@ export async function filterTypedRecordsForSession<T extends AnyRow>(
   return (await filterRecordsForSession(resource, records, session)) as T[];
 }
 
-function filterStudentScoped(resource: ResourceName, records: AnyRow[], studentIds: Set<unknown>) {
+async function filterStudentScoped(
+  resource: ResourceName,
+  records: AnyRow[],
+  studentIds: Set<unknown>,
+  db: Awaited<ReturnType<typeof getMongoDb>>,
+) {
   if (resource === "students") return records.filter((row) => studentIds.has(row.id));
+  if (
+    resource === "instruments" ||
+    resource === "instructors" ||
+    resource === "courses" ||
+    resource === "repertoires"
+  ) {
+    return records;
+  }
   if (resource === "journals") {
     return records.filter((row) => studentIds.has(row.studentId) && row.parentVisible === true);
   }
   if (["lesson-packages", "schedules", "student-attendance", "invoices"].includes(resource)) {
     return records.filter((row) => studentIds.has(row.studentId));
+  }
+  if (resource === "guardians") {
+    const students = await db
+      .collection("students")
+      .find({ id: { $in: [...studentIds].map(String) } })
+      .project({ guardianIds: 1 })
+      .toArray();
+    const guardianIds = new Set(
+      students
+        .flatMap((student) => (Array.isArray(student.guardianIds) ? student.guardianIds : []))
+        .map(String)
+        .filter(Boolean),
+    );
+    return records.filter((row) => guardianIds.has(String(row.id ?? "")));
+  }
+  if (["instruments", "courses", "instructors", "rooms"].includes(resource)) {
+    const schedules = await db
+      .collection("schedules")
+      .find({ studentId: { $in: [...studentIds].map(String) } })
+      .project({ courseId: 1, instructorId: 1, studioRoomId: 1, instrumentId: 1 })
+      .toArray();
+
+    if (resource === "instruments") {
+      const ids = new Set(schedules.map((row) => row.instrumentId).filter(Boolean));
+      return records.filter((row) => ids.has(row.id));
+    }
+    if (resource === "courses") {
+      const ids = new Set(schedules.map((row) => row.courseId).filter(Boolean));
+      return records.filter((row) => ids.has(row.id));
+    }
+    if (resource === "instructors") {
+      const ids = new Set(schedules.map((row) => row.instructorId).filter(Boolean));
+      return records.filter((row) => ids.has(row.id));
+    }
+    const ids = new Set(schedules.map((row) => row.studioRoomId).filter(Boolean));
+    return records.filter((row) => ids.has(row.id));
   }
   return [];
 }

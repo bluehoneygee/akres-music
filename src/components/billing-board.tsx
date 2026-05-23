@@ -26,6 +26,9 @@ export function BillingBoard() {
   const [instruments, setInstruments] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const [sessionRole, setSessionRole] = useState<string>("");
+  const isPortalReadOnly =
+    sessionRole === "Parent Portal User" || sessionRole === "Student Portal User";
 
   async function loadData() {
     setLoading(true);
@@ -54,6 +57,30 @@ export function BillingBoard() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSessionRole() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = (await response.json()) as { user?: { role?: string } };
+        if (mounted) {
+          setSessionRole(session.user?.role ?? "");
+        }
+      } catch {
+        if (mounted) {
+          setSessionRole("");
+        }
+      }
+    }
+
+    void loadSessionRole();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const lines = useMemo(() => {
@@ -124,6 +151,11 @@ export function BillingBoard() {
 
       <Card className="liquid-glass">
         <CardContent className="p-0">
+          {isPortalReadOnly ? (
+            <div className="border-b border-white/40 px-5 py-3 text-sm text-zinc-600">
+              Billing mode read-only untuk akun portal.
+            </div>
+          ) : null}
           {loading ? <div className="p-5 text-sm text-zinc-500">Loading billing...</div> : null}
 
           {!loading && lines.length === 0 ? (
@@ -134,7 +166,7 @@ export function BillingBoard() {
 
           {!loading && lines.length > 0 ? (
             <div className="overflow-x-auto no-scrollbar">
-              <table className="min-w-[1080px] text-left text-sm">
+              <table className={`${isPortalReadOnly ? "min-w-[920px]" : "min-w-[1080px]"} text-left text-sm`}>
                 <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500">
                   <tr>
                     <th className="px-4 py-3 font-medium">Student</th>
@@ -142,7 +174,7 @@ export function BillingBoard() {
                     <th className="px-4 py-3 font-medium">Period</th>
                     <th className="px-4 py-3 font-medium">Amount</th>
                     <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Confirmation</th>
+                    {!isPortalReadOnly ? <th className="px-4 py-3 font-medium">Confirmation</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -167,56 +199,64 @@ export function BillingBoard() {
                         {formatCurrency(Number(line.invoice.amount ?? 0))}
                       </td>
                       <td className="px-4 py-3">
-                        <select
-                          className="h-10 rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                          disabled={savingId === line.invoice.id || Boolean(line.invoice.confirmed)}
-                          onChange={(event) =>
-                            void updateInvoice(line.invoice, {
-                              status: event.target.value,
-                              paidAt: event.target.value === "Paid" ? new Date().toISOString() : "",
-                            })
-                          }
-                          value={String(line.invoice.status ?? "Unpaid")}
-                        >
-                          {["Unpaid", "Paid"].map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
+                        {isPortalReadOnly ? (
+                          <p className="font-medium text-zinc-900">
+                            {formatDisplayText(line.invoice.status || "Unpaid")}
+                          </p>
+                        ) : (
+                          <select
+                            className="h-10 rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            disabled={savingId === line.invoice.id || Boolean(line.invoice.confirmed)}
+                            onChange={(event) =>
+                              void updateInvoice(line.invoice, {
+                                status: event.target.value,
+                                paidAt: event.target.value === "Paid" ? new Date().toISOString() : "",
+                              })
+                            }
+                            value={String(line.invoice.status ?? "Unpaid")}
+                          >
+                            {["Unpaid", "Paid"].map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         {line.invoice.paidAt ? (
                           <p className="mt-1 text-xs italic text-zinc-500">
                             Paid at {formatDateTime(line.invoice.paidAt)}
                           </p>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3">
-                        {line.invoice.confirmed ? (
-                          <p className="text-xs italic text-zinc-500">
-                            Confirmed by {formatDisplayText(line.invoice.confirmedByName) || "Unknown User"}
-                            {formatDateTime(line.invoice.confirmedAt)
-                              ? ` at ${formatDateTime(line.invoice.confirmedAt)}`
-                              : ""}
-                          </p>
-                        ) : line.invoice.status === "Paid" ? (
-                          <Button
-                            disabled={savingId === line.invoice.id}
-                            onClick={() =>
-                              void updateInvoice(line.invoice, {
-                                confirmed: true,
-                                paidAt: line.invoice.paidAt || new Date().toISOString(),
-                                status: "Paid",
-                              })
-                            }
-                            size="sm"
-                            type="button"
-                          >
-                            Confirm Payment
-                          </Button>
-                        ) : (
-                          <p className="text-xs italic text-zinc-500">Set status to Paid to confirm.</p>
-                        )}
-                      </td>
+                      {!isPortalReadOnly ? (
+                        <td className="px-4 py-3">
+                          {line.invoice.confirmed ? (
+                            <p className="text-xs italic text-zinc-500">
+                              Confirmed by {formatDisplayText(line.invoice.confirmedByName) || "Unknown User"}
+                              {formatDateTime(line.invoice.confirmedAt)
+                                ? ` at ${formatDateTime(line.invoice.confirmedAt)}`
+                                : ""}
+                            </p>
+                          ) : line.invoice.status === "Paid" ? (
+                            <Button
+                              disabled={savingId === line.invoice.id}
+                              onClick={() =>
+                                void updateInvoice(line.invoice, {
+                                  confirmed: true,
+                                  paidAt: line.invoice.paidAt || new Date().toISOString(),
+                                  status: "Paid",
+                                })
+                              }
+                              size="sm"
+                              type="button"
+                            >
+                              Confirm Payment
+                            </Button>
+                          ) : (
+                            <p className="text-xs italic text-zinc-500">Set status to Paid to confirm.</p>
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

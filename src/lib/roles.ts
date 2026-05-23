@@ -65,10 +65,18 @@ const instructorReadResources: SecuredResource[] = [
 
 const portalReadResources: SecuredResource[] = [
   "students",
+  "guardians",
+  "instruments",
+  "courses",
+  "instructors",
+  "instructor-availability",
+  "rooms",
   "lesson-packages",
   "schedules",
   "student-attendance",
+  "instructor-attendance",
   "journals",
+  "repertoires",
   "invoices",
 ];
 

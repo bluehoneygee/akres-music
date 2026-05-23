@@ -33,7 +33,7 @@ export const appNavigation = [
     label: "Instruments",
     href: "/instruments",
     icon: Music2,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
   },
   {
     label: "Studio Rooms",
@@ -45,13 +45,13 @@ export const appNavigation = [
     label: "Courses",
     href: "/courses",
     icon: SquareLibrary,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
   },
   {
     label: "Instructors",
     href: "/instructors",
     icon: Users,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
   },
   {
     label: "Instructor Calendar",
@@ -99,7 +99,7 @@ export const appNavigation = [
     label: "Repertoire",
     href: "/repertoires",
     icon: Music2,
-    roles: ["System Manager", "Academic Staff", "Music Instructor"],
+    roles: ["System Manager", "Academic Staff", "Music Instructor", "Student Portal User", "Parent Portal User"],
   },
   {
     label: "Billing",

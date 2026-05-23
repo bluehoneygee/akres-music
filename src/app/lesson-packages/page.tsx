@@ -11,7 +11,7 @@ export default function LessonPackagesPage() {
   return (
     <AppShell>
       <ResourcePage
-        description="Paket les privat bulanan. Pilih Paket A untuk 4 sesi per bulan atau Paket B untuk 8 sesi per bulan, lalu sistem otomatis membuat schedules dan attendance."
+        description={"Paket les privat bulanan terdiri dari Paket A (4 sesi) dan Paket B (8 sesi).\nJadwal belajar dan absensi terbentuk otomatis berdasarkan slot aktif."}
         fields={[
           {
             key: "lessonCount",
