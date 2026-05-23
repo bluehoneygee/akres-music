@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BellRing,
   BookOpenCheck,
   CalendarClock,
   CalendarDays,
@@ -16,6 +17,18 @@ import {
 import type { AppRole } from "@/lib/roles";
 
 export const appNavigation = [
+  {
+    label: "Notifications",
+    href: "/notifications",
+    icon: BellRing,
+    roles: [
+      "System Manager",
+      "Academic Staff",
+      "Music Instructor",
+      "Student Portal User",
+      "Parent Portal User",
+    ],
+  },
   {
     label: "Overview",
     href: "/",

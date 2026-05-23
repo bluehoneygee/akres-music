@@ -208,8 +208,8 @@ export type Invoice = BaseRecord & {
 };
 
 export type Notification = BaseRecord & {
-  type: "Repeated Absence" | "Consecutive Absence" | "Invoice Reminder";
-  targetRole: "Parent Portal User" | "Academic Staff" | "Student Portal User";
+  type: "Class Reminder";
+  targetRole: "Parent Portal User" | "Student Portal User" | "Music Instructor";
   studentId: string;
   invoiceId: string;
   message: string;

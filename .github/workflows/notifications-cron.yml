@@ -1,0 +1,84 @@
+name: Notifications Cron
+
+on:
+  schedule:
+    # Daily morning reminder at 07:00 WIB (00:00 UTC)
+    - cron: "0 0 * * *"
+    # T-3h reminder checker every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Run target environment"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - staging
+          - production
+
+jobs:
+  run-staging:
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.target == 'all' || github.event.inputs.target == 'staging' }}
+    name: Run Staging Notifications
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Trigger notification scheduler (staging)
+        env:
+          AUTH_URL: ${{ vars.AUTH_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CRON_EXPR: ${{ github.event.schedule }}
+        run: |
+          if [ -z "$AUTH_URL" ]; then
+            echo "AUTH_URL is not set for staging environment"
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set for staging environment"
+            exit 1
+          fi
+          MODE="all"
+          if [ "$CRON_EXPR" = "0 0 * * *" ]; then
+            MODE="morning"
+          fi
+          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
+            MODE="preclass3h"
+          fi
+          curl --fail-with-body --show-error --silent \
+            -X POST "$AUTH_URL/api/notifications/run?mode=$MODE" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json"
+
+  run-production:
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.target == 'all' || github.event.inputs.target == 'production' }}
+    name: Run Production Notifications
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger notification scheduler (production)
+        env:
+          AUTH_URL: ${{ vars.AUTH_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CRON_EXPR: ${{ github.event.schedule }}
+        run: |
+          if [ -z "$AUTH_URL" ]; then
+            echo "AUTH_URL is not set for production environment"
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set for production environment"
+            exit 1
+          fi
+          MODE="all"
+          if [ "$CRON_EXPR" = "0 0 * * *" ]; then
+            MODE="morning"
+          fi
+          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
+            MODE="preclass3h"
+          fi
+          curl --fail-with-body --show-error --silent \
+            -X POST "$AUTH_URL/api/notifications/run?mode=$MODE" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json"

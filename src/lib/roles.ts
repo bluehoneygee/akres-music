@@ -61,6 +61,7 @@ const instructorReadResources: SecuredResource[] = [
   "instructor-attendance",
   "journals",
   "repertoires",
+  "notifications",
 ];
 
 const portalReadResources: SecuredResource[] = [
@@ -78,6 +79,7 @@ const portalReadResources: SecuredResource[] = [
   "journals",
   "repertoires",
   "invoices",
+  "notifications",
 ];
 
 export function canAccessResource({

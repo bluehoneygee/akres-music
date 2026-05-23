@@ -1592,6 +1592,19 @@ async function createConfirmedRescheduleSchedule(
     attendance.pendingRescheduleStudioRoomId || originalSchedule.studioRoomId || "",
   );
   const scheduleId = `reschedule-${String(originalSchedule.id)}`;
+  const lessonPackageId = String(originalSchedule.lessonPackageId || "");
+
+  if (lessonPackageId) {
+    const existingRescheduleCount = await db.collection("schedules").countDocuments({
+      lessonPackageId,
+      originalScheduleId: { $ne: "" },
+      id: { $ne: scheduleId },
+    });
+
+    if (existingRescheduleCount >= 1) {
+      throw new Error("Reschedule hanya boleh 1x untuk setiap lesson package.");
+    }
+  }
 
   await assertRescheduleSlotAvailable({
     scheduleId,

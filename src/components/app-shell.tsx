@@ -15,8 +15,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [role, setRole] = useState<string>();
+  const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [unreadNotification, setUnreadNotification] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -28,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         if (mounted) {
           setRole(session.user?.role ?? "Academic Staff");
+          setUserEmail(session.user?.email ?? "");
           setUserName(session.user?.name || session.user?.email || "User");
         }
       } finally {
@@ -43,6 +46,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadUnreadNotifications() {
+      if (!role || !userEmail) return;
+      try {
+        const response = await fetch("/api/notifications", { cache: "no-store" });
+        const json = (await response.json()) as { data?: Array<{ id: string }> };
+        const ids = Array.isArray(json.data) ? json.data.map((row) => row.id).filter(Boolean) : [];
+        const seenKey = `notifications:seen:${userEmail.toLowerCase()}`;
+        const seen = new Set<string>(JSON.parse(localStorage.getItem(seenKey) || "[]") as string[]);
+        const hasUnread = ids.some((id) => !seen.has(id));
+        if (mounted) setUnreadNotification(hasUnread);
+
+        if (pathname === "/notifications") {
+          localStorage.setItem(seenKey, JSON.stringify(ids));
+          if (mounted) setUnreadNotification(false);
+        }
+      } catch {
+        if (mounted) setUnreadNotification(false);
+      }
+    }
+
+    void loadUnreadNotifications();
+    const timer = setInterval(() => {
+      void loadUnreadNotifications();
+    }, 30_000);
+
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [pathname, role, userEmail]);
 
   const navigation = getNavigationForRole(role);
 
@@ -96,6 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 navigation={navigation}
                 onNavigate={() => setMobileMenuOpen(false)}
                 pathname={pathname}
+                unreadNotification={unreadNotification}
               />
             </div>
             <div className="mt-4 shrink-0">
@@ -120,7 +158,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Greeting role={role} userName={userName} />
           </div>
           <div className="mt-5 min-h-0 flex-1 overflow-y-auto no-scrollbar">
-            <NavigationList navigation={navigation} pathname={pathname} />
+            <NavigationList
+              navigation={navigation}
+              pathname={pathname}
+              unreadNotification={unreadNotification}
+            />
           </div>
           <div className="mt-4 shrink-0">
             <Button
@@ -165,10 +207,12 @@ function NavigationList({
   navigation,
   onNavigate,
   pathname,
+  unreadNotification = false,
 }: {
   navigation: ReturnType<typeof getNavigationForRole>;
   onNavigate?: () => void;
   pathname: string;
+  unreadNotification?: boolean;
 }) {
   return (
     <nav className="space-y-1 pr-1">
@@ -187,6 +231,9 @@ function NavigationList({
           >
             <item.icon className="size-4" />
             <span>{item.label}</span>
+            {item.href === "/notifications" && unreadNotification ? (
+              <span className="ml-auto size-2 rounded-full bg-rose-500" />
+            ) : null}
           </Link>
         );
       })}

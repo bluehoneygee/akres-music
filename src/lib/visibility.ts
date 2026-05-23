@@ -48,6 +48,9 @@ export async function filterRecordsForSession(
       return records.filter((row) => scheduleIds.has(row.courseScheduleId));
     }
     if (resource === "journals") return records.filter((row) => row.instructorId === instructorId);
+    if (resource === "notifications") {
+      return records.filter((row) => String(row.targetRole ?? "") === "Music Instructor");
+    }
 
     return records;
   }
@@ -65,6 +68,13 @@ export async function filterRecordsForSession(
       .project({ id: 1 })
       .toArray();
     const studentIds = new Set(students.map((student) => student.id));
+    if (resource === "notifications") {
+      return records.filter(
+        (row) =>
+          studentIds.has(String(row.studentId ?? "")) &&
+          String(row.targetRole ?? "") === "Parent Portal User",
+      );
+    }
     const scoped = await filterStudentScoped(resource, records, studentIds, db);
     if (resource === "journals") {
       return scoped.filter((row) => row.confirmed === true);
@@ -110,6 +120,13 @@ async function filterStudentScoped(
   db: Awaited<ReturnType<typeof getMongoDb>>,
 ) {
   if (resource === "students") return records.filter((row) => studentIds.has(row.id));
+  if (resource === "notifications") {
+    return records.filter(
+      (row) =>
+        studentIds.has(String(row.studentId ?? "")) &&
+        String(row.targetRole ?? "") === "Student Portal User",
+    );
+  }
   if (
     resource === "instruments" ||
     resource === "instructors" ||
@@ -138,25 +155,12 @@ async function filterStudentScoped(
     );
     return records.filter((row) => guardianIds.has(String(row.id ?? "")));
   }
-  if (["instruments", "courses", "instructors", "rooms"].includes(resource)) {
+  if (resource === "rooms") {
     const schedules = await db
       .collection("schedules")
       .find({ studentId: { $in: [...studentIds].map(String) } })
       .project({ courseId: 1, instructorId: 1, studioRoomId: 1, instrumentId: 1 })
       .toArray();
-
-    if (resource === "instruments") {
-      const ids = new Set(schedules.map((row) => row.instrumentId).filter(Boolean));
-      return records.filter((row) => ids.has(row.id));
-    }
-    if (resource === "courses") {
-      const ids = new Set(schedules.map((row) => row.courseId).filter(Boolean));
-      return records.filter((row) => ids.has(row.id));
-    }
-    if (resource === "instructors") {
-      const ids = new Set(schedules.map((row) => row.instructorId).filter(Boolean));
-      return records.filter((row) => ids.has(row.id));
-    }
     const ids = new Set(schedules.map((row) => row.studioRoomId).filter(Boolean));
     return records.filter((row) => ids.has(row.id));
   }
