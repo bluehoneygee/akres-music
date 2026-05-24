@@ -79,6 +79,9 @@ Required variables:
 - `AUTH_URL`
 - `MONGODB_URI`
 - `MONGODB_DB`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT`
 
 ## Local Development
 

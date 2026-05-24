@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PushNotificationToggle } from "@/components/push-notification-toggle";
 import { formatDisplayText } from "@/lib/utils";
 
 type NotificationRow = {
@@ -89,9 +90,12 @@ export function NotificationCenter() {
               Reminder jadwal kelas terbaru untuk akun Anda.
             </p>
           </div>
-          <Button onClick={loadData} size="icon" variant="glass" aria-label="Refresh">
-            <RefreshCw className="size-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <PushNotificationToggle />
+            <Button onClick={loadData} size="icon" variant="glass" aria-label="Refresh">
+              <RefreshCw className="size-4" />
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 

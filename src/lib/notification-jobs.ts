@@ -1,6 +1,7 @@
 import type { Document } from "mongodb";
 
 import { getMongoDb } from "@/lib/mongodb";
+import { sendPushToUsers } from "@/lib/push";
 
 type JobResult = {
   created: number;
@@ -15,6 +16,7 @@ type StudentRow = {
   id: string;
   firstName?: string;
   lastName?: string;
+  guardianIds?: string[];
 };
 
 type ScheduleRow = {
@@ -146,16 +148,34 @@ async function runClassReminderRule(mode: ReminderMode) {
   const students = (await db
     .collection("students")
     .find({ id: { $in: studentIds } })
-    .project<StudentRow>({ id: 1, firstName: 1, lastName: 1 })
+    .project<StudentRow>({ id: 1, firstName: 1, lastName: 1, guardianIds: 1 })
     .toArray()) as StudentRow[];
   const courses = (await db
     .collection("courses")
     .find({ id: { $in: courseIds } })
     .project<CourseRow>({ id: 1, courseName: 1 })
     .toArray()) as CourseRow[];
-
   const studentsById = new Map(students.map((row) => [String(row.id), row]));
   const coursesById = new Map(courses.map((row) => [String(row.id), row]));
+  const users = (await db
+    .collection("users")
+    .find({
+      role: { $in: ["Parent Portal User", "Student Portal User", "Music Instructor"] },
+    })
+    .project<{ _id: unknown; role?: string; studentId?: string; guardianId?: string; instructorId?: string }>({
+      _id: 1,
+      role: 1,
+      studentId: 1,
+      guardianId: 1,
+      instructorId: 1,
+    })
+    .toArray()) as Array<{
+    _id: unknown;
+    role?: string;
+    studentId?: string;
+    guardianId?: string;
+    instructorId?: string;
+  }>;
   const today = dayOffset(0);
   const nowUtc = Date.now();
   const jakartaNow = getJakartaNowParts();
@@ -199,11 +219,69 @@ async function runClassReminderRule(mode: ReminderMode) {
         });
         if (inserted) created += 1;
         else skipped += 1;
+
+        if (inserted) {
+          const recipientIds = resolveRecipientUserIds({
+            users,
+            targetRole,
+            studentId: sid,
+            instructorId: String(schedule.instructorId ?? ""),
+            guardianIds: (studentsById.get(sid)?.guardianIds ?? []) as string[],
+          });
+          await sendPushToUsers(recipientIds, {
+            title: "Akres Music Reminder",
+            body:
+              stage === "morning"
+                ? `[07:00] ${message}`
+                : `[T-3 Jam] ${message}`,
+            url: "/notifications",
+          });
+        }
       }
     }
   }
 
   return { created, skipped };
+}
+
+function resolveRecipientUserIds({
+  users,
+  targetRole,
+  studentId,
+  instructorId,
+  guardianIds,
+}: {
+  users: Array<{
+    _id: unknown;
+    role?: string;
+    studentId?: string;
+    guardianId?: string;
+    instructorId?: string;
+  }>;
+  targetRole: "Music Instructor" | "Parent Portal User" | "Student Portal User";
+  studentId: string;
+  instructorId: string;
+  guardianIds: string[];
+}) {
+  if (targetRole === "Student Portal User") {
+    return users
+      .filter((user) => user.role === targetRole && String(user.studentId ?? "") === studentId)
+      .map((user) => String(user._id));
+  }
+
+  if (targetRole === "Music Instructor") {
+    return users
+      .filter((user) => user.role === targetRole && String(user.instructorId ?? "") === instructorId)
+      .map((user) => String(user._id));
+  }
+
+  const guardianSet = new Set(guardianIds.map(String));
+  return users
+    .filter(
+      (user) =>
+        user.role === targetRole && guardianSet.has(String(user.guardianId ?? "")),
+    )
+    .map((user) => String(user._id));
 }
 
 export async function runNotificationSchedulers(mode: ReminderMode = "all") {
