@@ -21,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [unreadNotification, setUnreadNotification] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -112,6 +113,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigation = getNavigationForRole(role);
   const displayName = formatDisplayText(userName || "User");
   const isNotificationsActive = pathname === "/notifications";
+
+  useEffect(() => {
+    setHeaderScrolled(false);
+  }, [pathname]);
 
   function headerCopy() {
     if (role === "Parent Portal User") {
@@ -279,7 +284,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0">
+        <section
+          className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0"
+          onScroll={(event) => {
+            const scrolled = event.currentTarget.scrollTop > 8;
+            setHeaderScrolled((current) => (current === scrolled ? current : scrolled));
+          }}
+        >
           <div className="sticky top-3 z-20 mb-3 lg:hidden">
             <button
               aria-label="Buka menu"
@@ -290,14 +301,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="size-5" />
             </button>
           </div>
-          <div className="mb-4 hidden items-center justify-between gap-4 px-1 py-1 lg:flex">
+          <div
+            className={cn(
+              "sticky top-0 z-40 mb-4 hidden grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-2xl px-3 py-2 transition-all lg:grid",
+              headerScrolled
+                ? "bg-white/55 shadow-[0_10px_24px_rgba(15,23,42,.08)] backdrop-blur-md"
+                : "bg-transparent shadow-none backdrop-blur-0",
+            )}
+          >
             <div className="min-w-0">
               <p className="truncate text-lg font-semibold text-zinc-900">
                 {greetingCopy.title}
               </p>
               <p className="mt-0.5 truncate text-sm text-zinc-600">{greetingCopy.subtitle}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 justify-self-end">
               <button
                 aria-label="Notifications"
                 className={cn(
