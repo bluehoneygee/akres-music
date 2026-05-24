@@ -16,10 +16,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [role, setRole] = useState<string>();
-  const [userEmail, setUserEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("");
   const [sessionLoading, setSessionLoading] = useState(true);
-  const [unreadNotification, setUnreadNotification] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
 
@@ -32,12 +32,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           cache: "no-store",
         });
         const session = (await response.json()) as {
-          user?: { name?: string; email?: string; role?: string };
+          user?: { id?: string; name?: string; email?: string; role?: string };
         };
 
         if (mounted) {
           setRole(session.user?.role ?? "Academic Staff");
-          setUserEmail(session.user?.email ?? "");
+          setUserId(String(session.user?.id ?? ""));
           setUserName(session.user?.name || session.user?.email || "User");
         }
       } finally {
@@ -58,43 +58,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     async function loadUnreadNotifications() {
-      if (!role || !userEmail) return;
+      if (!role || !userId) return;
       try {
         const response = await fetch("/api/notifications", {
           cache: "no-store",
         });
         const json = (await response.json()) as {
-          data?: Array<{ id: string }>;
+          data?: Array<{ id: string; readByUserIds?: string[] }>;
         };
-        const ids = Array.isArray(json.data)
-          ? json.data.map((row) => row.id).filter(Boolean)
-          : [];
-        const seenKey = `notifications:seen:${userEmail.toLowerCase()}`;
-        const seen = new Set<string>(
-          JSON.parse(localStorage.getItem(seenKey) || "[]") as string[],
-        );
-        const hasUnread = ids.some((id) => !seen.has(id));
-        if (mounted) setUnreadNotification(hasUnread);
-
-        if (pathname === "/notifications") {
-          localStorage.setItem(seenKey, JSON.stringify(ids));
-          if (mounted) setUnreadNotification(false);
-        }
+        const unreadCount = Array.isArray(json.data)
+          ? json.data.filter((row) => {
+              const readBy = new Set((row.readByUserIds ?? []).map(String));
+              return !readBy.has(userId);
+            }).length
+          : 0;
+        if (mounted) setUnreadNotificationCount(unreadCount);
       } catch {
-        if (mounted) setUnreadNotification(false);
+        if (mounted) setUnreadNotificationCount(0);
       }
     }
 
     void loadUnreadNotifications();
+    const onSeenUpdated = () => {
+      void loadUnreadNotifications();
+    };
+    window.addEventListener("notifications:seen-updated", onSeenUpdated as EventListener);
     const timer = setInterval(() => {
       void loadUnreadNotifications();
     }, 30_000);
 
     return () => {
       mounted = false;
+      window.removeEventListener("notifications:seen-updated", onSeenUpdated as EventListener);
       clearInterval(timer);
     };
-  }, [pathname, role, userEmail]);
+  }, [role, userId]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -113,6 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigation = getNavigationForRole(role);
   const displayName = formatDisplayText(userName || "User");
   const isNotificationsActive = pathname === "/notifications";
+  const unreadNotification = unreadNotificationCount > 0;
 
   useEffect(() => {
     setHeaderScrolled(false);
@@ -313,7 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   aria-label="Notifications"
                   className={cn(
-                    "grid size-9 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
+                    "relative grid size-9 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
                     isNotificationsActive
                       ? isDarkMode
                         ? "!bg-white !text-zinc-900"
@@ -326,6 +325,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                 >
                   <Bell className="size-4" />
+                  {unreadNotification ? (
+                    <>
+                      <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-rose-500" />
+                      <span className="absolute -right-2 -top-2 min-w-[18px] rounded-full bg-rose-500 px-1 py-0.5 text-[10px] font-semibold leading-none text-white">
+                        {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                      </span>
+                    </>
+                  ) : null}
                 </button>
                 <ThemeToggle />
               </div>
@@ -349,7 +356,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 aria-label="Notifications"
                 className={cn(
-                  "grid size-10 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
+                  "relative grid size-10 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
                   isNotificationsActive
                     ? isDarkMode
                       ? "!bg-white !text-zinc-900"
@@ -362,6 +369,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
               >
                 <Bell className="size-4" />
+                {unreadNotification ? (
+                  <>
+                    <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-rose-500" />
+                    <span className="absolute -right-2 -top-2 min-w-[18px] rounded-full bg-rose-500 px-1 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                    </span>
+                  </>
+                ) : null}
               </button>
               <ThemeToggle />
             </div>

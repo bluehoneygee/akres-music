@@ -12,6 +12,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
+    ,
+    "smoke:notifications": "node scripts/smoke-notifications.mjs"
   },
   "keywords": [],
   "author": "",

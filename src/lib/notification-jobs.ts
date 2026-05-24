@@ -84,6 +84,30 @@ function studentName(student: StudentRow | undefined) {
   return full || "Murid";
 }
 
+function buildRoleMessage(params: {
+  targetRole: "Music Instructor" | "Parent Portal User" | "Student Portal User";
+  stage: "morning" | "preclass3h";
+  scheduleDate: string;
+  fromTime: string;
+  studentDisplayName: string;
+  courseName: string;
+  isToday: boolean;
+}) {
+  const stagePrefix = params.stage === "morning" ? "Pagi ini" : "Mulai 3 jam lagi";
+  const whenLabel = params.isToday ? "hari ini" : "besok";
+  const timeLabel = `${params.scheduleDate} ${params.fromTime}`;
+
+  if (params.targetRole === "Parent Portal User") {
+    return `[${stagePrefix}] Reminder untuk orang tua: ${params.studentDisplayName} ada kelas ${params.courseName} ${whenLabel} pukul ${params.fromTime} (${timeLabel}).`;
+  }
+
+  if (params.targetRole === "Student Portal User") {
+    return `[${stagePrefix}] Reminder kelasmu: ${params.courseName} ${whenLabel} pukul ${params.fromTime} (${timeLabel}).`;
+  }
+
+  return `[${stagePrefix}] Reminder mengajar: ${params.studentDisplayName} (${params.courseName}) ${whenLabel} pukul ${params.fromTime} (${timeLabel}).`;
+}
+
 async function upsertNotification(params: {
   idempotencyKey: string;
   message: string;
@@ -109,6 +133,7 @@ async function upsertNotification(params: {
         invoiceId: "",
         message: params.message,
         idempotencyKey: params.idempotencyKey,
+        readByUserIds: [],
       },
     },
     { upsert: true },
@@ -189,9 +214,9 @@ async function runClassReminderRule(mode: ReminderMode) {
     const scheduleId = String(schedule.id ?? "");
     const sid = String(schedule.studentId ?? "");
     const fromTime = String(schedule.fromTime ?? "");
-    const label = scheduleDate === today ? "hari ini" : "besok";
+    const isToday = scheduleDate === today;
     const courseName = String(coursesById.get(String(schedule.courseId ?? ""))?.courseName ?? "kelas musik");
-    const message = `Reminder kelas ${label}: ${studentName(studentsById.get(sid))}, ${courseName}, ${scheduleDate} ${fromTime}.`;
+    const studentDisplayName = studentName(studentsById.get(sid));
     const scheduleStartUtcMs = parseScheduleStartUtcMs(scheduleDate, fromTime);
 
     const shouldSendMorning =
@@ -203,17 +228,23 @@ async function runClassReminderRule(mode: ReminderMode) {
     if (!shouldSendMorning && !shouldSendPreclass) continue;
 
     for (const targetRole of ["Parent Portal User", "Student Portal User", "Music Instructor"] as const) {
-      const stages: string[] = [];
+      const stages: Array<"morning" | "preclass3h"> = [];
       if (shouldSendMorning) stages.push("morning");
       if (shouldSendPreclass) stages.push("preclass3h");
 
       for (const stage of stages) {
+        const formattedMessage = buildRoleMessage({
+          targetRole,
+          stage,
+          scheduleDate,
+          fromTime,
+          studentDisplayName,
+          courseName,
+          isToday,
+        });
         const inserted = await upsertNotification({
           idempotencyKey: `class-reminder:${stage}:${targetRole}:${scheduleId}:${scheduleDate}:${fromTime}`,
-          message:
-            stage === "morning"
-              ? `[07:00] ${message}`
-              : `[T-3 Jam] ${message}`,
+          message: formattedMessage,
           studentId: sid,
           targetRole,
         });
@@ -230,10 +261,7 @@ async function runClassReminderRule(mode: ReminderMode) {
           });
           await sendPushToUsers(recipientIds, {
             title: "Akres Music Reminder",
-            body:
-              stage === "morning"
-                ? `[07:00] ${message}`
-                : `[T-3 Jam] ${message}`,
+            body: formattedMessage,
             url: "/notifications",
           });
         }

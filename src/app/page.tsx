@@ -34,6 +34,10 @@ function statusVariant(status: string) {
   return "secondary";
 }
 
+function scheduleStartAt(schedule: Pick<CourseSchedule, "scheduleDate" | "fromTime">) {
+  return new Date(`${schedule.scheduleDate}T${schedule.fromTime}:00`);
+}
+
 export default async function HomePage() {
   const session = await auth();
   const role = session ? sessionRole(session) : "";
@@ -69,8 +73,14 @@ export default async function HomePage() {
   const completionPercent = attendance.length
     ? Math.round(((attendanceSummary.present + attendanceSummary.late) / attendance.length) * 100)
     : 0;
+  const now = new Date();
   const upcomingSchedules = schedules
     .filter((schedule) => schedule.scheduleStatus !== "Cancelled")
+    .filter((schedule) => {
+      const startAt = scheduleStartAt(schedule);
+      if (Number.isNaN(startAt.getTime())) return false;
+      return startAt >= now;
+    })
     .sort((left, right) =>
       `${left.scheduleDate} ${left.fromTime}`.localeCompare(`${right.scheduleDate} ${right.fromTime}`),
     )
