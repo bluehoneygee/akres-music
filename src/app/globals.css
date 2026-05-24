@@ -83,6 +83,10 @@ select {
   z-index: 1;
 }
 
+.no-glass-highlight::before {
+  display: none !important;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
 
@@ -13,6 +13,7 @@ import { cn, formatDisplayText } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [role, setRole] = useState<string>();
   const [userEmail, setUserEmail] = useState("");
@@ -25,8 +26,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        const session = (await response.json()) as { user?: { name?: string; email?: string; role?: string } };
+        const response = await fetch("/api/auth/session", {
+          cache: "no-store",
+        });
+        const session = (await response.json()) as {
+          user?: { name?: string; email?: string; role?: string };
+        };
 
         if (mounted) {
           setRole(session.user?.role ?? "Academic Staff");
@@ -53,11 +58,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     async function loadUnreadNotifications() {
       if (!role || !userEmail) return;
       try {
-        const response = await fetch("/api/notifications", { cache: "no-store" });
-        const json = (await response.json()) as { data?: Array<{ id: string }> };
-        const ids = Array.isArray(json.data) ? json.data.map((row) => row.id).filter(Boolean) : [];
+        const response = await fetch("/api/notifications", {
+          cache: "no-store",
+        });
+        const json = (await response.json()) as {
+          data?: Array<{ id: string }>;
+        };
+        const ids = Array.isArray(json.data)
+          ? json.data.map((row) => row.id).filter(Boolean)
+          : [];
         const seenKey = `notifications:seen:${userEmail.toLowerCase()}`;
-        const seen = new Set<string>(JSON.parse(localStorage.getItem(seenKey) || "[]") as string[]);
+        const seen = new Set<string>(
+          JSON.parse(localStorage.getItem(seenKey) || "[]") as string[],
+        );
         const hasUnread = ids.some((id) => !seen.has(id));
         if (mounted) setUnreadNotification(hasUnread);
 
@@ -82,17 +95,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname, role, userEmail]);
 
   const navigation = getNavigationForRole(role);
+  const displayName = formatDisplayText(userName || "User");
+
+  function headerCopy() {
+    if (role === "Parent Portal User") {
+      return {
+        title: `Halo, ${displayName}.`,
+        subtitle: "Siap pantau jadwal dan progres belajar anak Anda hari ini?",
+      };
+    }
+
+    if (role === "Instructor Portal User") {
+      return {
+        title: `Halo, ${displayName}.`,
+        subtitle: "Siap mengajar dan update progres murid hari ini?",
+      };
+    }
+
+    if (role === "System Manager") {
+      return {
+        title: `Halo, ${displayName}.`,
+        subtitle: "Siap kelola operasional akademik hari ini?",
+      };
+    }
+
+    return {
+      title: `Halo, ${displayName}.`,
+      subtitle: "Siap mulai aktivitas hari ini?",
+    };
+  }
+
+  const greetingCopy = headerCopy();
 
   if (sessionLoading) {
     return (
       <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
-        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="liquid-glass hidden h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-white/45 p-4 backdrop-blur-3xl lg:flex">
+        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)]">
+          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 backdrop-blur-3xl lg:flex">
             <div className="h-16 w-full animate-pulse rounded-2xl bg-white/55" />
             <div className="mt-4 h-11 w-full animate-pulse rounded-2xl bg-white/45" />
             <div className="mt-5 space-y-2">
               {Array.from({ length: 7 }).map((_, index) => (
-                <div className="h-10 w-full animate-pulse rounded-2xl bg-white/40" key={index} />
+                <div
+                  className="h-10 w-full animate-pulse rounded-2xl bg-white/40"
+                  key={index}
+                />
               ))}
             </div>
           </aside>
@@ -101,7 +148,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="h-28 w-full animate-pulse rounded-[28px] bg-white/45" />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, index) => (
-                  <div className="h-24 animate-pulse rounded-3xl bg-white/42" key={index} />
+                  <div
+                    className="h-24 animate-pulse rounded-3xl bg-white/42"
+                    key={index}
+                  />
                 ))}
               </div>
               <div className="h-80 w-full animate-pulse rounded-[28px] bg-white/38" />
@@ -149,16 +199,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="liquid-glass hidden h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/40 bg-white/45 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex">
+      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)]">
+        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex">
           <div className="shrink-0">
-            <div className="mb-5">
-              <Brand />
-            </div>
-            <Greeting role={role} userName={userName} />
+            <Brand />
           </div>
           <div className="mt-5 min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <NavigationList
+              compact
               navigation={navigation}
               pathname={pathname}
               unreadNotification={unreadNotification}
@@ -166,11 +214,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="mt-4 shrink-0">
             <Button
-              className="w-full"
+              className="h-10 w-full px-0"
               onClick={() => signOut({ callbackUrl: "/login" })}
               variant="glass"
             >
-              Logout
+              ⎋
             </Button>
           </div>
         </aside>
@@ -186,7 +234,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="size-5" />
             </button>
           </div>
-          <div className="space-y-4">{children}</div>
+          <div className="mb-4 hidden items-center justify-between gap-4 px-1 py-1 lg:flex">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold text-zinc-900">
+                {greetingCopy.title}
+              </p>
+              <p className="mt-0.5 truncate text-sm text-zinc-600">{greetingCopy.subtitle}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Notifications"
+                className="grid size-10 place-items-center rounded-full !border-white/70 !bg-white !text-zinc-500 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors hover:!bg-white hover:!text-zinc-700"
+                onClick={() => router.push("/notifications")}
+                type="button"
+              >
+                <Bell className="size-4" />
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="lg:hidden">
+              <Greeting role={role} userName={userName} />
+            </div>
+            {children}
+          </div>
         </section>
       </div>
     </main>
@@ -208,31 +280,54 @@ function NavigationList({
   onNavigate,
   pathname,
   unreadNotification = false,
+  compact = false,
 }: {
   navigation: ReturnType<typeof getNavigationForRole>;
   onNavigate?: () => void;
   pathname: string;
   unreadNotification?: boolean;
+  compact?: boolean;
 }) {
+  const filteredNavigation = navigation.filter(
+    (item) => item.href !== "/notifications",
+  );
+
   return (
-    <nav className="space-y-1 pr-1">
-      {navigation.map((item) => {
+    <nav className={cn("space-y-1 pr-1", compact && "space-y-2 pr-0")}>
+      {filteredNavigation.map((item) => {
         const active = pathname === item.href;
 
         return (
           <Link
             className={cn(
-              "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-zinc-600 transition-colors hover:bg-white/50 hover:text-zinc-950",
-              active && "bg-zinc-950 text-white shadow-lg hover:bg-zinc-900 hover:text-white",
+              "group",
+              compact
+                ? "relative mx-auto grid size-10 place-items-center rounded-full text-zinc-500 transition-colors hover:bg-white/70 hover:text-zinc-900 before:hidden after:hidden"
+                : "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-zinc-600 transition-colors hover:bg-white/50 hover:text-zinc-950",
+              active &&
+                (compact
+                  ? "bg-zinc-900 text-white shadow-[0_10px_18px_rgba(15,23,42,.25)] hover:bg-zinc-900 hover:text-white dark:bg-sky-300 dark:text-zinc-900 dark:shadow-[0_10px_18px_rgba(125,211,252,.35)] dark:hover:bg-sky-200"
+                  : "bg-zinc-950 text-white shadow-lg hover:bg-zinc-900 hover:text-white dark:bg-sky-300 dark:text-zinc-900 dark:hover:bg-sky-200"),
             )}
             href={item.href}
             key={item.href}
             onClick={onNavigate}
+            title={item.label}
           >
             <item.icon className="size-4" />
-            <span>{item.label}</span>
+            {compact ? null : <span>{item.label}</span>}
+            {compact ? (
+              <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-30 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white shadow-lg group-hover:block">
+                {item.label}
+              </span>
+            ) : null}
             {item.href === "/notifications" && unreadNotification ? (
-              <span className="ml-auto size-2 rounded-full bg-rose-500" />
+              <span
+                className={cn(
+                  "size-2 rounded-full bg-rose-500",
+                  compact ? "absolute right-1 top-1" : "ml-auto",
+                )}
+              />
             ) : null}
           </Link>
         );
@@ -243,19 +338,13 @@ function NavigationList({
 
 function Brand() {
   return (
-    <div className="flex items-start gap-3">
-      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/60 bg-white p-0 shadow-xl">
+    <div className="grid place-items-center">
+      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-white/60 bg-white p-0 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)]">
         <img
           alt="Akres Music Logo"
-          className="h-full w-full object-contain"
+          className="h-[78%] w-[78%] object-contain"
           src="/akres-logo-full.png?v=7"
         />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-base font-semibold leading-tight">Akres Music Academy</p>
-        <div className="mt-2">
-          <ThemeToggle />
-        </div>
       </div>
     </div>
   );

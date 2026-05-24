@@ -157,7 +157,7 @@ export default async function HomePage() {
     <AppShell>
       <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         {metrics.map((metric) => (
-          <Card className="liquid-glass" key={metric.label}>
+          <Card className="liquid-glass no-glass-highlight shadow-none" key={metric.label}>
             <CardContent className="p-3 sm:p-4">
               <div className="flex min-h-[88px] flex-col justify-between gap-2 sm:min-h-0 sm:flex-row sm:items-start sm:gap-3">
                 <div className={`grid size-8 shrink-0 place-items-center rounded-2xl sm:order-2 sm:size-11 ${metric.tint}`}>
@@ -181,7 +181,7 @@ export default async function HomePage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
-        <Card className="liquid-glass">
+        <Card className="liquid-glass no-glass-highlight shadow-none">
           <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Jadwal Les Anak" : "Jadwal Les Terdekat"}</CardTitle>
             <p className="mt-1 text-sm text-zinc-500">
@@ -254,7 +254,7 @@ export default async function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="liquid-glass">
+        <Card className="liquid-glass no-glass-highlight shadow-none">
           <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Yang Perlu Dilihat" : "Prioritas Hari Ini"}</CardTitle>
           </CardHeader>
@@ -286,7 +286,7 @@ export default async function HomePage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <Card className="liquid-glass">
+        <Card className="liquid-glass no-glass-highlight shadow-none">
           <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>Rekap Kehadiran</CardTitle>
           </CardHeader>
@@ -299,7 +299,7 @@ export default async function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="liquid-glass xl:col-span-2">
+        <Card className="liquid-glass no-glass-highlight shadow-none xl:col-span-2">
           <CardHeader className="p-4 pb-2 sm:p-5 sm:pb-3">
             <CardTitle>{isPortal ? "Progress Terbaru" : "Lesson Journal Terbaru"}</CardTitle>
           </CardHeader>
