@@ -2,7 +2,7 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
-import { Button } from "@/components/ui/button";
+import { LoginSubmitButton } from "@/components/login-submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage({
@@ -58,9 +58,7 @@ export default function LoginPage({
                 type="password"
               />
             </label>
-            <Button className="w-full" type="submit">
-              Masuk
-            </Button>
+            <LoginSubmitButton />
           </form>
           <p className="text-center text-xs text-zinc-500">
             User dibuat dan diatur dari dashboard Users oleh admin/staff.
