@@ -99,12 +99,12 @@ export function StudentCalendarBoard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="inline-flex rounded-xl border border-white/50 bg-white/58 p-0.5">
+            <div className="sticky top-2 z-20 inline-flex rounded-full border border-white/60 bg-white/78 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,.7),0_8px_18px_rgba(15,23,42,.08)] backdrop-blur-md">
               <button
-                className={`h-7 rounded-lg px-2 text-xs transition ${
+                className={`h-7 rounded-full px-2.5 text-xs transition ${
                   viewMode === "month"
                     ? "bg-emerald-500 text-white shadow-sm"
-                    : "text-zinc-600 hover:bg-white/70"
+                    : "text-zinc-600"
                 }`}
                 onClick={() => setViewMode("month")}
                 type="button"
@@ -112,10 +112,10 @@ export function StudentCalendarBoard() {
                 Month
               </button>
               <button
-                className={`h-7 rounded-lg px-2 text-xs transition ${
+                className={`h-7 rounded-full px-2.5 text-xs transition ${
                   viewMode === "week"
                     ? "bg-sky-500 text-white shadow-sm"
-                    : "text-zinc-600 hover:bg-white/70"
+                    : "text-zinc-600"
                 }`}
                 onClick={() => setViewMode("week")}
                 type="button"

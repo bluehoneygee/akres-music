@@ -215,6 +215,7 @@ export type Notification = BaseRecord & {
   message: string;
   idempotencyKey: string;
   sentAt: string;
+  readByUserIds?: string[];
 };
 
 export type Database = {
