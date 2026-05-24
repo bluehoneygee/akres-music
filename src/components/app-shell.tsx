@@ -151,8 +151,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (sessionLoading) {
     return (
       <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
-        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 backdrop-blur-3xl lg:flex xl:hidden">
+        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 md:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 backdrop-blur-3xl md:flex xl:hidden">
             <div className="h-16 w-full animate-pulse rounded-2xl bg-white/55" />
             <div className="mt-4 h-11 w-full animate-pulse rounded-2xl bg-white/45" />
             <div className="mt-5 space-y-2">
@@ -179,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="mt-auto h-10 w-full animate-pulse rounded-2xl bg-white/45" />
           </aside>
-          <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0">
+          <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 md:h-full md:pb-0">
             <div className="space-y-4">
               <div className="h-28 w-full animate-pulse rounded-[28px] bg-white/45" />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -201,10 +201,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
       {mobileMenuOpen ? (
-        <div className="fixed inset-0 z-50 bg-zinc-950/25 p-3 backdrop-blur-sm lg:hidden">
+        <div className="fixed inset-0 z-50 bg-zinc-950/25 p-3 backdrop-blur-sm md:hidden">
           <div className="liquid-glass flex h-full max-w-[340px] flex-col rounded-[28px] border border-white/40 bg-white/70 p-4 shadow-2xl backdrop-blur-3xl">
             <div className="mb-5 flex items-start justify-between gap-3">
-              <Brand compact />
+              <div className="flex min-w-0 items-start gap-3">
+                <Brand compact />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-zinc-900">{greetingCopy.title}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-zinc-600">{greetingCopy.subtitle}</p>
+                </div>
+              </div>
               <Button
                 aria-label="Tutup menu"
                 onClick={() => setMobileMenuOpen(false)}
@@ -236,8 +242,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex xl:hidden">
+      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 md:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl md:flex xl:hidden">
           <div className="shrink-0">
             <Brand compact />
           </div>
@@ -263,7 +269,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/40 bg-white/45 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl xl:flex">
           <div className="shrink-0 px-1 pb-2">
-            <Brand />
+            <Brand showText />
           </div>
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <NavigationList
@@ -285,25 +291,49 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <section
-          className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0"
+          className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 md:h-full md:pb-0"
           onScroll={(event) => {
             const scrolled = event.currentTarget.scrollTop > 8;
             setHeaderScrolled((current) => (current === scrolled ? current : scrolled));
           }}
         >
-          <div className="sticky top-3 z-20 mb-3 lg:hidden">
-            <button
-              aria-label="Buka menu"
-              className="grid size-9 place-items-center text-zinc-800 transition-colors hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-              onClick={() => setMobileMenuOpen(true)}
-              type="button"
-            >
-              <Menu className="size-5" />
-            </button>
+          <div className="sticky top-3 z-30 mb-5 md:hidden">
+            <div className="flex items-center justify-between gap-2 px-2 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  aria-label="Buka menu"
+                  className="grid size-9 place-items-center rounded-full text-zinc-800 transition-colors hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  onClick={() => setMobileMenuOpen(true)}
+                  type="button"
+                >
+                  <Menu className="size-5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  aria-label="Notifications"
+                  className={cn(
+                    "grid size-9 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
+                    isNotificationsActive
+                      ? isDarkMode
+                        ? "!bg-white !text-zinc-900"
+                        : "!bg-black !text-white"
+                      : isDarkMode
+                        ? "!bg-zinc-900/55 !text-zinc-300"
+                        : "!bg-white !text-zinc-500",
+                  )}
+                  onClick={() => router.push("/notifications")}
+                  type="button"
+                >
+                  <Bell className="size-4" />
+                </button>
+                <ThemeToggle />
+              </div>
+            </div>
           </div>
           <div
             className={cn(
-              "sticky top-0 z-40 mb-4 hidden grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-2xl px-3 py-2 transition-all lg:grid",
+              "sticky top-0 z-40 mb-4 hidden grid-cols-[minmax(0,1fr)_auto] items-start gap-4 rounded-2xl px-3 py-2 transition-all md:grid",
               headerScrolled
                 ? "bg-white/55 shadow-[0_10px_24px_rgba(15,23,42,.08)] backdrop-blur-md"
                 : "bg-transparent shadow-none backdrop-blur-0",
@@ -336,25 +366,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ThemeToggle />
             </div>
           </div>
-          <div className="space-y-4">
-            <div className="lg:hidden">
-              <Greeting role={role} userName={userName} />
-            </div>
-            {children}
-          </div>
+          <div className="space-y-4">{children}</div>
         </section>
       </div>
     </main>
-  );
-}
-
-function Greeting({ userName }: { role?: string; userName: string }) {
-  return (
-    <div className="rounded-2xl border border-white/40 bg-white/36 px-3 py-2">
-      <p className="text-sm font-semibold text-zinc-800">
-        Selamat datang, {formatDisplayText(userName || "User")}
-      </p>
-    </div>
   );
 }
 
@@ -425,17 +440,22 @@ function NavigationList({
   );
 }
 
-function Brand({ compact = false }: { compact?: boolean }) {
+function Brand({ compact = false, showText = false }: { compact?: boolean; showText?: boolean }) {
   return (
     <div className={cn("flex items-center gap-3", compact ? "justify-center" : "justify-start")}>
-      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/60 bg-white p-0 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)]">
+      <div
+        className={cn(
+          "grid h-10 w-10 shrink-0 place-items-center overflow-hidden border border-white/60 bg-white p-0 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)]",
+          compact ? "rounded-full" : "rounded-xl",
+        )}
+      >
         <img
           alt="Akres Music Logo"
           className="h-[78%] w-[78%] object-contain"
           src="/akres-logo-full.png?v=7"
         />
       </div>
-      {!compact ? (
+      {showText ? (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-zinc-900">Akres Music</p>
           <p className="truncate text-xs text-zinc-500">Academic</p>
