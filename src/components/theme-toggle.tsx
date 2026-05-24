@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
+import { MoonStar, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -50,9 +50,10 @@ export function ThemeToggle({
       <button
         aria-label="Aktifkan light mode"
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-zinc-600 transition-colors dark:text-zinc-300",
+          "inline-flex h-8 items-center gap-1 rounded-full border border-transparent px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-white/45",
+          theme === "dark" ? "text-zinc-200" : "text-zinc-700",
           theme === "light" &&
-            "bg-zinc-900 text-white shadow-[0_8px_20px_rgba(15,23,42,.25)] dark:bg-sky-300 dark:text-zinc-900",
+            "bg-zinc-900 text-white shadow-[0_8px_20px_rgba(15,23,42,.25)]",
         )}
         onClick={() => setThemeValue("light")}
         type="button"
@@ -63,14 +64,15 @@ export function ThemeToggle({
       <button
         aria-label="Aktifkan dark mode"
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-zinc-600 transition-colors dark:text-zinc-300",
+          "inline-flex h-8 items-center gap-1 rounded-full border border-transparent px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-white/45",
+          theme === "dark" ? "text-zinc-200" : "text-zinc-700",
           theme === "dark" &&
-            "bg-zinc-900 text-white shadow-[0_8px_20px_rgba(15,23,42,.25)] dark:bg-sky-300 dark:text-zinc-900",
+            "bg-white text-black shadow-[0_8px_20px_rgba(255,255,255,.24)]",
         )}
         onClick={() => setThemeValue("dark")}
         type="button"
       >
-        <Moon className="size-4" />
+        <MoonStar className="size-4" />
         {showLabel ? <span className="text-xs font-medium">Dark</span> : null}
       </button>
     </div>

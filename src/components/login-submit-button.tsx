@@ -10,7 +10,7 @@ export function LoginSubmitButton() {
 
   return (
     <Button
-      className="h-12 w-full rounded-[16px] bg-sky-500 text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35),0_14px_28px_rgba(14,165,233,.35)] hover:bg-sky-400"
+      className="h-12 w-full rounded-[16px] bg-zinc-900 text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25),0_14px_28px_rgba(15,23,42,.35)] hover:bg-black dark:bg-white dark:text-black dark:shadow-[0_14px_28px_rgba(255,255,255,.2)] dark:hover:bg-zinc-100"
       disabled={pending}
       type="submit"
     >

@@ -20,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState("");
   const [sessionLoading, setSessionLoading] = useState(true);
   const [unreadNotification, setUnreadNotification] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -94,8 +95,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, role, userEmail]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncTheme = () => setIsDarkMode(root.classList.contains("dark"));
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const navigation = getNavigationForRole(role);
   const displayName = formatDisplayText(userName || "User");
+  const isNotificationsActive = pathname === "/notifications";
 
   function headerCopy() {
     if (role === "Parent Portal User") {
@@ -130,8 +146,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (sessionLoading) {
     return (
       <main className="h-screen overflow-hidden px-3 py-3 text-zinc-950 sm:px-5 lg:p-6">
-        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)]">
-          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 backdrop-blur-3xl lg:flex">
+        <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 backdrop-blur-3xl lg:flex xl:hidden">
             <div className="h-16 w-full animate-pulse rounded-2xl bg-white/55" />
             <div className="mt-4 h-11 w-full animate-pulse rounded-2xl bg-white/45" />
             <div className="mt-5 space-y-2">
@@ -142,6 +158,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 />
               ))}
             </div>
+          </aside>
+          <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/40 bg-white/45 p-3 backdrop-blur-3xl xl:flex">
+            <div className="h-12 w-full animate-pulse rounded-2xl bg-white/55" />
+            <div className="mt-5 space-y-2">
+              {Array.from({ length: 10 }).map((_, index) => (
+                <div
+                  className="flex h-10 items-center gap-3 rounded-2xl bg-white/40 px-3 animate-pulse"
+                  key={index}
+                >
+                  <div className="size-4 rounded-full bg-white/65" />
+                  <div className="h-3 w-24 rounded bg-white/65" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-auto h-10 w-full animate-pulse rounded-2xl bg-white/45" />
           </aside>
           <section className="min-h-0 min-w-0 overflow-y-auto no-scrollbar pb-4 lg:h-full lg:pb-0">
             <div className="space-y-4">
@@ -168,7 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-50 bg-zinc-950/25 p-3 backdrop-blur-sm lg:hidden">
           <div className="liquid-glass flex h-full max-w-[340px] flex-col rounded-[28px] border border-white/40 bg-white/70 p-4 shadow-2xl backdrop-blur-3xl">
             <div className="mb-5 flex items-start justify-between gap-3">
-              <Brand />
+              <Brand compact />
               <Button
                 aria-label="Tutup menu"
                 onClick={() => setMobileMenuOpen(false)}
@@ -184,6 +215,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onNavigate={() => setMobileMenuOpen(false)}
                 pathname={pathname}
                 unreadNotification={unreadNotification}
+                isDarkMode={isDarkMode}
               />
             </div>
             <div className="mt-4 shrink-0">
@@ -199,10 +231,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)]">
-        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex">
+      <div className="mx-auto grid h-full w-full max-w-[1500px] gap-3 sm:gap-5 lg:gap-6 lg:grid-cols-[56px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-full border border-white/40 bg-white/45 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl lg:flex xl:hidden">
           <div className="shrink-0">
-            <Brand />
+            <Brand compact />
           </div>
           <div className="mt-5 min-h-0 flex-1 overflow-y-auto no-scrollbar">
             <NavigationList
@@ -210,6 +242,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               navigation={navigation}
               pathname={pathname}
               unreadNotification={unreadNotification}
+              isDarkMode={isDarkMode}
             />
           </div>
           <div className="mt-4 shrink-0">
@@ -219,6 +252,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               variant="glass"
             >
               ⎋
+            </Button>
+          </div>
+        </aside>
+
+        <aside className="liquid-glass no-glass-highlight hidden h-full min-h-0 flex-col overflow-hidden rounded-[30px] border border-white/40 bg-white/45 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.75),0_28px_90px_rgba(15,23,42,.12)] backdrop-blur-3xl xl:flex">
+          <div className="shrink-0 px-1 pb-2">
+            <Brand />
+          </div>
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto no-scrollbar">
+            <NavigationList
+              navigation={navigation}
+              pathname={pathname}
+              unreadNotification={unreadNotification}
+              isDarkMode={isDarkMode}
+            />
+          </div>
+          <div className="mt-4 shrink-0 px-1 pb-1">
+            <Button
+              className="h-10 w-full"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              variant="glass"
+            >
+              Logout
             </Button>
           </div>
         </aside>
@@ -244,7 +300,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <button
                 aria-label="Notifications"
-                className="grid size-10 place-items-center rounded-full !border-white/70 !bg-white !text-zinc-500 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors hover:!bg-white hover:!text-zinc-700"
+                className={cn(
+                  "grid size-10 place-items-center rounded-full !border-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)] transition-colors",
+                  isNotificationsActive
+                    ? isDarkMode
+                      ? "!bg-white !text-zinc-900"
+                      : "!bg-black !text-white"
+                    : isDarkMode
+                      ? "!bg-zinc-900/55 !text-zinc-300"
+                      : "!bg-white !text-zinc-500",
+                )}
                 onClick={() => router.push("/notifications")}
                 type="button"
               >
@@ -281,12 +346,14 @@ function NavigationList({
   pathname,
   unreadNotification = false,
   compact = false,
+  isDarkMode = false,
 }: {
   navigation: ReturnType<typeof getNavigationForRole>;
   onNavigate?: () => void;
   pathname: string;
   unreadNotification?: boolean;
   compact?: boolean;
+  isDarkMode?: boolean;
 }) {
   const filteredNavigation = navigation.filter(
     (item) => item.href !== "/notifications",
@@ -306,8 +373,12 @@ function NavigationList({
                 : "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-zinc-600 transition-colors hover:bg-white/50 hover:text-zinc-950",
               active &&
                 (compact
-                  ? "bg-zinc-900 text-white shadow-[0_10px_18px_rgba(15,23,42,.25)] hover:bg-zinc-900 hover:text-white dark:bg-sky-300 dark:text-zinc-900 dark:shadow-[0_10px_18px_rgba(125,211,252,.35)] dark:hover:bg-sky-200"
-                  : "bg-zinc-950 text-white shadow-lg hover:bg-zinc-900 hover:text-white dark:bg-sky-300 dark:text-zinc-900 dark:hover:bg-sky-200"),
+                  ? isDarkMode
+                    ? "!bg-white !text-zinc-900 shadow-[0_10px_18px_rgba(255,255,255,.24)] hover:!bg-zinc-100 hover:!text-zinc-900"
+                    : "!bg-black !text-white shadow-[0_10px_18px_rgba(15,23,42,.25)] hover:!bg-black hover:!text-white"
+                  : isDarkMode
+                    ? "!bg-white !text-zinc-900 shadow-lg hover:!bg-zinc-100 hover:!text-zinc-900"
+                    : "!bg-black !text-white shadow-lg hover:!bg-black hover:!text-white"),
             )}
             href={item.href}
             key={item.href}
@@ -336,16 +407,22 @@ function NavigationList({
   );
 }
 
-function Brand() {
+function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="grid place-items-center">
-      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-white/60 bg-white p-0 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)]">
+    <div className={cn("flex items-center gap-3", compact ? "justify-center" : "justify-start")}>
+      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/60 bg-white p-0 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_8px_18px_rgba(15,23,42,.1)]">
         <img
           alt="Akres Music Logo"
           className="h-[78%] w-[78%] object-contain"
           src="/akres-logo-full.png?v=7"
         />
       </div>
+      {!compact ? (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-zinc-900">Akres Music</p>
+          <p className="truncate text-xs text-zinc-500">Academic</p>
+        </div>
+      ) : null}
     </div>
   );
 }

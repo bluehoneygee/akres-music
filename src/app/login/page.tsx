@@ -37,7 +37,7 @@ export default function LoginPage({
         className="pointer-events-none absolute left-1/2 top-[52%] w-[92vw] max-w-[1080px] -translate-x-1/2 -translate-y-1/2 object-contain opacity-14"
         src="/akres-logo-full.png?v=6"
       />
-      <div aria-hidden className="absolute inset-0 bg-black/32" />
+      <div aria-hidden className="absolute inset-0 bg-black/38" />
       <div className="relative z-10 grid min-h-screen place-items-center px-4 py-10">
         <div className="w-full max-w-md">
           <Card className="w-full max-w-md rounded-[28px] border border-white/45 bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,.7),0_26px_70px_rgba(15,23,42,.16)] backdrop-blur-2xl">
@@ -55,7 +55,7 @@ export default function LoginPage({
                     Email
                   </span>
                   <input
-                    className="h-12 w-full rounded-[16px] border border-white/60 bg-white/70 px-4 text-base text-zinc-900 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,.6)] placeholder:text-zinc-400 focus:ring-2 focus:ring-sky-300"
+                    className="h-12 w-full rounded-[16px] border border-white/60 bg-white/70 px-4 text-base text-zinc-900 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,.6)] placeholder:text-zinc-400 focus:ring-2 focus:ring-zinc-300"
                     name="email"
                     placeholder="nama@email.com"
                     type="email"
