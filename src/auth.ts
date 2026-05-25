@@ -60,14 +60,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = "role" in user ? String(user.role) : "Academic Staff";
       }
 
-      if (token.email) {
-        const db = await getMongoDb();
-        const appUser = await db.collection("users").findOne<{ role?: string }>({
-          email: token.email.toLowerCase(),
-        });
-        token.role = appUser?.role ?? token.role ?? "Academic Staff";
-      }
-
       return token;
     },
     session({ session, token }) {
