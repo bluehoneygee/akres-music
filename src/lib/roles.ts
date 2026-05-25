@@ -78,7 +78,6 @@ const portalReadResources: SecuredResource[] = [
   "instructor-attendance",
   "journals",
   "repertoires",
-  "invoices",
   "notifications",
 ];
 
@@ -104,7 +103,12 @@ export function canAccessResource({
     return action === "read" || resource === "student-attendance" || resource === "instructor-attendance" || resource === "journals";
   }
 
-  if (role === "Student Portal User" || role === "Parent Portal User") {
+  if (role === "Student Portal User") {
+    return portalReadResources.includes(resource) && action === "read";
+  }
+
+  if (role === "Parent Portal User") {
+    if (resource === "invoices") return action === "read";
     return portalReadResources.includes(resource) && action === "read";
   }
 

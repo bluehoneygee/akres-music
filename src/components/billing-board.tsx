@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientSession } from "@/lib/client-session";
 import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
@@ -64,8 +65,7 @@ export function BillingBoard() {
 
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        const session = (await response.json()) as { user?: { role?: string } };
+        const session = (await getClientSession()) as { user?: { role?: string } };
         if (mounted) {
           setSessionRole(session.user?.role ?? "");
         }
@@ -152,11 +152,16 @@ export function BillingBoard() {
       <Card className="liquid-glass">
         <CardContent className="p-0">
           {isPortalReadOnly ? (
-            <div className="border-b border-white/40 px-5 py-3 text-sm text-zinc-600">
+            <div className="border-b border-white/40 px-5 py-3 text-sm text-zinc-600 dark:border-zinc-700/70 dark:text-zinc-300">
               Billing mode read-only untuk akun portal.
             </div>
           ) : null}
-          {loading ? <div className="p-5 text-sm text-zinc-500">Loading billing...</div> : null}
+          {loading ? (
+            <div className="space-y-3 p-5">
+              <div className="h-5 w-36 animate-pulse rounded-lg bg-white/45" />
+              <div className="h-20 w-full animate-pulse rounded-2xl bg-white/40" />
+            </div>
+          ) : null}
 
           {!loading && lines.length === 0 ? (
             <div className="p-5 text-sm text-zinc-500">
@@ -167,7 +172,7 @@ export function BillingBoard() {
           {!loading && lines.length > 0 ? (
             <div className="overflow-x-auto no-scrollbar">
               <table className={`${isPortalReadOnly ? "min-w-[920px]" : "min-w-[1080px]"} text-left text-sm`}>
-                <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500">
+                <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500 dark:border-zinc-700/70 dark:bg-zinc-800/60 dark:text-zinc-300">
                   <tr>
                     <th className="px-4 py-3 font-medium">Student</th>
                     <th className="px-4 py-3 font-medium">Package</th>
@@ -179,33 +184,33 @@ export function BillingBoard() {
                 </thead>
                 <tbody>
                   {lines.map((line) => (
-                    <tr className="border-b border-white/30" key={line.invoice.id}>
+                    <tr className="border-b border-white/30 dark:border-zinc-700/60" key={line.invoice.id}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-zinc-950">{studentName(line.student)}</p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="font-medium text-zinc-950 dark:text-zinc-100">{studentName(line.student)}</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-300">
                           {formatDisplayText(line.instrument?.instrumentName)}
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-zinc-950">
+                        <p className="font-medium text-zinc-950 dark:text-zinc-100">
                           {formatDisplayText(line.course?.courseName ?? line.invoice.lessonPackage)}
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-300">
                           {formatPackageName(line.lessonPackage?.lessonCount)}
                         </p>
                       </td>
-                      <td className="px-4 py-3">{formatDisplayText(line.invoice.billingPeriod)}</td>
-                      <td className="px-4 py-3 font-medium">
+                      <td className="px-4 py-3 text-zinc-700 dark:text-zinc-200">{formatDisplayText(line.invoice.billingPeriod)}</td>
+                      <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
                         {formatCurrency(Number(line.invoice.amount ?? 0))}
                       </td>
                       <td className="px-4 py-3">
                         {isPortalReadOnly ? (
-                          <p className="font-medium text-zinc-900">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">
                             {formatDisplayText(line.invoice.status || "Unpaid")}
                           </p>
                         ) : (
                           <select
-                            className="h-10 rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                            className="h-10 rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
                             disabled={savingId === line.invoice.id || Boolean(line.invoice.confirmed)}
                             onChange={(event) =>
                               void updateInvoice(line.invoice, {
@@ -223,7 +228,7 @@ export function BillingBoard() {
                           </select>
                         )}
                         {line.invoice.paidAt ? (
-                          <p className="mt-1 text-xs italic text-zinc-500">
+                          <p className="mt-1 text-xs italic text-zinc-500 dark:text-zinc-300">
                             Paid at {formatDateTime(line.invoice.paidAt)}
                           </p>
                         ) : null}
@@ -231,7 +236,7 @@ export function BillingBoard() {
                       {!isPortalReadOnly ? (
                         <td className="px-4 py-3">
                           {line.invoice.confirmed ? (
-                            <p className="text-xs italic text-zinc-500">
+                            <p className="text-xs italic text-zinc-500 dark:text-zinc-300">
                               Confirmed by {formatDisplayText(line.invoice.confirmedByName) || "Unknown User"}
                               {formatDateTime(line.invoice.confirmedAt)
                                 ? ` at ${formatDateTime(line.invoice.confirmedAt)}`
@@ -253,7 +258,7 @@ export function BillingBoard() {
                               Confirm Payment
                             </Button>
                           ) : (
-                            <p className="text-xs italic text-zinc-500">Set status to Paid to confirm.</p>
+                            <p className="text-xs italic text-zinc-500 dark:text-zinc-300">Set status to Paid to confirm.</p>
                           )}
                         </td>
                       ) : null}

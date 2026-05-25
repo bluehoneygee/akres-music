@@ -19,7 +19,12 @@ import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
   const session = await auth();
   const role = session ? sessionRole(session) : "";
   const isPortal = role === "Parent Portal User" || role === "Student Portal User";
@@ -39,6 +44,23 @@ export default async function ReportsPage() {
   const invoices = session
     ? await filterTypedRecordsForSession("invoices", db.invoices, session)
     : db.invoices;
+  const schedulesById = new Map(schedules.map((row) => [row.id, row]));
+  const today = new Date();
+  const period = readQueryValue(params.period) || "this_month";
+  const defaultFrom = toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
+  const defaultTo = toDateInputValue(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  const from = readQueryValue(params.from) || defaultFrom;
+  const to = readQueryValue(params.to) || defaultTo;
+  const attendanceInRange = attendance.filter((row) =>
+    isAttendanceInRange({
+      from,
+      period,
+      schedulesById,
+      to,
+      row,
+      today,
+    }),
+  );
 
   const confirmedJournals = journals.filter((journal) => journal.confirmed);
   const visibleJournals = isPortal
@@ -46,7 +68,7 @@ export default async function ReportsPage() {
     : confirmedJournals;
   const paidInvoices = invoices.filter((invoice) => invoice.status === "Paid");
   const unpaidInvoices = invoices.filter((invoice) => invoice.status !== "Paid");
-  const attendanceSummary = summarizeAttendance(attendance);
+  const attendanceSummary = summarizeAttendance(attendanceInRange);
   const upcomingSchedules = schedules
     .filter((schedule) => schedule.scheduleStatus !== "Cancelled")
     .sort((left, right) => String(left.scheduleDate).localeCompare(String(right.scheduleDate)))
@@ -123,7 +145,7 @@ export default async function ReportsPage() {
               ) : null}
 
               {students.map((student) => {
-                const studentAttendance = attendance.filter((row) => row.studentId === student.id);
+                const studentAttendance = attendanceInRange.filter((row) => row.studentId === student.id);
                 const studentJournals = visibleJournals.filter((journal) => journal.studentId === student.id);
                 const studentInvoices = invoices.filter((invoice) => invoice.studentId === student.id);
                 const unpaidTotal = sumInvoices(studentInvoices.filter((invoice) => invoice.status !== "Paid"));
@@ -201,10 +223,48 @@ export default async function ReportsPage() {
 
             <Card className="liquid-glass">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                   <Users className="size-5" />
                   Rekap Kehadiran
                 </CardTitle>
+                <form className="mt-2 flex flex-wrap items-end gap-2" method="GET">
+                  <label className="text-xs text-zinc-500">
+                    Periode
+                    <select
+                      className="mt-1 block h-9 rounded-xl border border-white/45 bg-white/65 px-2 text-sm"
+                      defaultValue={period}
+                      name="period"
+                    >
+                      <option value="this_month">Bulan ini</option>
+                      <option value="last_30_days">30 hari terakhir</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </label>
+                  <label className="text-xs text-zinc-500">
+                    Dari
+                    <input
+                      className="mt-1 block h-9 rounded-xl border border-white/45 bg-white/65 px-2 text-sm"
+                      defaultValue={from}
+                      name="from"
+                      type="date"
+                    />
+                  </label>
+                  <label className="text-xs text-zinc-500">
+                    Sampai
+                    <input
+                      className="mt-1 block h-9 rounded-xl border border-white/45 bg-white/65 px-2 text-sm"
+                      defaultValue={to}
+                      name="to"
+                      type="date"
+                    />
+                  </label>
+                  <button
+                    className="h-9 rounded-xl border border-white/45 bg-white/70 px-3 text-sm font-medium"
+                    type="submit"
+                  >
+                    Terapkan
+                  </button>
+                </form>
               </CardHeader>
               <CardContent className="grid gap-2 sm:grid-cols-2">
                 <MetricPill label="Pending" value={attendanceSummary.pending} />
@@ -279,6 +339,61 @@ function sumInvoices(invoices: Invoice[]) {
 
 function studentName(student: Student) {
   return formatDisplayText(`${student.firstName} ${student.lastName}`);
+}
+
+function readQueryValue(value: string | string[] | undefined) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0] ?? "";
+  return "";
+}
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateAtMidnight(value: string) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function resolveAttendanceDate(row: StudentAttendance, schedulesById: Map<string, CourseSchedule>) {
+  const dateFromSchedule = schedulesById.get(row.courseScheduleId)?.scheduleDate;
+  return String(dateFromSchedule || row.date || "");
+}
+
+function isAttendanceInRange({
+  row,
+  schedulesById,
+  period,
+  from,
+  to,
+  today,
+}: {
+  row: StudentAttendance;
+  schedulesById: Map<string, CourseSchedule>;
+  period: string;
+  from: string;
+  to: string;
+  today: Date;
+}) {
+  const attendanceDate = parseDateAtMidnight(resolveAttendanceDate(row, schedulesById));
+  if (!attendanceDate) return false;
+
+  if (period === "last_30_days") {
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return attendanceDate >= start && attendanceDate <= end;
+  }
+
+  const start = parseDateAtMidnight(from);
+  const end = parseDateAtMidnight(to);
+  if (!start || !end) return true;
+  return attendanceDate >= start && attendanceDate <= end;
 }
 
 function formatCurrency(value: number) {

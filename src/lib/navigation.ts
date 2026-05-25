@@ -118,7 +118,7 @@ export const appNavigation = [
     label: "Billing",
     href: "/billing",
     icon: Banknote,
-    roles: ["System Manager", "Academic Staff", "Student Portal User", "Parent Portal User"],
+    roles: ["System Manager", "Academic Staff", "Parent Portal User"],
   },
 ];
 

@@ -21,3 +21,7 @@ export async function getMongoDb() {
   const mongoClient = await client;
   return mongoClient.db(process.env.MONGODB_DB ?? "akres_music_academic");
 }
+
+export async function getMongoClient() {
+  return client;
+}

@@ -149,7 +149,7 @@ export function StudioRoomBoard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 px-2 pb-2 sm:px-3 sm:pb-3">
-          {loading ? <p className="text-sm text-zinc-500">Loading room availability...</p> : null}
+          {loading ? <div className="h-5 w-52 animate-pulse rounded-lg bg-white/45" /> : null}
           {!loading && rooms.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-zinc-200/80 bg-white/45 px-3 py-2 text-sm text-zinc-500">
               Belum ada Studio A/B aktif.

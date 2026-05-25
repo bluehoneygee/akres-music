@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
+import { getClientSession } from "@/lib/client-session";
 import { cn, formatDisplayText } from "@/lib/utils";
 
 type NotificationRow = {
@@ -37,12 +38,11 @@ export function NotificationCenter() {
   async function loadData() {
     setLoading(true);
     try {
-        const [sessionRes, notificationRes, studentRes] = await Promise.all([
-        fetch("/api/auth/session", { cache: "no-store" }),
+      const [session, notificationRes, studentRes] = await Promise.all([
+        getClientSession(),
         fetch("/api/notifications", { cache: "no-store" }),
         fetch("/api/students", { cache: "no-store" }),
       ]);
-      const sessionJson = (await sessionRes.json()) as { user?: { id?: string } };
       const notificationsJson = (await notificationRes.json()) as {
         data?: NotificationRow[];
         error?: string;
@@ -55,7 +55,7 @@ export function NotificationCenter() {
 
       setNotifications(Array.isArray(notificationsJson.data) ? notificationsJson.data : []);
       setStudents(Array.isArray(studentsJson.data) ? studentsJson.data : []);
-      setUserId(String(sessionJson.user?.id ?? ""));
+      setUserId(String(session.user?.id ?? ""));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load notifications");
     } finally {
@@ -152,7 +152,11 @@ export function NotificationCenter() {
       <Card className="liquid-glass">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-5 text-sm text-zinc-500">Loading notifications...</div>
+            <div className="space-y-3 p-5">
+              <div className="h-5 w-44 animate-pulse rounded-lg bg-white/45" />
+              <div className="h-16 w-full animate-pulse rounded-2xl bg-white/40" />
+              <div className="h-16 w-full animate-pulse rounded-2xl bg-white/40" />
+            </div>
           ) : null}
 
           {!loading && orderedRows.length === 0 ? (

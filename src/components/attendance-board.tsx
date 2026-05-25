@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientSession } from "@/lib/client-session";
 import {
   Select,
   SelectContent,
@@ -118,8 +119,7 @@ export function AttendanceBoard() {
 
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        const session = (await response.json()) as { user?: { role?: string } };
+        const session = (await getClientSession()) as { user?: { role?: string } };
         if (mounted) {
           setSessionRole(session.user?.role ?? "");
         }
@@ -387,7 +387,10 @@ export function AttendanceBoard() {
         ) : null}
         {loading ? (
           <Card className="liquid-glass">
-            <CardContent className="p-5 text-sm text-zinc-500">Loading attendance...</CardContent>
+            <CardContent className="space-y-3 p-5">
+              <div className="h-5 w-40 animate-pulse rounded-lg bg-white/45" />
+              <div className="h-24 w-full animate-pulse rounded-2xl bg-white/40" />
+            </CardContent>
           </Card>
         ) : null}
 
@@ -744,14 +747,14 @@ function StudentAttendanceModal({
             {rescheduledTo ? (
               <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
             ) : null}
-            <p className="text-xs italic text-zinc-500">
+            <p className="text-xs italic text-zinc-500 dark:text-zinc-300">
               Draft reschedule. It will appear in Schedules after attendance is confirmed.
             </p>
           </div>
         ) : attendance ? (
           <div className="space-y-3">
             <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
               disabled={controlDisabled}
               onChange={(event) => {
                 const nextStatus = event.target.value;
@@ -794,7 +797,7 @@ function StudentAttendanceModal({
             {needsReason ? (
               <>
                 <input
-                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
                   disabled={controlDisabled}
                   onBlur={(event) =>
                     void onUpdate(attendance.id, {
@@ -920,7 +923,7 @@ function AttendanceModalShell({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
-      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[460px] overflow-y-auto rounded-3xl border border-white/55 bg-white/90 p-4 shadow-2xl backdrop-blur-2xl">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[460px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
@@ -1052,13 +1055,13 @@ function ReplacementScheduleModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
-      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[420px] overflow-y-auto rounded-3xl border border-white/55 bg-white/90 p-4 shadow-2xl backdrop-blur-2xl">
+      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[420px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
               Replacement schedule
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-zinc-950">Set Jadwal Pengganti</h2>
+            <h2 className="mt-1 text-lg font-semibold text-zinc-950 dark:text-zinc-100">Set Jadwal Pengganti</h2>
           </div>
           <div className="flex justify-end">
             <Button onClick={onClose} size="sm" type="button" variant="glass">
@@ -1071,7 +1074,7 @@ function ReplacementScheduleModal({
           <label className="space-y-1.5">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">Status</span>
             <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
               onChange={(event) => setStatus(event.target.value)}
               value={status}
             >
@@ -1085,7 +1088,7 @@ function ReplacementScheduleModal({
           <label className="space-y-1.5">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">Reason</span>
             <input
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
               onChange={(event) => setReason(event.target.value)}
               placeholder="Absence reason"
               value={reason}
@@ -1095,7 +1098,7 @@ function ReplacementScheduleModal({
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
               Replacement slot
             </span>
-            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl dark:border-zinc-700/80 dark:bg-zinc-800/55">
               {slotOptions.map((slot) => {
                 const checked = selectedSlot === slot.value;
                 return (
@@ -1104,7 +1107,7 @@ function ReplacementScheduleModal({
                     className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
                       checked
                         ? "border-zinc-950 bg-zinc-950 text-white"
-                        : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                        : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:bg-zinc-700/80"
                     }`}
                     key={slot.value}
                     onClick={(event) => {
@@ -1120,7 +1123,7 @@ function ReplacementScheduleModal({
                       className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
                         checked
                           ? "border-white bg-white text-zinc-950"
-                          : "border-zinc-300 bg-white/70 text-transparent"
+                          : "border-zinc-300 bg-white/70 text-transparent dark:border-zinc-500 dark:bg-zinc-700/80"
                       }`}
                     >
                       ✓
@@ -1135,9 +1138,9 @@ function ReplacementScheduleModal({
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
               Available date
             </span>
-            <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+            <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl dark:border-zinc-700/80 dark:bg-zinc-800/55">
               {dateOptions.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-zinc-500">No available date.</p>
+                <p className="px-2 py-1 text-xs text-zinc-500 dark:text-zinc-300">No available date.</p>
               ) : (
                 dateOptions.map((option) => {
                   const checked = rescheduleDate === option.value;
@@ -1147,7 +1150,7 @@ function ReplacementScheduleModal({
                       className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
                         checked
                           ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:bg-zinc-700/80"
                       } ${option.disabled ? "cursor-not-allowed opacity-45" : ""}`}
                       disabled={!selectedSlot || option.disabled}
                       key={option.value}
@@ -1164,7 +1167,7 @@ function ReplacementScheduleModal({
                         className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
                           checked
                             ? "border-white bg-white text-zinc-950"
-                            : "border-zinc-300 bg-white/70 text-transparent"
+                            : "border-zinc-300 bg-white/70 text-transparent dark:border-zinc-500 dark:bg-zinc-700/80"
                         }`}
                       >
                         ✓
@@ -1182,7 +1185,7 @@ function ReplacementScheduleModal({
                 Studio room
               </span>
               <select
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
                 onChange={(event) => setStudioRoomId(event.target.value)}
                 value={studioRoomId}
               >
@@ -1488,7 +1491,7 @@ function InstructorAttendanceModal({
       {attendance ? (
         <div className="space-y-3">
           <select
-            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
             disabled={controlDisabled}
             onChange={(event) => {
               const nextStatus = event.target.value;
@@ -1526,7 +1529,7 @@ function InstructorAttendanceModal({
           ) : null}
           {attendance.rescheduleRequired && !effectiveRescheduledTo && !pendingReschedule ? (
             <div className="grid gap-2">
-              <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+              <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl dark:border-zinc-700/80 dark:bg-zinc-800/55">
                 {slotOptions.map((slot) => {
                   const checked = selectedSlot === slot.value;
                   return (
@@ -1535,7 +1538,7 @@ function InstructorAttendanceModal({
                       className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
                         checked
                           ? "border-zinc-950 bg-zinc-950 text-white"
-                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:bg-zinc-700/80"
                       } ${controlDisabled ? "cursor-not-allowed opacity-45" : ""}`}
                       disabled={controlDisabled}
                       key={slot.value}
@@ -1552,7 +1555,7 @@ function InstructorAttendanceModal({
                         className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
                           checked
                             ? "border-white bg-white text-zinc-950"
-                            : "border-zinc-300 bg-white/70 text-transparent"
+                            : "border-zinc-300 bg-white/70 text-transparent dark:border-zinc-500 dark:bg-zinc-700/80"
                         }`}
                       >
                         ✓
@@ -1562,9 +1565,9 @@ function InstructorAttendanceModal({
                   );
                 })}
               </div>
-              <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+              <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl dark:border-zinc-700/80 dark:bg-zinc-800/55">
                 {dateOptions.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-zinc-500">No available date.</p>
+                  <p className="px-2 py-1 text-xs text-zinc-500 dark:text-zinc-300">No available date.</p>
                 ) : (
                   dateOptions.map((option) => {
                     const checked = rescheduleDate === option.value;
@@ -1574,7 +1577,7 @@ function InstructorAttendanceModal({
                         className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
                           checked
                             ? "border-zinc-950 bg-zinc-950 text-white"
-                            : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                            : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:bg-zinc-700/80"
                         } ${(!selectedSlot || controlDisabled || option.disabled) ? "cursor-not-allowed opacity-45" : ""}`}
                         disabled={!selectedSlot || controlDisabled || option.disabled}
                         key={option.value}
@@ -1591,7 +1594,7 @@ function InstructorAttendanceModal({
                           className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
                             checked
                               ? "border-white bg-white text-zinc-950"
-                              : "border-zinc-300 bg-white/70 text-transparent"
+                              : "border-zinc-300 bg-white/70 text-transparent dark:border-zinc-500 dark:bg-zinc-700/80"
                           }`}
                         >
                           ✓
@@ -1604,7 +1607,7 @@ function InstructorAttendanceModal({
               </div>
               {isStudioMode && rescheduleDate ? (
                 <select
-                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+                  className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
                   disabled={controlDisabled}
                   onChange={(event) => setStudioRoomId(event.target.value)}
                   value={studioRoomId}
@@ -1642,7 +1645,7 @@ function InstructorAttendanceModal({
               </Button>
             </div>
           ) : requiresReschedule ? (
-            <p className="text-xs italic text-zinc-500">
+            <p className="text-xs italic text-zinc-500 dark:text-zinc-300">
               Set reschedule required to add a replacement session.
             </p>
           ) : null}
@@ -1650,7 +1653,7 @@ function InstructorAttendanceModal({
           
 
           <input
-            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl focus:ring-2 focus:ring-sky-200 dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100 dark:focus:ring-zinc-500"
             disabled={controlDisabled}
             onBlur={(event) =>
               void onUpdate(attendance.id, {

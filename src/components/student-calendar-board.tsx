@@ -168,7 +168,7 @@ export function StudentCalendarBoard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 px-2 pb-2 sm:px-3 sm:pb-3">
-          {loading ? <p className="text-sm text-zinc-500">Loading calendar...</p> : null}
+          {loading ? <div className="h-5 w-40 animate-pulse rounded-lg bg-white/45" /> : null}
 
           <div className="pb-1">
             <div className="w-full">

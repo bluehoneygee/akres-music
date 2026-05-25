@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientSession } from "@/lib/client-session";
 import { progressRatingOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
@@ -55,6 +56,8 @@ export function JournalBoard() {
   const [savingId, setSavingId] = useState("");
   const [sessionRole, setSessionRole] = useState<string>("");
   const isParentPortal = sessionRole === "Parent Portal User";
+  const isStudentPortal = sessionRole === "Student Portal User";
+  const isPortalReadOnly = isParentPortal || isStudentPortal;
 
   async function loadData() {
     setLoading(true);
@@ -101,8 +104,7 @@ export function JournalBoard() {
     let mounted = true;
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        const session = (await response.json()) as { user?: { role?: string } };
+        const session = (await getClientSession()) as { user?: { role?: string } };
         if (mounted) setSessionRole(session.user?.role ?? "");
       } catch {
         if (mounted) setSessionRole("");
@@ -250,7 +252,10 @@ export function JournalBoard() {
       <Card className="liquid-glass">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-5 text-sm text-zinc-500">Loading journals...</div>
+            <div className="space-y-3 p-5">
+              <div className="h-5 w-40 animate-pulse rounded-lg bg-white/45" />
+              <div className="h-20 w-full animate-pulse rounded-2xl bg-white/40" />
+            </div>
           ) : null}
 
           {!loading && lines.length === 0 ? (
@@ -261,8 +266,8 @@ export function JournalBoard() {
 
           {!loading && lines.length > 0 ? (
             <div className="overflow-x-auto no-scrollbar">
-              <table className={`${isParentPortal ? "min-w-[1120px]" : "min-w-[1280px]"} text-left text-sm`}>
-                <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500">
+              <table className={`${isPortalReadOnly ? "min-w-[1120px]" : "min-w-[1280px]"} text-left text-sm`}>
+                <thead className="border-b border-white/40 bg-white/35 text-xs uppercase text-zinc-500 dark:border-zinc-700/70 dark:bg-zinc-800/60 dark:text-zinc-300">
                   <tr>
                     <th className="px-4 py-3 font-medium">Session</th>
                     <th className="px-4 py-3 font-medium">Student</th>
@@ -271,8 +276,8 @@ export function JournalBoard() {
                     <th className="px-4 py-3 font-medium">Technique</th>
                     <th className="px-4 py-3 font-medium">Homework</th>
                     <th className="px-4 py-3 font-medium">Progress</th>
-                    {!isParentPortal ? <th className="px-4 py-3 font-medium">Parent</th> : null}
-                    {!isParentPortal ? <th className="px-4 py-3 font-medium">Action</th> : null}
+                    {!isPortalReadOnly ? <th className="px-4 py-3 font-medium">Parent</th> : null}
+                    {!isPortalReadOnly ? <th className="px-4 py-3 font-medium">Action</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -286,12 +291,12 @@ export function JournalBoard() {
                     );
 
                     return (
-                      <tr className="border-b border-white/30 align-top" key={line.attendance.id}>
+                      <tr className="border-b border-white/30 align-top dark:border-zinc-700/60" key={line.attendance.id}>
                         <td className="w-[170px] px-4 py-3">
-                          <p className="font-medium text-zinc-950">
+                          <p className="font-medium text-zinc-950 dark:text-zinc-100">
                             {String(line.schedule?.scheduleDate ?? line.attendance.date ?? "-")}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-zinc-500 dark:text-zinc-300">
                             {String(line.schedule?.fromTime ?? "-")} - {String(line.schedule?.toTime ?? "-")}
                           </p>
                           <Badge className="mt-2" variant={line.journal ? "success" : "outline"}>
@@ -299,18 +304,18 @@ export function JournalBoard() {
                           </Badge>
                         </td>
                         <td className="w-[180px] px-4 py-3">
-                          <p className="font-medium text-zinc-950">{studentName(line.student)}</p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="font-medium text-zinc-950 dark:text-zinc-100">{studentName(line.student)}</p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-300">
                             {formatDisplayText(line.instrument?.instrumentName)}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-zinc-500 dark:text-zinc-300">
                             {formatDisplayText(line.instructor?.instructorName)}
                           </p>
                         </td>
                         <td className="w-[210px] px-4 py-3">
                           <select
-                            className="h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                            disabled={isConfirmed}
+                            className="h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
+                            disabled={isConfirmed || isPortalReadOnly}
                             multiple
                             onChange={(event) =>
                               updateDraft(line.attendance.id, {
@@ -330,8 +335,8 @@ export function JournalBoard() {
                         </td>
                         <td className="w-[240px] px-4 py-3">
                           <textarea
-                            className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                            disabled={isConfirmed}
+                            className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
+                            disabled={isConfirmed || isPortalReadOnly}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { materialCovered: event.target.value })
                             }
@@ -340,8 +345,8 @@ export function JournalBoard() {
                         </td>
                         <td className="w-[210px] px-4 py-3">
                           <input
-                            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                            disabled={isConfirmed}
+                            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
+                            disabled={isConfirmed || isPortalReadOnly}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { techniqueFocus: event.target.value })
                             }
@@ -350,8 +355,8 @@ export function JournalBoard() {
                         </td>
                         <td className="w-[240px] px-4 py-3">
                           <textarea
-                            className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                            disabled={isConfirmed}
+                            className="min-h-24 w-full rounded-2xl border border-white/50 bg-white/58 px-3 py-2 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
+                            disabled={isConfirmed || isPortalReadOnly}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { homework: event.target.value })
                             }
@@ -360,8 +365,8 @@ export function JournalBoard() {
                         </td>
                         <td className="w-[170px] px-4 py-3">
                           <select
-                            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                            disabled={isConfirmed}
+                            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl dark:border-zinc-600 dark:bg-zinc-800/75 dark:text-zinc-100"
+                            disabled={isConfirmed || isPortalReadOnly}
                             onChange={(event) =>
                               updateDraft(line.attendance.id, { progressRating: event.target.value })
                             }
@@ -374,12 +379,12 @@ export function JournalBoard() {
                             ))}
                           </select>
                         </td>
-                        {!isParentPortal ? (
+                        {!isPortalReadOnly ? (
                           <td className="w-[100px] px-4 py-3">
                             <input
                               checked={draft.parentVisible}
                               className="size-4 accent-zinc-950"
-                              disabled={isConfirmed}
+                              disabled={isConfirmed || isPortalReadOnly}
                               onChange={(event) =>
                                 updateDraft(line.attendance.id, { parentVisible: event.target.checked })
                               }
@@ -387,7 +392,7 @@ export function JournalBoard() {
                             />
                           </td>
                         ) : null}
-                        {!isParentPortal ? (
+                        {!isPortalReadOnly ? (
                           <td className="w-[130px] px-4 py-3">
                             <div className="flex items-center gap-2">
                               {!isConfirmed ? (
@@ -414,7 +419,7 @@ export function JournalBoard() {
                             </div>
                             <div className="mt-2">
                               {!line.journal ? (
-                                <p className="text-xs italic text-zinc-500">Save journal to confirm.</p>
+                                <p className="text-xs italic text-zinc-500 dark:text-zinc-300">Save journal to confirm.</p>
                               ) : null}
                               {isConfirmed ? <ConfirmedText journal={line.journal} /> : null}
                             </div>

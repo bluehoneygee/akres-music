@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getClientSession } from "@/lib/client-session";
 import { getNavigationForRole } from "@/lib/navigation";
 import { cn, formatDisplayText } from "@/lib/utils";
 
@@ -28,10 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", {
-          cache: "no-store",
-        });
-        const session = (await response.json()) as {
+        const session = (await getClientSession()) as {
           user?: { id?: string; name?: string; email?: string; role?: string };
         };
 

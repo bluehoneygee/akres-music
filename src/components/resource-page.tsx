@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientSession } from "@/lib/client-session";
 import type { ResourceName } from "@/lib/models";
 import { canAccessResource } from "@/lib/roles";
 import { formatDisplayText } from "@/lib/utils";
@@ -200,8 +201,7 @@ export function ResourcePage({
 
     async function loadSessionRole() {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
-        const session = (await response.json()) as { user?: { role?: string } };
+        const session = (await getClientSession()) as { user?: { role?: string } };
         if (mounted) {
           setSessionRole(session.user?.role ?? "");
         }
@@ -455,7 +455,7 @@ export function ResourcePage({
         <Card className="liquid-glass">
           <CardHeader>
             <CardTitle className="text-base">
-              {loading ? "Loading..." : `${rows.length} records`}
+              {loading ? <span className="block h-5 w-28 animate-pulse rounded-lg bg-white/45" /> : `${rows.length} records`}
             </CardTitle>
           </CardHeader>
           <CardContent>

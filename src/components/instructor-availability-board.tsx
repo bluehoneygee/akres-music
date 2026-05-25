@@ -268,7 +268,7 @@ export function InstructorAvailabilityBoard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2 px-2 pb-2 sm:px-3 sm:pb-3">
-          {loading ? <p className="text-sm text-zinc-500">Loading instructor calendar...</p> : null}
+          {loading ? <div className="h-5 w-48 animate-pulse rounded-lg bg-white/45" /> : null}
           {!loading && !selectedInstructorId ? (
             <p className="text-sm text-zinc-500">Belum ada instructor.</p>
           ) : null}
