@@ -29,6 +29,8 @@ jobs:
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
+          AUTH_URL_SECRET: ${{ secrets.AUTH_URL }}
+          APP_URL_SECRET: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -n "$AUTH_URL" ]; then
@@ -41,6 +43,16 @@ jobs:
           else
             echo "APP_URL: missing"
           fi
+          if [ -n "$AUTH_URL_SECRET" ]; then
+            echo "AUTH_URL secret: set"
+          else
+            echo "AUTH_URL secret: missing"
+          fi
+          if [ -n "$APP_URL_SECRET" ]; then
+            echo "APP_URL secret: set"
+          else
+            echo "APP_URL secret: missing"
+          fi
           if [ -n "$CRON_SECRET" ]; then
             echo "CRON_SECRET: set"
           else
@@ -50,12 +62,14 @@ jobs:
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
+          AUTH_URL_SECRET: ${{ secrets.AUTH_URL }}
+          APP_URL_SECRET: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_EXPR: ${{ github.event.schedule }}
         run: |
-          BASE_URL="${AUTH_URL:-$APP_URL}"
+          BASE_URL="${AUTH_URL:-${APP_URL:-${AUTH_URL_SECRET:-$APP_URL_SECRET}}}"
           if [ -z "$BASE_URL" ]; then
-            echo "Neither AUTH_URL nor APP_URL is set for staging environment"
+            echo "No base URL found in vars/secrets AUTH_URL or APP_URL for staging environment"
             exit 1
           fi
           if [ -z "$CRON_SECRET" ]; then
@@ -84,6 +98,8 @@ jobs:
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
+          AUTH_URL_SECRET: ${{ secrets.AUTH_URL }}
+          APP_URL_SECRET: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -n "$AUTH_URL" ]; then
@@ -96,6 +112,16 @@ jobs:
           else
             echo "APP_URL: missing"
           fi
+          if [ -n "$AUTH_URL_SECRET" ]; then
+            echo "AUTH_URL secret: set"
+          else
+            echo "AUTH_URL secret: missing"
+          fi
+          if [ -n "$APP_URL_SECRET" ]; then
+            echo "APP_URL secret: set"
+          else
+            echo "APP_URL secret: missing"
+          fi
           if [ -n "$CRON_SECRET" ]; then
             echo "CRON_SECRET: set"
           else
@@ -105,12 +131,14 @@ jobs:
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
+          AUTH_URL_SECRET: ${{ secrets.AUTH_URL }}
+          APP_URL_SECRET: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_EXPR: ${{ github.event.schedule }}
         run: |
-          BASE_URL="${AUTH_URL:-$APP_URL}"
+          BASE_URL="${AUTH_URL:-${APP_URL:-${AUTH_URL_SECRET:-$APP_URL_SECRET}}}"
           if [ -z "$BASE_URL" ]; then
-            echo "Neither AUTH_URL nor APP_URL is set for production environment"
+            echo "No base URL found in vars/secrets AUTH_URL or APP_URL for production environment"
             exit 1
           fi
           if [ -z "$CRON_SECRET" ]; then
