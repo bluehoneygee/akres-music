@@ -7,6 +7,25 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akres-music-web
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - .env.local
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: ${MONGODB_DB:-akres_music_academic}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
 
 volumes:
   mongo_data:
