@@ -25,14 +25,37 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - name: Debug env wiring (staging)
+        env:
+          AUTH_URL: ${{ vars.AUTH_URL }}
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -n "$AUTH_URL" ]; then
+            echo "AUTH_URL: set"
+          else
+            echo "AUTH_URL: missing"
+          fi
+          if [ -n "$APP_URL" ]; then
+            echo "APP_URL: set"
+          else
+            echo "APP_URL: missing"
+          fi
+          if [ -n "$CRON_SECRET" ]; then
+            echo "CRON_SECRET: set"
+          else
+            echo "CRON_SECRET: missing"
+          fi
       - name: Trigger notification scheduler (staging)
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
+          APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_EXPR: ${{ github.event.schedule }}
         run: |
-          if [ -z "$AUTH_URL" ]; then
-            echo "AUTH_URL is not set for staging environment"
+          BASE_URL="${AUTH_URL:-$APP_URL}"
+          if [ -z "$BASE_URL" ]; then
+            echo "Neither AUTH_URL nor APP_URL is set for staging environment"
             exit 1
           fi
           if [ -z "$CRON_SECRET" ]; then
@@ -47,7 +70,7 @@ jobs:
             MODE="preclass3h"
           fi
           curl --fail-with-body --show-error --silent \
-            -X POST "$AUTH_URL/api/notifications/run?mode=$MODE" \
+            -X POST "$BASE_URL/api/notifications/run?mode=$MODE" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json"
 
@@ -57,14 +80,37 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Debug env wiring (production)
+        env:
+          AUTH_URL: ${{ vars.AUTH_URL }}
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -n "$AUTH_URL" ]; then
+            echo "AUTH_URL: set"
+          else
+            echo "AUTH_URL: missing"
+          fi
+          if [ -n "$APP_URL" ]; then
+            echo "APP_URL: set"
+          else
+            echo "APP_URL: missing"
+          fi
+          if [ -n "$CRON_SECRET" ]; then
+            echo "CRON_SECRET: set"
+          else
+            echo "CRON_SECRET: missing"
+          fi
       - name: Trigger notification scheduler (production)
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
+          APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_EXPR: ${{ github.event.schedule }}
         run: |
-          if [ -z "$AUTH_URL" ]; then
-            echo "AUTH_URL is not set for production environment"
+          BASE_URL="${AUTH_URL:-$APP_URL}"
+          if [ -z "$BASE_URL" ]; then
+            echo "Neither AUTH_URL nor APP_URL is set for production environment"
             exit 1
           fi
           if [ -z "$CRON_SECRET" ]; then
@@ -79,6 +125,6 @@ jobs:
             MODE="preclass3h"
           fi
           curl --fail-with-body --show-error --silent \
-            -X POST "$AUTH_URL/api/notifications/run?mode=$MODE" \
+            -X POST "$BASE_URL/api/notifications/run?mode=$MODE" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json"
