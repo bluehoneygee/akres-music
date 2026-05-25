@@ -49,21 +49,12 @@ export async function ensureSeedData() {
 }
 
 async function seed() {
-  const db = await getMongoDb();
-  const marker = db.collection("_meta");
-
   const seedProfile = getDemoSeedProfile();
   if (seedProfile === "full") {
     await ensureDemoRecords();
   } else if (seedProfile === "studio") {
     await ensureStudioScheduleRecords();
   }
-
-  await marker.updateOne(
-    { key: "seeded" },
-    { $set: { value: true, seededAt: new Date() } },
-    { upsert: true },
-  );
 }
 
 function getDemoSeedProfile(): "none" | "studio" | "full" {

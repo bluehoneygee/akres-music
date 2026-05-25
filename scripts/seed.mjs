@@ -47,12 +47,6 @@ async function main() {
       { upsert: true },
     );
 
-    await db.collection("_meta").updateOne(
-      { key: "seeded" },
-      { $set: { key: "seeded", value: true, seededAt: now } },
-      { upsert: true },
-    );
-
     const created = result.upsertedCount > 0;
     console.log(`Seed completed for database "${dbName}".`);
     console.log(
