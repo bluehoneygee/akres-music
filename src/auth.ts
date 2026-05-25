@@ -3,15 +3,14 @@ import bcrypt from "bcryptjs";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
+import { authConfig } from "@/auth.config";
 import { ensureSeedData } from "@/lib/db";
 import { client, getMongoDb } from "@/lib/mongodb";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: MongoDBAdapter(client),
   session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
   providers: [
     Credentials({
       name: "Email and password",
@@ -49,24 +48,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    authorized({ auth, request }) {
-      const { pathname } = request.nextUrl;
-      if (pathname === "/login") return true;
-      return Boolean(auth?.user);
-    },
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = "role" in user ? String(user.role) : "Academic Staff";
-      }
-
-      return token;
-    },
-    session({ session, token }) {
-      const user = session.user as typeof session.user & { id: string; role: string };
-      user.id = token.sub ?? "";
-      user.role = String(token.role ?? "Academic Staff");
-      return session;
-    },
-  },
 });
