@@ -990,6 +990,17 @@ function ReplacementScheduleModal({
     () => buildRescheduleSlotOptions({ availabilityRows: instructorAvailability, schedule }),
     [instructorAvailability, schedule],
   );
+  useEffect(() => {
+    if (selectedSlot || slotOptions.length === 0) return;
+    const nextSlot =
+      findRescheduleSlotValueForSchedule(slotOptions, schedule) ?? slotOptions[0]?.value ?? "";
+    if (!nextSlot) return;
+    setSelectedSlot(nextSlot);
+    const selected = slotOptions.find((slot) => slot.value === nextSlot);
+    if (!selected) return;
+    setFromTime(selected.fromTime);
+    setToTime(selected.toTime);
+  }, [schedule, selectedSlot, slotOptions]);
   const selectedSlotData = slotOptions.find((slot) => slot.value === selectedSlot);
   const dateOptions = useMemo(
     () => buildRescheduleDateOptions({ schedule, schedules, selectedSlot: selectedSlotData }),
@@ -1067,52 +1078,86 @@ function ReplacementScheduleModal({
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
               Replacement slot
             </span>
-            <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              onChange={(event) => {
-                const value = event.target.value;
-                setSelectedSlot(value);
-                setRescheduleDate("");
-                const selected = slotOptions.find((slot) => slot.value === value);
-                if (!selected) return;
-                setFromTime(selected.fromTime);
-                setToTime(selected.toTime);
-              }}
-              value={selectedSlot}
-            >
-              <option value="">Select replacement slot</option>
-              {slotOptions.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
+            <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+              {slotOptions.map((slot) => {
+                const checked = selectedSlot === slot.value;
+                return (
+                  <button
+                    aria-pressed={checked}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                      checked
+                        ? "border-zinc-950 bg-zinc-950 text-white"
+                        : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                    }`}
+                    key={slot.value}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setSelectedSlot(slot.value);
+                      setRescheduleDate("");
+                      setFromTime(slot.fromTime);
+                      setToTime(slot.toTime);
+                    }}
+                    type="button"
+                  >
+                    <span
+                      className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
+                        checked
+                          ? "border-white bg-white text-zinc-950"
+                          : "border-zinc-300 bg-white/70 text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{slot.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
               Available date
             </span>
-            <select
-              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-              disabled={!selectedSlot}
-              onChange={(event) => {
-                const value = event.target.value;
-                setRescheduleDate(value);
-                if (!value) return;
-                const nextDate = dateOptions.find((option) => option.value === value);
-                if (!nextDate?.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
-                  setStudioRoomId(String(schedule.studioRoomId ?? ""));
-                }
-              }}
-              value={rescheduleDate}
-            >
-              <option value="">Select available date</option>
-              {dateOptions.map((option) => (
-                <option disabled={option.disabled} key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+              {dateOptions.length === 0 ? (
+                <p className="px-2 py-1 text-xs text-zinc-500">No available date.</p>
+              ) : (
+                dateOptions.map((option) => {
+                  const checked = rescheduleDate === option.value;
+                  return (
+                    <button
+                      aria-pressed={checked}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        checked
+                          ? "border-zinc-950 bg-zinc-950 text-white"
+                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                      } ${option.disabled ? "cursor-not-allowed opacity-45" : ""}`}
+                      disabled={!selectedSlot || option.disabled}
+                      key={option.value}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setRescheduleDate(option.value);
+                        if (!option.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
+                          setStudioRoomId(String(schedule.studioRoomId ?? ""));
+                        }
+                      }}
+                      type="button"
+                    >
+                      <span
+                        className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
+                          checked
+                            ? "border-white bg-white text-zinc-950"
+                            : "border-zinc-300 bg-white/70 text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </label>
           {isStudioMode && rescheduleDate ? (
             <label className="space-y-1.5">
@@ -1350,6 +1395,17 @@ function InstructorAttendanceModal({
     () => buildRescheduleSlotOptions({ availabilityRows: instructorAvailability, schedule }),
     [instructorAvailability, schedule],
   );
+  useEffect(() => {
+    if (selectedSlot || slotOptions.length === 0) return;
+    const nextSlot =
+      findRescheduleSlotValueForSchedule(slotOptions, schedule) ?? slotOptions[0]?.value ?? "";
+    if (!nextSlot) return;
+    setSelectedSlot(nextSlot);
+    const selected = slotOptions.find((slot) => slot.value === nextSlot);
+    if (!selected) return;
+    setRescheduleFromTime(selected.fromTime);
+    setRescheduleToTime(selected.toTime);
+  }, [schedule, selectedSlot, slotOptions]);
   const selectedSlotData = slotOptions.find((slot) => slot.value === selectedSlot);
   const dateOptions = useMemo(
     () => buildRescheduleDateOptions({ schedule, schedules, selectedSlot: selectedSlotData }),
@@ -1440,47 +1496,82 @@ function InstructorAttendanceModal({
             <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
           ) : attendance.rescheduleRequired ? (
             <div className="grid gap-2">
-              <select
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                disabled={controlDisabled}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setSelectedSlot(value);
-                  setRescheduleDate("");
-                  const selected = slotOptions.find((slot) => slot.value === value);
-                  if (!selected) return;
-                  setRescheduleFromTime(selected.fromTime);
-                  setRescheduleToTime(selected.toTime);
-                }}
-                value={selectedSlot}
-              >
-                <option value="">Select replacement slot</option>
-                {slotOptions.map((slot) => (
-                  <option key={slot.value} value={slot.value}>
-                    {slot.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
-                disabled={!selectedSlot || controlDisabled}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setRescheduleDate(value);
-                  const nextDate = dateOptions.find((option) => option.value === value);
-                  if (!nextDate?.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
-                    setStudioRoomId(String(schedule.studioRoomId ?? ""));
-                  }
-                }}
-                value={rescheduleDate}
-              >
-                <option value="">Select available date</option>
-                {dateOptions.map((option) => (
-                  <option disabled={option.disabled} key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+                {slotOptions.map((slot) => {
+                  const checked = selectedSlot === slot.value;
+                  return (
+                    <button
+                      aria-pressed={checked}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        checked
+                          ? "border-zinc-950 bg-zinc-950 text-white"
+                          : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                      } ${controlDisabled ? "cursor-not-allowed opacity-45" : ""}`}
+                      disabled={controlDisabled}
+                      key={slot.value}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setSelectedSlot(slot.value);
+                        setRescheduleDate("");
+                        setRescheduleFromTime(slot.fromTime);
+                        setRescheduleToTime(slot.toTime);
+                      }}
+                      type="button"
+                    >
+                      <span
+                        className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
+                          checked
+                            ? "border-white bg-white text-zinc-950"
+                            : "border-zinc-300 bg-white/70 text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{slot.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid max-h-44 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
+                {dateOptions.length === 0 ? (
+                  <p className="px-2 py-1 text-xs text-zinc-500">No available date.</p>
+                ) : (
+                  dateOptions.map((option) => {
+                    const checked = rescheduleDate === option.value;
+                    return (
+                      <button
+                        aria-pressed={checked}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition ${
+                          checked
+                            ? "border-zinc-950 bg-zinc-950 text-white"
+                            : "border-white/50 bg-white/52 text-zinc-900 hover:bg-white/75"
+                        } ${(!selectedSlot || controlDisabled || option.disabled) ? "cursor-not-allowed opacity-45" : ""}`}
+                        disabled={!selectedSlot || controlDisabled || option.disabled}
+                        key={option.value}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setRescheduleDate(option.value);
+                          if (!option.conflicts.studio && String(schedule.lessonMode ?? "").toLowerCase() === "studio") {
+                            setStudioRoomId(String(schedule.studioRoomId ?? ""));
+                          }
+                        }}
+                        type="button"
+                      >
+                        <span
+                          className={`grid size-4 shrink-0 place-items-center rounded border text-[10px] ${
+                            checked
+                              ? "border-white bg-white text-zinc-950"
+                              : "border-zinc-300 bg-white/70 text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
               {isStudioMode && rescheduleDate ? (
                 <select
                   className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl"
@@ -1869,6 +1960,18 @@ function buildRescheduleDateOptions({
     const fromTime = selectedSlot.fromTime;
     const toTime = selectedSlot.toTime;
     const conflicts = { instructor: false, student: false, studio: false };
+    const isSameSlotAsOriginal =
+      date === String(schedule.scheduleDate ?? "") &&
+      fromTime === String(schedule.fromTime ?? "") &&
+      toTime === String(schedule.toTime ?? "");
+
+    if (isSameSlotAsOriginal) {
+      conflicts.instructor = true;
+      conflicts.student = true;
+      if (lessonMode.toLowerCase() === "studio" && studioRoomId) {
+        conflicts.studio = true;
+      }
+    }
 
     schedules.forEach((existing) => {
       const existingId = String(existing.id ?? "");
@@ -1933,6 +2036,22 @@ function dayNameToIndex(dayName: string) {
   if (normalized === "friday") return 5;
   if (normalized === "saturday") return 6;
   return -1;
+}
+
+function findRescheduleSlotValueForSchedule(
+  slotOptions: RescheduleSlotOption[],
+  schedule: Row,
+) {
+  const scheduleDay = new Date(`${String(schedule.scheduleDate ?? "")}T00:00:00`).getDay();
+  const scheduleFromTime = String(schedule.fromTime ?? "");
+  const scheduleToTime = String(schedule.toTime ?? "");
+  const matched = slotOptions.find(
+    (slot) =>
+      slot.dayOfWeek === scheduleDay &&
+      slot.fromTime === scheduleFromTime &&
+      slot.toTime === scheduleToTime,
+  );
+  return matched?.value;
 }
 
 function dayIndexToName(dayIndex: number) {
