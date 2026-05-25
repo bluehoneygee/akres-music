@@ -1,9 +1,8 @@
-import bcrypt from "bcryptjs";
 import type { Collection, Document, Filter } from "mongodb";
 
 import type { AnyRecord, Database, ResourceName } from "@/lib/models";
 import { getMongoDb } from "@/lib/mongodb";
-import { seedDatabase, seedUsers } from "@/lib/seed";
+import { seedDatabase } from "@/lib/seed";
 
 export const resources: ResourceName[] = [
   "instruments",
@@ -53,8 +52,6 @@ async function seed() {
   const db = await getMongoDb();
   const marker = db.collection("_meta");
 
-  await ensureDefaultUsers();
-  await ensureDefaultStudioRooms();
   const seedProfile = getDemoSeedProfile();
   if (seedProfile === "full") {
     await ensureDemoRecords();
@@ -79,99 +76,6 @@ function getDemoSeedProfile(): "none" | "studio" | "full" {
   if (process.env.SEED_DEMO_DATA === "true") return "full";
 
   return "none";
-}
-
-async function ensureDefaultUsers() {
-  const db = await getMongoDb();
-  const adminBootstrap = resolveAdminBootstrapConfig();
-  const passwordHash = await bcrypt.hash(adminBootstrap.password, 12);
-  const autoSeedAllUsers = process.env.AUTO_SEED_ALL_USERS === "true";
-  const adminTemplate = seedUsers[0];
-  const adminUser = {
-    ...adminTemplate,
-    email: adminBootstrap.email,
-    name: adminBootstrap.name,
-    role: "System Manager",
-    studentId: "",
-    guardianId: "",
-    instructorId: "",
-  };
-  const users = autoSeedAllUsers ? [adminUser, ...seedUsers.slice(1)] : [adminUser];
-
-  await Promise.all(
-    users.map((user) =>
-      db.collection("users").updateOne(
-        { email: user.email },
-        {
-          $setOnInsert: {
-            email: user.email,
-            emailVerified: null,
-            name: user.name,
-            role: user.role,
-            studentId: user.studentId,
-            guardianId: user.guardianId,
-            instructorId: user.instructorId,
-            passwordHash,
-            createdAt: new Date().toISOString(),
-          },
-          $set: {
-            updatedAt: new Date().toISOString(),
-          },
-        },
-        { upsert: true },
-      ),
-    ),
-  );
-}
-
-function resolveAdminBootstrapConfig() {
-  const isProduction = process.env.NODE_ENV === "production";
-  const envEmail = String(process.env.SEED_ADMIN_EMAIL || "").trim();
-  const envPassword = String(process.env.SEED_ADMIN_PASSWORD || "").trim();
-  const envName = String(process.env.SEED_ADMIN_NAME || "").trim();
-
-  if (isProduction && (!envEmail || !envPassword)) {
-    throw new Error(
-      "Missing SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD for production bootstrap.",
-    );
-  }
-
-  return {
-    email: envEmail || "admin@akres.test",
-    password: envPassword || "admin123",
-    name: envName || "Administrator Akres",
-  };
-}
-
-async function ensureDefaultStudioRooms() {
-  const db = await getMongoDb();
-  const now = new Date().toISOString();
-  const defaultRooms = [
-    { id: "room-a", roomName: "Studio A", capacity: 1, instrumentIds: [] as string[] },
-    { id: "room-b", roomName: "Studio B", capacity: 1, instrumentIds: [] as string[] },
-  ];
-
-  await Promise.all(
-    defaultRooms.map((room) =>
-      db.collection("rooms").updateOne(
-        { id: room.id },
-        {
-          $setOnInsert: {
-            _id: room.id,
-            createdAt: now,
-          },
-          $set: {
-            roomName: room.roomName,
-            capacity: room.capacity,
-            instrumentIds: room.instrumentIds,
-            isActive: true,
-            updatedAt: now,
-          },
-        },
-        { upsert: true },
-      ),
-    ),
-  );
 }
 
 async function ensureDemoRecords() {
