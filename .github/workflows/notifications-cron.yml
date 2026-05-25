@@ -30,6 +30,7 @@ jobs:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_BYPASS_TOKEN }}
         run: |
           if [ -n "$AUTH_URL" ]; then
             echo "AUTH_URL: set"
@@ -46,11 +47,17 @@ jobs:
           else
             echo "CRON_SECRET: missing"
           fi
+          if [ -n "$VERCEL_BYPASS_TOKEN" ]; then
+            echo "VERCEL_BYPASS_TOKEN: set"
+          else
+            echo "VERCEL_BYPASS_TOKEN: missing (staging preview may return 401)"
+          fi
       - name: Trigger notification scheduler (staging)
         env:
           AUTH_URL: ${{ vars.AUTH_URL }}
           APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_BYPASS_TOKEN }}
           CRON_EXPR: ${{ github.event.schedule }}
         run: |
           BASE_URL="${AUTH_URL:-$APP_URL}"
@@ -69,8 +76,12 @@ jobs:
           if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
             MODE="preclass3h"
           fi
+          REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE"
+          if [ -n "$VERCEL_BYPASS_TOKEN" ]; then
+            REQUEST_URL="$REQUEST_URL&x-vercel-protection-bypass=$VERCEL_BYPASS_TOKEN&x-vercel-set-bypass-cookie=true"
+          fi
           curl --fail-with-body --show-error --silent \
-            -X POST "$BASE_URL/api/notifications/run?mode=$MODE" \
+            -X POST "$REQUEST_URL" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json"
 
