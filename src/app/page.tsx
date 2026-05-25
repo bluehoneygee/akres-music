@@ -5,15 +5,14 @@ import {
   CalendarDays,
   CheckCircle2,
   GraduationCap,
-  Home,
-  MapPin,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 
 import { auth } from "@/auth";
 import { AttendancePeriodFilter } from "@/components/attendance-period-filter";
 import { AppShell } from "@/components/app-shell";
+import { LatestJournalList } from "@/components/latest-journal-list";
+import { UpcomingScheduleList } from "@/components/upcoming-schedule-list";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readDatabase } from "@/lib/db";
@@ -29,7 +28,7 @@ import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
-function statusVariant(status: string) {
+function statusVariant(status: string): "success" | "warning" | "danger" | "secondary" {
   if (["Present", "Completed", "Paid", "Active", "Good", "Excellent"].includes(status)) return "success";
   if (["Late", "Rescheduled", "Unpaid", "Improving"].includes(status)) return "warning";
   if (["Absent", "Sick", "Permission", "Cancelled", "Needs Work"].includes(status)) return "danger";
@@ -207,6 +206,37 @@ export default async function HomePage({
         ]
       : []),
   ];
+  const upcomingScheduleItems = upcomingSchedules.map((item) => {
+    const student = db.students.find((row) => row.id === item.studentId);
+    const instructor = instructors.find((row) => row.id === item.instructorId);
+    const course = db.courses.find((row) => row.id === item.courseId);
+    const room = db.rooms.find((row) => row.id === item.studioRoomId);
+
+    return {
+      id: item.id,
+      fromTime: item.fromTime,
+      scheduleDate: item.scheduleDate,
+      studentName: formatDisplayText(student ? studentName(student) : "Unknown Student"),
+      courseName: formatDisplayText(course?.courseName),
+      instructorName: formatDisplayText(instructor?.instructorName),
+      lessonMode: item.lessonMode,
+      locationLabel: formatDisplayText(item.lessonMode === "Studio" ? room?.roomName : item.homeVisitAddress),
+      statusLabel: formatDisplayText(item.scheduleStatus),
+      statusVariant: statusVariant(item.scheduleStatus),
+    } as const;
+  });
+  const latestJournalItems = latestJournals.map((journal) => {
+    const student = db.students.find((row) => row.id === journal.studentId);
+    return {
+      id: journal.id,
+      studentName: formatDisplayText(student ? studentName(student) : "Unknown Student"),
+      lessonDate: journal.lessonDate,
+      progressRating: formatDisplayText(journal.progressRating),
+      progressVariant: statusVariant(journal.progressRating),
+      materialCovered: formatDisplayText(journal.materialCovered),
+      homework: journal.homework ? formatDisplayText(journal.homework) : "",
+    } as const;
+  });
 
   return (
     <AppShell>
@@ -251,63 +281,10 @@ export default async function HomePage({
             {upcomingSchedules.length === 0 ? (
               <p className="text-sm text-zinc-500">Belum ada jadwal aktif.</p>
             ) : null}
-
-            {upcomingSchedules.map((item) => {
-              const student = db.students.find((row) => row.id === item.studentId);
-              const instructor = instructors.find((row) => row.id === item.instructorId);
-              const course = db.courses.find((row) => row.id === item.courseId);
-              const room = db.rooms.find((row) => row.id === item.studioRoomId);
-
-              return (
-                <div
-                  className="grid gap-2 rounded-[20px] border border-white/45 bg-white/42 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] sm:grid-cols-[92px_minmax(0,1fr)_auto] sm:gap-3"
-                  key={item.id}
-                >
-                  <div className="flex items-start justify-between gap-3 sm:block">
-                    <div>
-                      <p className="font-semibold">{item.fromTime}</p>
-                      <p className="text-xs text-zinc-500">{item.scheduleDate}</p>
-                    </div>
-                    <Badge
-                      className="px-2.5 py-0.5 sm:hidden"
-                      variant={statusVariant(item.scheduleStatus)}
-                    >
-                      {formatDisplayText(item.scheduleStatus)}
-                    </Badge>
-                  </div>
-                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(112px,.72fr)] gap-3 sm:block">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {formatDisplayText(student ? studentName(student) : "Unknown Student")}
-                      </p>
-                      <p className="truncate text-sm text-zinc-500">{formatDisplayText(course?.courseName)}</p>
-                    </div>
-                    <div className="min-w-0 space-y-1 text-xs text-zinc-600 sm:mt-2 sm:flex sm:flex-wrap sm:gap-2 sm:space-y-0">
-                      <span className="flex max-w-full items-center gap-1">
-                        <Users className="size-3.5 shrink-0" />
-                        <span className="truncate">{formatDisplayText(instructor?.instructorName)}</span>
-                      </span>
-                      <span className="flex max-w-full min-w-0 items-center gap-1">
-                        {item.lessonMode === "Studio" ? (
-                          <MapPin className="size-3.5 shrink-0" />
-                        ) : (
-                          <Home className="size-3.5 shrink-0" />
-                        )}
-                        <span className="truncate">
-                          {formatDisplayText(item.lessonMode === "Studio" ? room?.roomName : item.homeVisitAddress)}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <Badge
-                    className="hidden self-start justify-self-start px-3 py-1 sm:inline-flex sm:self-center sm:justify-self-end"
-                    variant={statusVariant(item.scheduleStatus)}
-                  >
-                    {formatDisplayText(item.scheduleStatus)}
-                  </Badge>
-                </div>
-              );
-            })}
+            <UpcomingScheduleList
+              items={upcomingScheduleItems}
+              storageKey={isPortal ? "overview-schedule-read-portal" : "overview-schedule-read-admin"}
+            />
           </CardContent>
         </Card>
 
@@ -407,34 +384,10 @@ export default async function HomePage({
             {latestJournals.length === 0 ? (
               <p className="text-sm text-zinc-500 md:col-span-3">Belum ada journal terkonfirmasi.</p>
             ) : null}
-
-            {latestJournals.map((journal) => {
-              const student = db.students.find((row) => row.id === journal.studentId);
-
-              return (
-                <div className="rounded-[20px] border border-white/45 bg-white/42 p-3 sm:p-4" key={journal.id}>
-                  <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
-                    <div className="min-w-0">
-                      <p className="font-medium">
-                        {formatDisplayText(student ? studentName(student) : "Unknown Student")}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-500">{journal.lessonDate}</p>
-                    </div>
-                    <Badge className="shrink-0" variant={statusVariant(journal.progressRating)}>
-                      {formatDisplayText(journal.progressRating)}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-zinc-600 sm:min-h-16">
-                    {formatDisplayText(journal.materialCovered) || "Materi belum diisi"}
-                  </p>
-                  {journal.homework ? (
-                    <p className="mt-3 text-xs text-zinc-500">
-                      Homework: {formatDisplayText(journal.homework)}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
+            <LatestJournalList
+              items={latestJournalItems}
+              storageKey={isPortal ? "overview-journal-read-portal" : "overview-journal-read-admin"}
+            />
           </CardContent>
         </Card>
       </section>

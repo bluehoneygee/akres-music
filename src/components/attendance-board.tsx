@@ -378,13 +378,6 @@ export function AttendanceBoard() {
       </div>
 
       <div className="space-y-3">
-        {readOnlyPortal ? (
-          <Card className="liquid-glass">
-            <CardContent className="p-4 text-sm text-zinc-600">
-              Attendance mode read-only untuk akun portal.
-            </CardContent>
-          </Card>
-        ) : null}
         {loading ? (
           <Card className="liquid-glass">
             <CardContent className="space-y-3 p-5">

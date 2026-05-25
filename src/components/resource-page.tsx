@@ -121,6 +121,11 @@ export function ResourcePage({
     (field) => !field.hidden && (!field.hideOnCreate || editingId),
   );
   const isParentStudentsView = resource === "students" && sessionRole === "Parent Portal User";
+  const hidePortalEnabledColumn = [
+    "Parent Portal User",
+    "Student Portal User",
+    "Music Instructor",
+  ].includes(sessionRole);
   const canWriteResource =
     resource === "users"
       ? canAccessResource({ role: sessionRole, resource: "users", action: "create" })
@@ -128,7 +133,10 @@ export function ResourcePage({
         canAccessResource({ role: sessionRole, resource, action: "update" }) &&
         canAccessResource({ role: sessionRole, resource, action: "delete" });
   const tableFields = fields.filter(
-    (field) => !field.writeOnly && !(isParentStudentsView && field.key === "portalEnabled"),
+    (field) =>
+      !field.writeOnly &&
+      !(isParentStudentsView && field.key === "portalEnabled") &&
+      !(hidePortalEnabledColumn && field.key === "portalEnabled"),
   );
   const showActionsColumn = !isParentStudentsView && canWriteResource;
   const canCreate = allowCreate && !isParentStudentsView && canWriteResource;
