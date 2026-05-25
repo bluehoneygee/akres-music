@@ -154,6 +154,16 @@ export function ResourcePage({
     ] as const;
   }, []);
 
+  const loadSchedulesForAvailability = useCallback(async () => {
+    try {
+      const response = await fetch("/api/schedules", { cache: "no-store" });
+      const json = (await response.json()) as { data?: UiRecord[] };
+      setScheduleRows(Array.isArray(json.data) ? json.data : []);
+    } catch {
+      setScheduleRows([]);
+    }
+  }, []);
+
   async function loadRows() {
     setLoading(true);
     setError("");
@@ -239,7 +249,7 @@ export function ResourcePage({
 
     let mounted = true;
 
-    async function loadSchedulesForAvailability() {
+    async function loadSchedules() {
       try {
         const response = await fetch("/api/schedules", { cache: "no-store" });
         const json = (await response.json()) as { data?: UiRecord[] };
@@ -252,7 +262,7 @@ export function ResourcePage({
       }
     }
 
-    void loadSchedulesForAvailability();
+    void loadSchedules();
 
     return () => {
       mounted = false;
@@ -334,6 +344,9 @@ export function ResourcePage({
     setFormOpen(false);
     setDraft(emptyDraft);
     await loadRows();
+    if (fields.some((field) => field.roomAvailabilityFrom || field.availabilityDateFrom)) {
+      await loadSchedulesForAvailability();
+    }
   }
 
   async function deleteRow(id: string) {
@@ -1069,13 +1082,16 @@ function getAvailabilityDateOptions(
         conflictReasons.size === 0
           ? ""
           : conflictReasons.size === 2
-            ? "Instructor + Student"
-            : Array.from(conflictReasons)[0];
+            ? "student + instructor"
+            : Array.from(conflictReasons)[0].toLowerCase();
       const conflictSchedule = conflictSchedules[0];
 
       return {
         disabled: conflictSchedules.length > 0,
         label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}${conflictSchedule ? ` · Booked (${reasonLabel})` : ""}`,
+        reasonLabel,
+        hasInstructorConflict: conflictReasons.has("Instructor"),
+        hasStudentConflict: conflictReasons.has("Student"),
         unavailableReason: conflictSchedule
           ? `${String(conflictSchedule.fromTime ?? "")} - ${String(conflictSchedule.toTime ?? "")}`
           : undefined,
@@ -1084,29 +1100,76 @@ function getAvailabilityDateOptions(
     });
   });
   const today = todayDateString();
-  const uniqueDates = new Map<string, { label: string; value: string; disabled?: boolean; unavailableReason?: string }>();
+  const uniqueDates = new Map<
+    string,
+    {
+      label: string;
+      value: string;
+      disabled?: boolean;
+      unavailableReason?: string;
+      reasonLabel?: string;
+      totalSlots: number;
+      blockedSlots: number;
+      reasonSet: Set<string>;
+      hasInstructorConflict: boolean;
+      hasStudentConflict: boolean;
+    }
+  >();
   dates
     .filter((date) => date.value >= today)
     .forEach((date) => {
       const current = uniqueDates.get(date.value);
       if (!current) {
-        uniqueDates.set(date.value, date);
+        uniqueDates.set(date.value, {
+          ...date,
+          totalSlots: 1,
+          blockedSlots: date.disabled ? 1 : 0,
+          reasonSet: date.reasonLabel ? new Set([date.reasonLabel]) : new Set<string>(),
+          hasInstructorConflict: Boolean(date.hasInstructorConflict),
+          hasStudentConflict: Boolean(date.hasStudentConflict),
+        });
         return;
       }
 
-      uniqueDates.set(date.value, {
-        ...current,
-        disabled: Boolean(current.disabled) && Boolean(date.disabled),
-        label:
-          Boolean(current.disabled) && Boolean(date.disabled)
-            ? current.label
-            : `${current.label.replace(" · Booked", "")}`,
-      });
+      if (date.reasonLabel) {
+        if (date.reasonLabel === "student + instructor") {
+          current.reasonSet.add("student");
+          current.reasonSet.add("instructor");
+        } else {
+          current.reasonSet.add(date.reasonLabel);
+        }
+      }
+      current.totalSlots += 1;
+      if (date.disabled) current.blockedSlots += 1;
+      current.hasInstructorConflict = current.hasInstructorConflict || Boolean(date.hasInstructorConflict);
+      current.hasStudentConflict = current.hasStudentConflict || Boolean(date.hasStudentConflict);
+      if (!current.unavailableReason && date.unavailableReason) {
+        current.unavailableReason = date.unavailableReason;
+      }
+      uniqueDates.set(date.value, current);
     });
 
-  return Array.from(uniqueDates.values()).sort((left, right) =>
-    left.value.localeCompare(right.value),
-  );
+  return Array.from(uniqueDates.values())
+    .map((date) => {
+      const bookedStatus =
+        date.hasInstructorConflict && date.hasStudentConflict
+          ? "student + instructor"
+          : date.hasInstructorConflict
+            ? "instructor"
+            : date.hasStudentConflict
+              ? "student"
+              : "";
+      const isFullyBooked = date.blockedSlots >= date.totalSlots;
+      const baseLabel = date.label.split(" · Booked")[0];
+
+      return {
+        value: date.value,
+        disabled: isFullyBooked,
+        label: bookedStatus ? `${baseLabel} · Booked (${bookedStatus})` : baseLabel,
+        unavailableReason: date.unavailableReason,
+      };
+    })
+    .sort((left, right) => left.value.localeCompare(right.value));
 }
 
 function todayDateString() {
