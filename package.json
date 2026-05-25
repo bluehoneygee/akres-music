@@ -10,7 +10,7 @@
     "seed:rooms": "node scripts/seed-rooms.mjs",
     "seed": "node scripts/seed.mjs",
     "migrate:sheets": "node scripts/migrate-google-sheets.mjs",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -55,6 +55,7 @@ export function StudentCalendarBoard() {
   const instructorsById = useMemo(() => mapById(instructors), [instructors]);
   const roomsById = useMemo(() => mapById(rooms), [rooms]);
   const schedulesById = useMemo(() => mapById(schedules), [schedules]);
+  const rescheduledToByOriginalId = useMemo(() => mapRescheduledToByOriginalId(schedules), [schedules]);
   const calendarCells = useMemo(
     () => (viewMode === "month" ? buildMonthCells(cursorDate) : buildWeekCells(cursorDate)),
     [cursorDate, viewMode],
@@ -185,6 +186,7 @@ export function StudentCalendarBoard() {
                 {calendarCells.map(({ date, inMonth }) => {
                   const dateKey = formatDate(date);
                   const daySchedules = schedulesByDate[dateKey] ?? [];
+                  const activeDaySchedules = daySchedules.filter(isActiveBookedSchedule);
 
                   return (
                     <button
@@ -199,9 +201,9 @@ export function StudentCalendarBoard() {
                         <p className="text-xs font-semibold leading-none text-zinc-950 sm:text-sm">
                           {date.getUTCDate()}
                         </p>
-                        {daySchedules.length > 0 ? (
+                        {activeDaySchedules.length > 0 ? (
                           <span className="rounded-full bg-white/70 px-1.5 py-0 text-[9px] font-semibold text-zinc-700">
-                            {daySchedules.length}
+                            {activeDaySchedules.length}
                           </span>
                         ) : null}
                       </div>
@@ -213,8 +215,8 @@ export function StudentCalendarBoard() {
                             title={`${String(schedule.fromTime || "")} - ${String(schedule.toTime || "")}`}
                           />
                         ))}
-                        {daySchedules.length > 5 ? (
-                          <span className="text-[8px] font-semibold text-zinc-500">+{daySchedules.length - 5}</span>
+                        {activeDaySchedules.length > 5 ? (
+                          <span className="text-[8px] font-semibold text-zinc-500">+{activeDaySchedules.length - 5}</span>
                         ) : null}
                       </div>
                     </button>
@@ -232,6 +234,7 @@ export function StudentCalendarBoard() {
           date={selectedCell.date}
           instructorsById={instructorsById}
           onClose={() => setSelectedDate("")}
+          rescheduledToByOriginalId={rescheduledToByOriginalId}
           roomsById={roomsById}
           schedules={schedulesByDate[selectedDate] ?? []}
           schedulesById={schedulesById}
@@ -247,6 +250,7 @@ function DayDetailModal({
   date,
   instructorsById,
   onClose,
+  rescheduledToByOriginalId,
   roomsById,
   schedules,
   schedulesById,
@@ -256,6 +260,7 @@ function DayDetailModal({
   date: Date;
   instructorsById: Map<string, Row>;
   onClose: () => void;
+  rescheduledToByOriginalId: Map<string, Row>;
   roomsById: Map<string, Row>;
   schedules: Row[];
   schedulesById: Map<string, Row>;
@@ -282,6 +287,7 @@ function DayDetailModal({
               const instructor = instructorsById.get(String(schedule.instructorId || ""));
               const room = roomsById.get(String(schedule.studioRoomId || ""));
               const originalSchedule = schedulesById.get(String(schedule.originalScheduleId || ""));
+              const rescheduledTo = rescheduledToByOriginalId.get(String(schedule.id || ""));
               const mode = String(schedule.lessonMode || "");
               return (
                 <div className="rounded-2xl border border-white/60 bg-white/55 p-3" key={schedule.id}>
@@ -301,6 +307,11 @@ function DayDetailModal({
                       Rescheduled from {originalSchedule
                         ? `${String(originalSchedule.scheduleDate || "-")}, ${String(originalSchedule.fromTime || "-")} - ${String(originalSchedule.toTime || "-")}`
                         : "original session"}
+                    </p>
+                  ) : null}
+                  {rescheduledTo ? (
+                    <p className="mt-1 text-[11px] italic text-zinc-500">
+                      Rescheduled to {`${String(rescheduledTo.scheduleDate || "-")}, ${String(rescheduledTo.fromTime || "-")} - ${String(rescheduledTo.toTime || "-")}`}
                     </p>
                   ) : null}
                   <div className="mt-1 flex flex-col gap-1 text-xs text-zinc-700">
@@ -340,6 +351,19 @@ async function fetchRows(resource: string) {
 
 function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+function mapRescheduledToByOriginalId(rows: Row[]) {
+  const map = new Map<string, Row>();
+  rows.forEach((row) => {
+    const originalId = String(row.originalScheduleId || "");
+    if (!originalId) return;
+    if (String(row.scheduleStatus || "").toLowerCase() === "cancelled") return;
+    if (!map.has(originalId)) {
+      map.set(originalId, row);
+    }
+  });
+  return map;
 }
 
 function startOfMonth(value: Date) {
@@ -463,4 +487,9 @@ function scheduleStatusBadgeClass(schedule: Row) {
   if (status === "Cancelled") return "bg-zinc-200 text-zinc-700";
   if (status === "Completed") return "bg-emerald-100 text-emerald-800";
   return "bg-sky-100 text-sky-800";
+}
+
+function isActiveBookedSchedule(schedule: Row) {
+  const status = String(schedule.scheduleStatus || "").toLowerCase();
+  return status !== "cancelled" && status !== "rescheduled";
 }

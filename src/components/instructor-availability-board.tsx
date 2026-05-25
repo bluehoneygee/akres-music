@@ -65,6 +65,8 @@ export function InstructorAvailabilityBoard() {
 
   const studentsById = useMemo(() => mapById(students), [students]);
   const coursesById = useMemo(() => mapById(courses), [courses]);
+  const schedulesById = useMemo(() => mapById(schedules), [schedules]);
+  const rescheduledToByOriginalId = useMemo(() => mapRescheduledToByOriginalId(schedules), [schedules]);
   const selectedInstructor = instructors.find((instructor) => instructor.id === selectedInstructorId);
   const calendarCells = useMemo(
     () => (viewMode === "month" ? buildMonthCells(cursorDate) : buildWeekCells(cursorDate)),
@@ -91,6 +93,11 @@ export function InstructorAvailabilityBoard() {
   }, [existingSlotValuesForDraftDay]);
   const schedulesByDate = groupByDate(
     schedules.filter((row) => row.instructorId === selectedInstructorId),
+  );
+  const occupiedSchedulesByDate = groupByDate(
+    schedules.filter(
+      (row) => row.instructorId === selectedInstructorId && isOccupiedSchedule(row),
+    ),
   );
 
   async function createAvailability() {
@@ -282,8 +289,10 @@ export function InstructorAvailabilityBoard() {
                 {calendarCells.map(({ date, day, inMonth }) => {
                   const dateKey = formatDate(date);
                   const bookedSlots = schedulesByDate[dateKey] ?? [];
-                  const availableSlots = availableSlotsForDate(availabilityByDay[day] ?? [], bookedSlots);
-                  const totalItems = availableSlots.length + bookedSlots.length;
+                  const activeBookedSlots = bookedSlots.filter(isActiveBookedSchedule);
+                  const occupiedSlots = occupiedSchedulesByDate[dateKey] ?? [];
+                  const availableSlots = availableSlotsForDate(availabilityByDay[day] ?? [], occupiedSlots);
+                  const totalItems = activeBookedSlots.length;
 
                   return (
                     <button
@@ -322,18 +331,24 @@ export function InstructorAvailabilityBoard() {
                         ))}
                         {bookedSlots.slice(0, 4).map((schedule) => {
                           const mode = scheduleLessonMode(schedule);
+                          const isRescheduled =
+                            String(schedule.scheduleStatus ?? "").toLowerCase() === "rescheduled";
                           return (
                             <span
                               className={`size-1.5 rounded-full sm:size-2 ${
-                                mode === "Studio" ? "bg-sky-500" : "bg-violet-500"
+                                isRescheduled
+                                  ? "bg-amber-500"
+                                  : mode === "Studio"
+                                    ? "bg-sky-500"
+                                    : "bg-violet-500"
                               }`}
                               key={schedule.id}
                               title={`${String(schedule.fromTime)} - ${String(schedule.toTime)} • ${mode}`}
                             />
                           );
                         })}
-                        {totalItems > 8 ? (
-                          <span className="text-[8px] font-semibold text-zinc-500">+{totalItems - 8}</span>
+                        {activeBookedSlots.length > 4 ? (
+                          <span className="text-[8px] font-semibold text-zinc-500">+{activeBookedSlots.length - 4}</span>
                         ) : null}
                       </div>
                     </button>
@@ -349,7 +364,7 @@ export function InstructorAvailabilityBoard() {
         <DayDetailModal
           availability={availableSlotsForDate(
             availabilityByDay[selectedCell.day] ?? [],
-            schedulesByDate[selectedDate] ?? [],
+            occupiedSchedulesByDate[selectedDate] ?? [],
           )}
           booked={schedulesByDate[selectedDate] ?? []}
           coursesById={coursesById}
@@ -357,6 +372,8 @@ export function InstructorAvailabilityBoard() {
           onClose={() => setSelectedDate("")}
           onDeleteAvailability={deleteAvailability}
           saving={saving}
+          rescheduledToByOriginalId={rescheduledToByOriginalId}
+          schedulesById={schedulesById}
           studentsById={studentsById}
         />
       ) : null}
@@ -535,7 +552,9 @@ function DayDetailModal({
   date,
   onClose,
   onDeleteAvailability,
+  rescheduledToByOriginalId,
   saving,
+  schedulesById,
   studentsById,
 }: {
   availability: Row[];
@@ -544,7 +563,9 @@ function DayDetailModal({
   date: Date;
   onClose: () => void;
   onDeleteAvailability: (id: string) => Promise<void>;
+  rescheduledToByOriginalId: Map<string, Row>;
   saving: boolean;
+  schedulesById: Map<string, Row>;
   studentsById: Map<string, Row>;
 }) {
   return (
@@ -609,12 +630,18 @@ function DayDetailModal({
                 <span className="size-2 rounded-full bg-violet-500" />
                 Home Visit
               </span>
+              <span className="inline-flex items-center gap-1 text-xs text-zinc-600">
+                <span className="size-2 rounded-full bg-amber-500" />
+                Rescheduled
+              </span>
               <h3 className="text-sm font-semibold text-zinc-950">Booked schedules</h3>
             </div>
             {booked.length > 0 ? (
               booked.map((schedule) => {
                 const student = studentsById.get(String(schedule.studentId ?? ""));
                 const course = coursesById.get(String(schedule.courseId ?? ""));
+                const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
+                const rescheduledTo = rescheduledToByOriginalId.get(String(schedule.id ?? ""));
                 const mode = scheduleLessonMode(schedule);
                 const tone =
                   mode === "Studio"
@@ -631,14 +658,30 @@ function DayDetailModal({
                       <p className="text-sm font-semibold">
                         {String(schedule.fromTime)} - {String(schedule.toTime)}
                       </p>
-                      <Badge className="h-5 rounded-md px-1.5 text-[10px]" variant="secondary">
-                        {mode}
+                      <Badge
+                        className={`h-5 rounded-md px-1.5 text-[10px] ${scheduleStatusBadgeClass(schedule)}`}
+                        variant="secondary"
+                      >
+                        {formatDisplayText(String(schedule.scheduleStatus || "Scheduled"))}
                       </Badge>
                     </div>
+                    {schedule.originalScheduleId ? (
+                      <p className={`mt-1 text-[11px] italic ${subTone}`}>
+                        Rescheduled from {originalSchedule
+                          ? `${String(originalSchedule.scheduleDate || "-")}, ${String(originalSchedule.fromTime || "-")} - ${String(originalSchedule.toTime || "-")}`
+                          : "original session"}
+                      </p>
+                    ) : null}
+                    {rescheduledTo ? (
+                      <p className={`mt-1 text-[11px] italic ${subTone}`}>
+                        Rescheduled to {`${String(rescheduledTo.scheduleDate || "-")}, ${String(rescheduledTo.fromTime || "-")} - ${String(rescheduledTo.toTime || "-")}`}
+                      </p>
+                    ) : null}
                     <p className={`mt-0.5 text-xs ${subTone}`}>
                       {studentName(student) || "Booked schedule"}
                     </p>
                     <p className={`text-xs ${subTone}`}>{formatDisplayText(course?.courseName)}</p>
+                    <p className={`text-[11px] ${subTone}`}>Mode: {mode}</p>
                   </div>
                 );
               })
@@ -656,6 +699,19 @@ function DayDetailModal({
 
 function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
+}
+
+function mapRescheduledToByOriginalId(rows: Row[]) {
+  const map = new Map<string, Row>();
+  rows.forEach((row) => {
+    const originalId = String(row.originalScheduleId ?? "");
+    if (!originalId) return;
+    if (String(row.scheduleStatus ?? "").toLowerCase() === "cancelled") return;
+    if (!map.has(originalId)) {
+      map.set(originalId, row);
+    }
+  });
+  return map;
 }
 
 function groupByDay(rows: Row[], key: "dayOfWeek") {
@@ -757,6 +813,24 @@ function weekTitle(value: Date) {
 function studentName(student?: Row) {
   if (!student) return "";
   return formatDisplayText(`${String(student.firstName ?? "")} ${String(student.lastName ?? "")}`);
+}
+
+function scheduleStatusBadgeClass(schedule: Row) {
+  const status = String(schedule.scheduleStatus || "").toLowerCase();
+  if (status === "rescheduled") return "bg-amber-100 text-amber-800";
+  if (status === "cancelled") return "bg-rose-100 text-rose-800";
+  if (status === "completed") return "bg-emerald-100 text-emerald-800";
+  return "bg-zinc-100 text-zinc-700";
+}
+
+function isOccupiedSchedule(schedule: Row) {
+  const status = String(schedule.scheduleStatus ?? "").toLowerCase();
+  return status !== "cancelled" && status !== "rescheduled";
+}
+
+function isActiveBookedSchedule(schedule: Row) {
+  const status = String(schedule.scheduleStatus ?? "").toLowerCase();
+  return status !== "cancelled" && status !== "rescheduled";
 }
 
 function nextHour(value: string) {

@@ -754,6 +754,10 @@ function dateToDayOfWeek(date: string) {
     : "";
 }
 
+function activeScheduleFilter() {
+  return { $nin: ["Cancelled", "Rescheduled"] };
+}
+
 async function assertStudioRoomSlotAvailable({
   fromTime,
   lessonCount,
@@ -787,7 +791,7 @@ async function assertStudioRoomSlotAvailable({
     .find({
       studioRoomId,
       scheduleDate: { $in: dates },
-      scheduleStatus: { $ne: "Cancelled" },
+      scheduleStatus: activeScheduleFilter(),
     })
     .toArray();
 
@@ -1126,7 +1130,7 @@ async function assertInstructorSlotAvailable({
     .find({
       instructorId,
       scheduleDate: { $in: dates },
-      scheduleStatus: { $ne: "Cancelled" },
+      scheduleStatus: activeScheduleFilter(),
     })
     .toArray();
 
@@ -1174,7 +1178,7 @@ async function assertStudentSlotAvailable({
     .find({
       studentId,
       scheduleDate: { $in: dates },
-      scheduleStatus: { $ne: "Cancelled" },
+      scheduleStatus: activeScheduleFilter(),
     })
     .toArray();
 
@@ -1650,7 +1654,7 @@ async function assertRescheduleSlotAvailable({
       id: { $nin: [scheduleId, originalScheduleId] },
       instructorId,
       scheduleDate,
-      scheduleStatus: { $ne: "Cancelled" },
+      scheduleStatus: activeScheduleFilter(),
     })
     .toArray();
 
@@ -1676,7 +1680,7 @@ async function assertRescheduleSlotAvailable({
         id: { $nin: [scheduleId, originalScheduleId] },
         studentId,
         scheduleDate,
-        scheduleStatus: { $ne: "Cancelled" },
+        scheduleStatus: activeScheduleFilter(),
       })
       .toArray();
 
@@ -1705,7 +1709,7 @@ async function assertRescheduleSlotAvailable({
       lessonMode: "Studio",
       studioRoomId,
       scheduleDate,
-      scheduleStatus: { $ne: "Cancelled" },
+      scheduleStatus: activeScheduleFilter(),
     })
     .toArray();
 

@@ -454,6 +454,7 @@ export function AttendanceBoard() {
                       })
                     }
                     schedule={schedule}
+                    schedules={schedules}
                     sessionNumber={index + 1}
                   />
                 ))}
@@ -516,6 +517,7 @@ export function AttendanceBoard() {
                       })
                     }
                     schedule={schedule}
+                    schedules={schedules}
                     sessionNumber={index + 1}
                   />
                 ))}
@@ -613,17 +615,20 @@ function SessionCard({
   originalSchedule,
   onOpen,
   schedule,
+  schedules,
   sessionNumber,
 }: {
   attendance: Row | null;
   originalSchedule: Row | null;
   onOpen: () => void;
   schedule: Row;
+  schedules: Row[];
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
   const isDraftReschedule = Boolean(schedule.isDraftReschedule);
   const confirmed = Boolean(attendance?.confirmed);
+  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
 
   return (
     <button
@@ -657,6 +662,11 @@ function SessionCard({
             {schedule.originalScheduleId ? (
               <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
                 Rescheduled from {originalSchedule ? scheduleDateTime(originalSchedule) : "original session"}
+              </p>
+            ) : null}
+            {rescheduledTo ? (
+              <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
+                Rescheduled to {scheduleDateTime(rescheduledTo)}
               </p>
             ) : null}
             {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
@@ -705,6 +715,7 @@ function StudentAttendanceModal({
   const controlDisabled = disabled || confirmed;
   const linkedReschedule = schedulesById.get(String(attendance?.makeupScheduleId ?? ""));
   const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
+  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [replacementStatus, setReplacementStatus] = useState(status);
   const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
@@ -729,6 +740,9 @@ function StudentAttendanceModal({
                 label="From"
                 value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
               />
+            ) : null}
+            {rescheduledTo ? (
+              <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
             ) : null}
             <p className="text-xs italic text-zinc-500">
               Draft reschedule. It will appear in Schedules after attendance is confirmed.
@@ -772,6 +786,9 @@ function StudentAttendanceModal({
                 label="From"
                 value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
               />
+            ) : null}
+            {rescheduledTo && String(linkedReschedule?.id ?? "") !== String(rescheduledTo.id ?? "") ? (
+              <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
             ) : null}
 
             {needsReason ? (
@@ -1271,16 +1288,19 @@ function InstructorSessionCard({
   originalSchedule,
   onOpen,
   schedule,
+  schedules,
   sessionNumber,
 }: {
   attendance: Row | null;
   originalSchedule: Row | null;
   onOpen: () => void;
   schedule: Row;
+  schedules: Row[];
   sessionNumber: number;
 }) {
   const status = String(attendance?.status ?? "Pending");
   const confirmed = Boolean(attendance?.confirmed);
+  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
 
   return (
     <button
@@ -1306,6 +1326,11 @@ function InstructorSessionCard({
           {schedule.originalScheduleId ? (
             <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
               Rescheduled from {originalSchedule ? scheduleDateTime(originalSchedule) : "original session"}
+            </p>
+          ) : null}
+          {rescheduledTo ? (
+            <p className="text-[7px] italic text-zinc-500 sm:text-[9px]">
+              Rescheduled to {scheduleDateTime(rescheduledTo)}
             </p>
           ) : null}
           {confirmed && attendance ? <ConfirmedBadge compact attendance={attendance} /> : null}
@@ -1382,6 +1407,9 @@ function InstructorAttendanceModal({
   const requiresReschedule = status === "Rescheduled";
   const pendingReschedule = pendingRescheduleLabel(attendance);
   const linkedReschedule = schedulesById.get(String(attendance?.rescheduleScheduleId ?? ""));
+  const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
+  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
+  const effectiveRescheduledTo = linkedReschedule ?? rescheduledTo;
   const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
     !requiresReschedule || Boolean(attendance?.rescheduleScheduleId || pendingReschedule)
   );
@@ -1483,18 +1511,20 @@ function InstructorAttendanceModal({
             ))}
           </select>
 
-          {attendance.rescheduleScheduleId ? (
+          {schedule.originalScheduleId ? (
             <RescheduleBadge
-              label="To"
-              value={
-                linkedReschedule
-                  ? scheduleDateTime(linkedReschedule)
-                  : "Replacement session created"
-              }
+              label="From"
+              value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
             />
+          ) : null}
+          {effectiveRescheduledTo ? (
+            <RescheduleBadge label="To" value={scheduleDateTime(effectiveRescheduledTo)} />
           ) : pendingReschedule ? (
             <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
-          ) : attendance.rescheduleRequired ? (
+          ) : attendance.rescheduleScheduleId ? (
+            <RescheduleBadge label="To" value="Replacement session created" />
+          ) : null}
+          {attendance.rescheduleRequired && !effectiveRescheduledTo && !pendingReschedule ? (
             <div className="grid gap-2">
               <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl">
                 {slotOptions.map((slot) => {
@@ -1818,6 +1848,17 @@ function scheduleSortKey(schedule: Row) {
     String(schedule.toTime ?? ""),
     String(schedule.id ?? ""),
   ].join("|");
+}
+
+function findRescheduledToSchedule(schedules: Row[], scheduleId: string) {
+  if (!scheduleId) return null;
+  return (
+    schedules.find(
+      (row) =>
+        String(row.originalScheduleId ?? "") === scheduleId &&
+        String(row.scheduleStatus ?? "").toLowerCase() !== "cancelled",
+    ) ?? null
+  );
 }
 
 function studentProgressLabel(sessions: SessionRow[]) {

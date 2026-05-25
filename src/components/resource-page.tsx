@@ -164,7 +164,7 @@ export function ResourcePage({
     }
   }, []);
 
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -187,11 +187,13 @@ export function ResourcePage({
     } finally {
       setLoading(false);
     }
-  }
+  }, [resource]);
 
   useEffect(() => {
-    void loadRows();
-  }, [resource]);
+    queueMicrotask(() => {
+      void loadRows();
+    });
+  }, [loadRows]);
 
   useEffect(() => {
     let mounted = true;
@@ -270,56 +272,58 @@ export function ResourcePage({
   }, [fieldsSignature, fields]);
 
   useEffect(() => {
-    setDraft((current) => {
-      const updates = Object.fromEntries(
-        fields
-          .filter((field) => field.type === "relation" || field.deriveFrom)
-          .map((field) => {
-            const derivedValue = getDerivedValue(field, current, relationOptions);
+    queueMicrotask(() => {
+      setDraft((current) => {
+        const updates = Object.fromEntries(
+          fields
+            .filter((field) => field.type === "relation" || field.deriveFrom)
+            .map((field) => {
+              const derivedValue = getDerivedValue(field, current, relationOptions);
 
-            if (derivedValue !== undefined) {
-              return [field.key, derivedValue];
-            }
+              if (derivedValue !== undefined) {
+                return [field.key, derivedValue];
+              }
 
-            if (field.type !== "relation") {
-              return [field.key, current[field.key]];
-            }
+              if (field.type !== "relation") {
+                return [field.key, current[field.key]];
+              }
 
-            if (!relationOptions[field.key]) {
-              return [field.key, current[field.key]];
-            }
+              if (!relationOptions[field.key]) {
+                return [field.key, current[field.key]];
+              }
 
-            const options = getFieldOptions(field, current, relationOptions, scheduleRows);
-            const currentValue = current[field.key];
-            const optionValues = new Set(
-              options.filter((option) => !option.disabled).map((option) => option.value),
-            );
+              const options = getFieldOptions(field, current, relationOptions, scheduleRows);
+              const currentValue = current[field.key];
+              const optionValues = new Set(
+                options.filter((option) => !option.disabled).map((option) => option.value),
+              );
 
-            if (field.multiple && Array.isArray(currentValue)) {
-              return [field.key, currentValue.filter((value) => optionValues.has(String(value)))];
-            }
+              if (field.multiple && Array.isArray(currentValue)) {
+                return [field.key, currentValue.filter((value) => optionValues.has(String(value)))];
+              }
 
-            if (!field.multiple && currentValue && !optionValues.has(String(currentValue))) {
-              return [field.key, ""];
-            }
+              if (!field.multiple && currentValue && !optionValues.has(String(currentValue))) {
+                return [field.key, ""];
+              }
 
-            if (
-              field.autoSelectSingleOption &&
-              !field.multiple &&
-              !currentValue &&
-              options.filter((option) => !option.disabled).length === 1
-            ) {
-              return [field.key, options.find((option) => !option.disabled)?.value ?? ""];
-            }
+              if (
+                field.autoSelectSingleOption &&
+                !field.multiple &&
+                !currentValue &&
+                options.filter((option) => !option.disabled).length === 1
+              ) {
+                return [field.key, options.find((option) => !option.disabled)?.value ?? ""];
+              }
 
-            return [field.key, currentValue];
-          }),
-      ) as Record<string, RecordValue>;
+              return [field.key, currentValue];
+            }),
+        ) as Record<string, RecordValue>;
 
-      const changed = Object.entries(updates).some(
-        ([key, value]) => !isRecordValueEqual(current[key], value),
-      );
-      return changed ? { ...current, ...updates } : current;
+        const changed = Object.entries(updates).some(
+          ([key, value]) => !isRecordValueEqual(current[key], value),
+        );
+        return changed ? { ...current, ...updates } : current;
+      });
     });
   }, [fieldsSignature, fields, relationOptions, scheduleRows]);
 
@@ -1054,7 +1058,7 @@ function getAvailabilityDateOptions(
 
     return datesInMonthForDay(monthValue, slotDayOfWeek).map((date) => {
       const conflictSchedules = scheduleRows.filter((schedule) => {
-        if (String(schedule.scheduleStatus ?? "") === "Cancelled") return false;
+        if (isNonBlockingScheduleStatus(schedule.scheduleStatus)) return false;
         if (String(schedule.scheduleDate ?? "") !== date) return false;
         const isInstructorConflict =
           Boolean(instructorId) && String(schedule.instructorId ?? "") === instructorId;
@@ -1260,7 +1264,7 @@ function filterRoomAvailabilityOptions(
       (schedule) =>
         String(schedule.studioRoomId ?? "") === option.value &&
         String(schedule.lessonMode ?? "") === "Studio" &&
-        String(schedule.scheduleStatus ?? "") !== "Cancelled" &&
+        !isNonBlockingScheduleStatus(schedule.scheduleStatus) &&
         dates.includes(String(schedule.scheduleDate ?? "")),
     );
 
@@ -1382,6 +1386,11 @@ function rangesOverlap(
 
   if ([startA, endA, startB, endB].some((value) => Number.isNaN(value))) return false;
   return startA < endB && startB < endA;
+}
+
+function isNonBlockingScheduleStatus(status: unknown) {
+  const normalized = String(status ?? "").toLowerCase();
+  return normalized === "cancelled" || normalized === "rescheduled";
 }
 
 function timeToMinutes(value: string) {

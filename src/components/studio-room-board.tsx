@@ -70,13 +70,18 @@ export function StudioRoomBoard() {
   const studentsById = useMemo(() => mapById(students), [students]);
   const coursesById = useMemo(() => mapById(courses), [courses]);
   const instructorsById = useMemo(() => mapById(instructors), [instructors]);
+  const schedulesById = useMemo(() => mapById(schedules), [schedules]);
+  const rescheduledToByOriginalId = useMemo(() => mapRescheduledToByOriginalId(schedules), [schedules]);
   const roomSchedules = schedules.filter(
     (schedule) =>
       schedule.studioRoomId === selectedRoomId &&
       schedule.lessonMode === "Studio" &&
-      schedule.scheduleStatus !== "Cancelled",
+      String(schedule.scheduleStatus ?? "").toLowerCase() !== "cancelled",
   );
   const schedulesByDate = groupByDate(roomSchedules);
+  const occupiedSchedulesByDate = groupByDate(
+    roomSchedules.filter((schedule) => !isNonBlockingScheduleStatus(schedule.scheduleStatus)),
+  );
 
   return (
     <div className="space-y-2.5">
@@ -162,7 +167,11 @@ export function StudioRoomBoard() {
             {monthCells.map(({ date, inMonth }) => {
               const dateKey = formatDate(date);
               const bookedSlots = schedulesByDate[dateKey] ?? [];
-              const availableBlocks = availableBlocksForDay(bookedSlots, date);
+              const activeBookedSlots = bookedSlots.filter((schedule) =>
+                !isNonBlockingScheduleStatus(schedule.scheduleStatus),
+              );
+              const occupiedSlots = occupiedSchedulesByDate[dateKey] ?? [];
+              const availableBlocks = availableBlocksForDay(occupiedSlots, date);
 
               return (
                 <button
@@ -175,15 +184,22 @@ export function StudioRoomBoard() {
                 >
                   <div className="flex items-start justify-between gap-1">
                     <p className="text-xs font-semibold leading-none text-zinc-950 sm:text-sm">{date.getUTCDate()}</p>
-                    {bookedSlots.length > 0 ? (
-                      <Badge className="px-1.5 py-0 text-[9px]" variant="warning">
-                        {bookedSlots.length}
-                      </Badge>
+                    {activeBookedSlots.length > 0 ? (
+                      <span className="rounded-full bg-white/70 px-1.5 py-0 text-[9px] font-semibold text-zinc-700">
+                        {activeBookedSlots.length}
+                      </span>
                     ) : null}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {bookedSlots.slice(0, 5).map((schedule) => (
-                      <span className="size-1.5 rounded-full bg-amber-500 sm:size-2" key={schedule.id} />
+                      <span
+                        className={`size-1.5 rounded-full sm:size-2 ${
+                          String(schedule.scheduleStatus ?? "").toLowerCase() === "rescheduled"
+                            ? "bg-amber-500"
+                            : "bg-sky-500"
+                        }`}
+                        key={schedule.id}
+                      />
                     ))}
                     {availableBlocks.length > 0 ? (
                       <span className="size-1.5 rounded-full bg-emerald-500 sm:size-2" />
@@ -199,11 +215,14 @@ export function StudioRoomBoard() {
       {selectedCell ? (
         <RoomDayDetailModal
           booked={schedulesByDate[selectedDate] ?? []}
+          occupied={occupiedSchedulesByDate[selectedDate] ?? []}
           coursesById={coursesById}
           date={selectedCell.date}
           instructorsById={instructorsById}
           onClose={() => setSelectedDate("")}
+          rescheduledToByOriginalId={rescheduledToByOriginalId}
           room={selectedRoom}
+          schedulesById={schedulesById}
           studentsById={studentsById}
         />
       ) : null}
@@ -213,22 +232,28 @@ export function StudioRoomBoard() {
 
 function RoomDayDetailModal({
   booked,
+  occupied,
   coursesById,
   date,
   instructorsById,
   onClose,
+  rescheduledToByOriginalId,
   room,
+  schedulesById,
   studentsById,
 }: {
   booked: Row[];
+  occupied: Row[];
   coursesById: Map<string, Row>;
   date: Date;
   instructorsById: Map<string, Row>;
   onClose: () => void;
+  rescheduledToByOriginalId: Map<string, Row>;
   room?: Row;
+  schedulesById: Map<string, Row>;
   studentsById: Map<string, Row>;
 }) {
-  const availableBlocks = availableBlocksForDay(booked, date);
+  const availableBlocks = availableBlocksForDay(occupied, date);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/35 p-3 backdrop-blur-sm sm:items-center">
@@ -267,7 +292,7 @@ function RoomDayDetailModal({
 
           <section className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="size-2.5 rounded-full bg-amber-500" />
+              <span className="size-2.5 rounded-full bg-sky-500" />
               <h3 className="text-sm font-semibold text-zinc-950">Booked schedules</h3>
             </div>
             {booked.length > 0 ? (
@@ -275,13 +300,32 @@ function RoomDayDetailModal({
                 const student = studentsById.get(String(schedule.studentId ?? ""));
                 const course = coursesById.get(String(schedule.courseId ?? ""));
                 const instructor = instructorsById.get(String(schedule.instructorId ?? ""));
+                const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
+                const rescheduledTo = rescheduledToByOriginalId.get(String(schedule.id ?? ""));
+                const isRescheduled = String(schedule.scheduleStatus ?? "").toLowerCase() === "rescheduled";
+                const toneClass = isRescheduled
+                  ? "border-amber-200/70 bg-amber-50/90 text-amber-950"
+                  : "border-sky-200/70 bg-sky-50/90 text-sky-950";
+                const subToneClass = isRescheduled ? "text-amber-700" : "text-sky-700";
 
                 return (
-                  <div className="rounded-2xl border border-amber-200/70 bg-amber-50/90 px-3 py-2 text-amber-950" key={schedule.id}>
+                  <div className={`rounded-2xl border px-3 py-2 ${toneClass}`} key={schedule.id}>
                     <p className="text-sm font-semibold">{String(schedule.fromTime)} - {String(schedule.toTime)}</p>
-                    <p className="mt-0.5 text-xs text-amber-700">{studentName(student)}</p>
-                    <p className="text-xs text-amber-700">{formatDisplayText(course?.courseName)}</p>
-                    <p className="text-xs text-amber-700">{formatDisplayText(instructor?.instructorName)}</p>
+                    {schedule.originalScheduleId ? (
+                      <p className={`mt-1 text-[11px] italic ${subToneClass}`}>
+                        Rescheduled from {originalSchedule
+                          ? `${String(originalSchedule.scheduleDate || "-")}, ${String(originalSchedule.fromTime || "-")} - ${String(originalSchedule.toTime || "-")}`
+                          : "original session"}
+                      </p>
+                    ) : null}
+                    {rescheduledTo ? (
+                      <p className={`mt-1 text-[11px] italic ${subToneClass}`}>
+                        Rescheduled to {`${String(rescheduledTo.scheduleDate || "-")}, ${String(rescheduledTo.fromTime || "-")} - ${String(rescheduledTo.toTime || "-")}`}
+                      </p>
+                    ) : null}
+                    <p className={`mt-0.5 text-xs ${subToneClass}`}>{studentName(student)}</p>
+                    <p className={`text-xs ${subToneClass}`}>{formatDisplayText(course?.courseName)}</p>
+                    <p className={`text-xs ${subToneClass}`}>{formatDisplayText(instructor?.instructorName)}</p>
                   </div>
                 );
               })
@@ -354,6 +398,19 @@ function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
 }
 
+function mapRescheduledToByOriginalId(rows: Row[]) {
+  const map = new Map<string, Row>();
+  rows.forEach((row) => {
+    const originalId = String(row.originalScheduleId ?? "");
+    if (!originalId) return;
+    if (String(row.scheduleStatus ?? "").toLowerCase() === "cancelled") return;
+    if (!map.has(originalId)) {
+      map.set(originalId, row);
+    }
+  });
+  return map;
+}
+
 function groupByDate(rows: Row[]) {
   return rows.reduce<Record<string, Row[]>>((acc, row) => {
     const date = String(row.scheduleDate ?? "");
@@ -415,6 +472,11 @@ function monthTitle(value: Date) {
     timeZone: "UTC",
     year: "numeric",
   });
+}
+
+function isNonBlockingScheduleStatus(status: unknown) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  return normalized === "cancelled" || normalized === "rescheduled";
 }
 
 function studentName(student?: Row) {
