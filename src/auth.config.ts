@@ -8,7 +8,9 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
-      if (pathname === "/login") return true;
+      if (pathname === "/" || pathname === "/login" || pathname === "/about" || pathname.startsWith("/about/")) {
+        return true;
+      }
       return Boolean(auth?.user);
     },
     async jwt({ token, user }) {
