@@ -2,6 +2,7 @@
 
 import { LandingFooter } from "@/components/landing-footer";
 import { LandingNavbar } from "@/components/landing-navbar";
+import GridMotion from "@/components/grid-motion";
 import Image from "next/image";
 
 const instructors = [
@@ -36,14 +37,27 @@ const instructors = [
 ];
 
 export default function InstructorsPage() {
+  const bgItems = Array.from({ length: 28 }, () => "/akres-logo-full.png?v=6");
+
   return (
     <main className="bg-[#f5f5f5]">
       <LandingNavbar />
 
-      <section className="flex h-screen w-full items-center px-3 pt-16 md:px-6 md:pt-20">
-        <div className="mx-auto w-full max-w-7xl">
-          <h1 className="mb-6 text-center text-3xl font-semibold tracking-tight text-zinc-900 md:text-4xl">
-            Instructors
+      <section className="relative z-0 flex h-screen w-full items-center overflow-hidden px-3 pt-16 md:px-6 md:pt-20">
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden md:block">
+          <div className="h-full w-full bg-[#eef1f4] [filter:grayscale(1)]">
+            <GridMotion gradientColor="rgba(255, 255, 255, 0.5)" items={bgItems} />
+          </div>
+          <div className="absolute inset-0 bg-[#dfe4ea]/68" />
+        </div>
+        <div aria-hidden className="absolute inset-0 z-0 bg-[#f5f5f5] md:hidden" />
+
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <h1
+            className="mb-6 text-center text-3xl font-semibold tracking-tight md:text-4xl"
+            style={{ color: "#09090b" }}
+          >
+            Meet Our Instructors
           </h1>
           <div className="mx-auto flex min-h-[58vh] w-full max-w-6xl flex-nowrap items-center justify-center gap-6 overflow-x-auto px-2 md:overflow-visible md:px-4">
             {instructors.map((instructor) => (
