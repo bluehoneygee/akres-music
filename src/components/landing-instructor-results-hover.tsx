@@ -38,8 +38,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   const revealRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const maskRef = useRef({ x: 0, y: 0, size: 0 });
-  const maskXRef = useRef<ReturnType<typeof gsap.quickTo> | null>(null);
-  const maskYRef = useRef<ReturnType<typeof gsap.quickTo> | null>(null);
+  const targetRef = useRef({ x: 0, y: 0 });
   const maskSizeRef = useRef<ReturnType<typeof gsap.quickTo> | null>(null);
   const maskRadius = 90;
 
@@ -53,26 +52,26 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
       reveal.style.clipPath = `circle(${size}px at ${x}px ${y}px)`;
     };
 
-    gsap.set(reveal, { autoAlpha: 0, clipPath: "circle(0px at 50% 50%)" });
+    gsap.set(reveal, { autoAlpha: 0, clipPath: "circle(0px at 50% 50%)", willChange: "clip-path, opacity" });
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
-    maskXRef.current = gsap.quickTo(maskRef.current, "x", {
-      duration: 0.4,
-      ease: "power2.out",
-      onUpdate: updateMask,
-    });
-    maskYRef.current = gsap.quickTo(maskRef.current, "y", {
-      duration: 0.4,
-      ease: "power2.out",
-      onUpdate: updateMask,
-    });
+    const tick = () => {
+      const smooth = 0.2;
+      maskRef.current.x += (targetRef.current.x - maskRef.current.x) * smooth;
+      maskRef.current.y += (targetRef.current.y - maskRef.current.y) * smooth;
+      updateMask();
+    };
+
+    gsap.ticker.add(tick);
+
     maskSizeRef.current = gsap.quickTo(maskRef.current, "size", {
-      duration: 0.3,
+      duration: 0.24,
       ease: "power2.out",
       onUpdate: updateMask,
     });
 
     return () => {
+      gsap.ticker.remove(tick);
       gsap.killTweensOf([maskRef.current, reveal, image]);
     };
   }, []);
@@ -82,12 +81,19 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     const rawX = event.clientX - rect.left;
     const rawY = event.clientY - rect.top;
 
-    maskXRef.current?.(rawX);
-    maskYRef.current?.(rawY);
+    targetRef.current.x = rawX;
+    targetRef.current.y = rawY;
   }
 
   function reveal(event: PointerEvent<HTMLElement>) {
-    moveMask(event);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const startX = event.clientX - rect.left;
+    const startY = event.clientY - rect.top;
+
+    targetRef.current.x = startX;
+    targetRef.current.y = startY;
+    maskRef.current.x = startX;
+    maskRef.current.y = startY;
     maskSizeRef.current?.(maskRadius);
     gsap.to(revealRef.current, { autoAlpha: 1, duration: 0.32, ease: "power2.out" });
   }
