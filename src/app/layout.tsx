@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
 
 import "./globals.css";
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Akres Music Academic",
@@ -15,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body>
+      <body className={poppins.className}>
         <script
           dangerouslySetInnerHTML={{
             __html:
