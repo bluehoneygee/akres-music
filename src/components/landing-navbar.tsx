@@ -1,14 +1,37 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function LandingNavbar() {
   const [open, setOpen] = useState(false);
+  const [isSticky, setIsSticky] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname !== "/") {
+      setIsSticky(false);
+      return;
+    }
+
+    const onScroll = () => {
+      const trigger = window.innerHeight - 80;
+      setIsSticky(window.scrollY >= trigger);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [pathname]);
 
   return (
-    <nav className="absolute left-0 top-0 z-20 w-full bg-white">
+    <nav
+      className={`left-0 top-0 z-20 w-full transition-all duration-300 ${
+        isSticky ? "fixed bg-white/95 shadow-md backdrop-blur" : "absolute bg-white"
+      }`}
+    >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link className="text-xl font-bold text-zinc-900" href="/">
           Akres<span className="text-zinc-600">Music</span>
