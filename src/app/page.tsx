@@ -21,12 +21,12 @@ export default function LandingPage() {
                 bend={3}
                 borderRadius={0.05}
                 items={[
-                  { image: "/akres-logo-full.png?v=6", text: "" },
-                  { image: "/akres-logo-full.png?v=6", text: "" },
-                  { image: "/akres-logo-full.png?v=6", text: "" },
-                  { image: "/akres-logo-full.png?v=6", text: "" },
-                  { image: "/akres-logo-full.png?v=6", text: "" },
-                  { image: "/akres-logo-full.png?v=6", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.51_p2xg8n.jpg", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.37.05_opgi1f.jpg", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.48_ff4iiv.jpg", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817141/IMG_5148_sswd48.jpg", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.37.04_trqbzh.jpg", text: "" },
+                  { image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.49_moaku3.jpg", text: "" },
                 ]}
                 scrollEase={0.02}
                 textColor="black"
