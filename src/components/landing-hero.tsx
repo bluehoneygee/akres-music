@@ -36,16 +36,25 @@ export function LandingHero() {
 
       <div className="absolute inset-0 grid place-content-center px-4 text-center text-white">
         <div className="mx-auto max-w-3xl">
-          <h1 className="text-[clamp(28px,6vw,56px)] font-extrabold leading-tight">Belajar Musik Lebih Terarah</h1>
+          <h1 className="text-[clamp(28px,6vw,56px)] font-extrabold leading-tight">Mengajarkan Anak Mencintai Musik</h1>
           <p className="mt-2 text-[clamp(14px,3vw,18px)] text-white/90 md:mt-4">
-            Bantu murid memantau progres belajar musik dengan alur yang lebih jelas dan konsisten.
+            Akres Music Academy membimbing anak melalui kelas privat 1-on-1 agar berkembang musikal dan percaya diri.
+            Kami mengajar piano, gitar, vocal, dan biola.
           </p>
           <div className="mt-2 flex justify-center gap-4 md:mt-5">
             <Link
               className="w-full rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(24,24,27,.25)] transition hover:cursor-pointer hover:bg-zinc-800 hover:shadow-[0_14px_28px_rgba(24,24,27,.32)] sm:w-auto"
-              href="/login"
+              href="/about"
             >
-              Masuk Dashboard
+              Tentang Akres
+            </Link>
+            <Link
+              className="w-full rounded-full border border-white/70 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-white hover:bg-white/20 sm:w-auto"
+              href="https://wa.me/6281366584810?text=Halo%20Akres%20Music%20Academy%2C%20saya%20ingin%20booking%20kelas%20privat%201-on-1.%20Mohon%20info%20jadwal%2C%20biaya%2C%20dan%20pilihan%20instrumennya.%20Terima%20kasih."
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Booking via WhatsApp
             </Link>
           </div>
         </div>
@@ -53,4 +62,3 @@ export function LandingHero() {
     </section>
   );
 }
-

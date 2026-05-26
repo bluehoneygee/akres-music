@@ -48,16 +48,10 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="relative mt-20" style={{ height: "650px" }}>
-            <h3 className="text-center text-2xl font-semibold leading-tight text-zinc-900 md:text-5xl">
-              Dari Kelas ke Panggung
-            </h3>
-            <p className="mb-5 mt-8 px-2 text-center text-sm text-zinc-900/80 md:px-20 md:text-base">
-              Dokumentasi proses belajar murid Akres dari latihan rutin hingga showcase.
-            </p>
-            <div className="h-76 w-full overflow-hidden sm:h-64 md:h-126 lg:h-[30rem]">
-              <CircularGallery
-                bend={3}
+        <div className="relative mt-20" style={{ height: "650px" }}>
+          <div className="h-76 w-full overflow-hidden sm:h-64 md:h-126 lg:h-[30rem]">
+            <CircularGallery
+              bend={3}
                 borderRadius={0.05}
                 items={[
                   { image: "/akres-logo-full.png?v=6", text: "" },
