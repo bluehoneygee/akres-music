@@ -46,10 +46,10 @@ export default function InstructorsPage() {
   const [activeInstructor, setActiveInstructor] = useState<string | null>(null);
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-[#f5f5f5] md:block md:h-auto md:overflow-visible">
+    <main className="flex min-h-screen flex-col bg-[#f5f5f5] md:block md:h-auto md:overflow-visible">
       <LandingNavbar />
 
-      <section className="relative z-0 flex w-full flex-1 items-center overflow-hidden px-4 pt-16 md:h-screen md:px-12 md:pt-20">
+      <section className="relative z-0 flex h-screen w-full items-start overflow-y-auto px-4 pt-6 md:h-screen md:items-center md:overflow-hidden md:px-12 md:pt-20">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-0 hidden md:block"
@@ -68,7 +68,7 @@ export default function InstructorsPage() {
         />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl md:max-w-5xl">
-          <h1 className="mb-2 text-center text-2xl font-semibold tracking-wide text-[#223A5E] md:hidden">
+          <h1 className="mb-2 pt-30 text-center text-2xl font-semibold tracking-wide text-[#223A5E] md:hidden">
             Meet Our Instructors
           </h1>
 
