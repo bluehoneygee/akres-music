@@ -4,6 +4,7 @@ import { LandingFooter } from "@/components/landing-footer";
 import { LandingNavbar } from "@/components/landing-navbar";
 import GridMotion from "@/components/grid-motion";
 import Image from "next/image";
+import { useState } from "react";
 
 const instructors = [
   {
@@ -38,31 +39,85 @@ const instructors = [
 
 export default function InstructorsPage() {
   const bgItems = Array.from({ length: 28 }, () => "/akres-logo-full.png?v=6");
+  const [activeInstructor, setActiveInstructor] = useState<string | null>(null);
 
   return (
-    <main className="bg-[#f5f5f5]">
+    <main className="flex h-screen flex-col overflow-hidden bg-[#f5f5f5] md:block md:h-auto md:overflow-visible">
       <LandingNavbar />
 
-      <section className="relative z-0 flex h-screen w-full items-center overflow-hidden px-3 pt-16 md:px-6 md:pt-20">
+      <section className="relative z-0 flex flex-1 w-full items-center overflow-hidden px-3 pt-16 md:h-screen md:px-6 md:pt-20">
         <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden md:block">
           <div className="h-full w-full bg-[#eef1f4] [filter:grayscale(1)]">
             <GridMotion gradientColor="rgba(255, 255, 255, 0.5)" items={bgItems} />
           </div>
           <div className="absolute inset-0 bg-[#dfe4ea]/68" />
         </div>
-        <div aria-hidden className="absolute inset-0 z-0 bg-[#f5f5f5] md:hidden" />
+        <div aria-hidden className="absolute inset-0 z-0 bg-[#7b7f4a] md:hidden" />
 
         <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <h1
-            className="mb-6 text-center text-3xl font-semibold tracking-tight md:text-4xl"
-            style={{ color: "#09090b" }}
-          >
+          <h1 className="mb-6 text-center text-3xl font-semibold tracking-tight text-white md:text-4xl md:text-[#09090b]">
             Meet Our Instructors
           </h1>
-          <div className="mx-auto flex min-h-[58vh] w-full max-w-6xl flex-nowrap items-center justify-center gap-6 overflow-x-auto px-2 md:overflow-visible md:px-4">
-            {instructors.map((instructor) => (
-              <article className="group relative h-[350px] w-[230px] shrink-0" key={instructor.name}>
-                <div className="absolute bottom-3 left-1/2 z-0 flex h-[230px] w-[230px] -translate-x-1/2 flex-col items-center justify-start rounded-[12px] bg-[#09090d] px-4 pt-32 text-white shadow-[0_18px_42px_rgba(15,23,42,.3)] transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
+
+          <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-4 px-2 md:hidden">
+            {instructors.map((instructor) => {
+              const isActive = activeInstructor === instructor.name;
+
+              return (
+                <article
+                  className="group relative h-[220px]"
+                  key={`mobile-${instructor.name}`}
+                  onClick={() => {
+                    setActiveInstructor((current) => (current === instructor.name ? null : instructor.name));
+                  }}
+                >
+                  <div
+                    className={`absolute bottom-0 left-1/2 z-0 flex h-[150px] w-[150px] -translate-x-1/2 flex-col items-center justify-start rounded-[6px] bg-[#09090d] px-3 pt-20 text-white shadow-[0_14px_30px_rgba(15,23,42,.26)] transition-all duration-300 ${
+                      isActive ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    <h2 className="text-center text-[11px] font-semibold uppercase leading-tight tracking-[0.05em]">
+                      {instructor.name}
+                    </h2>
+                    <p className="mt-1 text-center text-[10px] font-medium text-white/85">{instructor.role}</p>
+                  </div>
+
+                  <div
+                    className={`absolute bottom-0 left-1/2 z-20 h-[150px] w-[150px] -translate-x-1/2 overflow-hidden rounded-[6px] [transform-origin:50%_0%] shadow-[0_10px_20px_rgba(15,23,42,.14)] transition-all duration-300 ${
+                      isActive ? "-translate-y-8 scale-[0.68]" : ""
+                    }`}
+                  >
+                    <Image
+                      alt={instructor.name}
+                      className="object-cover"
+                      fill
+                      sizes="150px"
+                      src={instructor.image}
+                      style={{ objectPosition: instructor.imagePosition }}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mx-auto hidden min-h-[58vh] w-full max-w-6xl flex-nowrap items-center justify-center gap-6 overflow-x-auto px-2 md:flex md:overflow-visible md:px-4">
+            {instructors.map((instructor) => {
+              const isActive = activeInstructor === instructor.name;
+
+              return (
+              <article
+                className="group relative h-[350px] w-[230px] shrink-0"
+                key={instructor.name}
+                onClick={() => {
+                  setActiveInstructor((current) => (current === instructor.name ? null : instructor.name));
+                }}
+              >
+                <div
+                  className={`absolute bottom-3 left-1/2 z-0 flex h-[230px] w-[230px] -translate-x-1/2 flex-col items-center justify-start rounded-[6px] bg-[#09090d] px-4 pt-32 text-white shadow-[0_18px_42px_rgba(15,23,42,.3)] transition-all duration-500 ${
+                    isActive ? "opacity-100" : "opacity-0"
+                  } md:opacity-0 md:group-hover:opacity-100`}
+                >
                   <h2
                     className="text-center text-[18px] font-semibold uppercase leading-tight tracking-[0.06em] md:text-[20px]"
                     style={{ color: "#ffffff" }}
@@ -77,7 +132,11 @@ export default function InstructorsPage() {
                   </p>
                 </div>
 
-                <div className="absolute bottom-3 left-1/2 z-20 h-[230px] w-[230px] -translate-x-1/2 overflow-hidden rounded-[12px] [transform-origin:50%_0%] transition-all duration-500 md:group-hover:-translate-y-10 md:group-hover:scale-[0.62] md:group-hover:shadow-[0_14px_30px_rgba(15,23,42,.26)]">
+                <div
+                  className={`absolute bottom-3 left-1/2 z-20 h-[230px] w-[230px] -translate-x-1/2 overflow-hidden rounded-[6px] [transform-origin:50%_0%] transition-all duration-500 ${
+                    isActive ? "-translate-y-10 scale-[0.62] shadow-[0_14px_30px_rgba(15,23,42,.26)]" : ""
+                  } md:group-hover:-translate-y-10 md:group-hover:scale-[0.62] md:group-hover:shadow-[0_14px_30px_rgba(15,23,42,.26)]`}
+                >
                   <Image
                     alt={instructor.name}
                     className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -89,7 +148,8 @@ export default function InstructorsPage() {
                 </div>
 
               </article>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

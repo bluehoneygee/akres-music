@@ -2,13 +2,10 @@
 
 export default function AboutContent() {
   return (
-    <section className="flex h-screen w-full items-center px-6 pt-20 md:px-12 md:pt-24">
+    <section className="flex min-h-0 flex-1 w-full items-center overflow-y-auto px-4 pb-4 pt-16 md:h-screen md:px-12 md:pt-24">
       <div className="mx-auto max-w-6xl">
         <div className="grid gap-8 md:grid-cols-[1.2fr_.8fr]">
           <div className="rounded-[6px] border border-slate-200 bg-white/95 p-6 shadow-[0_20px_40px_rgba(15,23,42,.12)] md:p-10">
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-              About
-            </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 md:text-5xl">
               Tentang Akres Music Academy
             </h1>
