@@ -11,6 +11,7 @@ import {
   LogIn,
   Menu,
   MicVocal,
+  Trophy,
   UserRound,
   X,
 } from "lucide-react";
@@ -24,8 +25,8 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/results", label: "Results", icon: FileText },
-  { href: "/policies", label: "Policies", icon: Info },
+  { href: "/results", label: "Results", icon: Trophy },
+  { href: "/policies", label: "Policies", icon: FileText },
   {
     href: "/akres-concert-series",
     label: "Akres Concert Series",
