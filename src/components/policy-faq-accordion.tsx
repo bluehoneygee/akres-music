@@ -22,14 +22,14 @@ export function PolicyFaqAccordion({
   const [openIndexes, setOpenIndexes] = useState<number[]>([]);
 
   return (
-    <div className="w-full py-5 pl-6 pr-0" style={{ background }}>
+    <div className="w-full py-4 pl-4 pr-2 sm:py-5 sm:pl-6 sm:pr-0" style={{ background }}>
       {items.map((faq, index) => {
         const isOpen = openIndexes.includes(index);
 
         return (
           <div className="mb-4" key={faq.q}>
             <button
-              className="relative z-20 flex w-full cursor-pointer items-center gap-4 rounded-l-md border-0 bg-black px-6 py-5 text-left text-[1.1rem] font-bold !text-white"
+              className="relative z-20 flex w-full cursor-pointer items-center gap-3 rounded-l-md border-0 bg-black px-4 py-4 text-left text-[0.95rem] font-bold !text-white sm:gap-4 sm:px-6 sm:py-5 sm:text-[1.1rem]"
               onClick={() => {
                 const nextOpen = !isOpen;
                 setOpenIndexes((prev) =>
@@ -40,7 +40,7 @@ export function PolicyFaqAccordion({
             >
               <span
                 aria-hidden="true"
-                className={`inline-flex w-5 flex-none justify-center text-[1.4rem] font-black leading-none !text-white transition-transform duration-200 ease-out ${
+                className={`inline-flex w-5 flex-none justify-center text-[1.2rem] font-black leading-none !text-white transition-transform duration-200 ease-out sm:text-[1.4rem] ${
                   isOpen ? "rotate-[360deg]" : "rotate-0"
                 }`}
               >
@@ -55,7 +55,7 @@ export function PolicyFaqAccordion({
               }`}
             >
               <div
-                className={`ml-6 mr-0 -mt-[18px] rounded-bl-md bg-white px-6 pb-5 pt-9 text-[#222] ${
+                className={`ml-4 mr-0 -mt-3 rounded-bl-md bg-white px-4 pb-4 pt-7 text-[0.92rem] text-[#222] sm:ml-6 sm:-mt-[18px] sm:px-6 sm:pb-5 sm:pt-9 sm:text-base ${
                   scrollableAnswer ? "max-h-[260px] overflow-y-auto" : ""
                 }`}
               >

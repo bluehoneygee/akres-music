@@ -3,29 +3,48 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import {
+  ChevronDown,
+  FileText,
+  Home,
+  Info,
+  LogIn,
+  Menu,
+  MicVocal,
+  UserRound,
+  X,
+} from "lucide-react";
+import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
 
 type NavItem = {
   href: string;
   label: string;
+  icon: ComponentType<{ className?: string }>;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Home" },
-  { href: "/results", label: "Results" },
-  { href: "/policies", label: "Policies" },
-  { href: "/akres-concert-series", label: "Akres Concert Series" },
+  { href: "/results", label: "Results", icon: FileText },
+  { href: "/policies", label: "Policies", icon: Info },
+  { href: "/akres-concert-series", label: "Akres Concert Series", icon: MicVocal },
 ];
 
 export function LandingNavbar() {
   const [open, setOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     setOpen(false);
+    setAboutOpen(false);
   }, [pathname]);
+
+  const isHomeActive = pathname === "/";
+  const isHomePage = pathname === "/";
+  const isAboutActive = pathname === "/about" || pathname.startsWith("/about/");
+  const isInstructorsActive = pathname === "/about/instructors";
+  const isActivePath = (href: string) => pathname === href;
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -44,118 +63,236 @@ export function LandingNavbar() {
   }, [pathname]);
 
   return (
-    <nav
-      className={`left-0 top-0 z-20 w-full transition-all duration-300 ${
-        isSticky
-          ? "fixed bg-white/92 shadow-[0_12px_34px_rgba(146,64,14,0.12)] backdrop-blur"
-          : "absolute bg-white/92 shadow-[0_12px_34px_rgba(146,64,14,0.12)] backdrop-blur"
-      }`}
-    >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link className="inline-flex items-center" href="/">
-          <span className="relative block h-[44px] w-[242px] shrink-0 md:h-[56px] md:w-[308px]">
-            <Image
-              alt="Akres Music Academy"
-              className="object-contain"
-              fill
-              priority
-              sizes="(max-width: 768px) 242px, 308px"
-              src="/IMG_4876-navbar.png"
-            />
-          </span>
-        </Link>
+    <>
+      {open ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            aria-label="Close menu overlay"
+            className="absolute inset-0 bg-zinc-950/35 backdrop-blur-[1px]"
+            onClick={() => {
+              setOpen(false);
+              setAboutOpen(false);
+            }}
+            type="button"
+          />
 
-        <ul className="hidden gap-8 text-xs uppercase tracking-wider md:flex">
-          <li className="group relative">
-            <Link className="!text-black transition hover:text-amber-700" href="/about">
-              About
-            </Link>
-            <div className="absolute left-1/2 top-full z-30 w-44 -translate-x-1/2 pt-1.5">
-              <div className="pointer-events-none translate-y-2 rounded-xl border border-zinc-200 bg-white p-2 opacity-0 shadow-[0_12px_30px_rgba(24,24,27,0.12)] transition duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
-                <Link
-                  className="block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider text-black transition hover:bg-zinc-50 hover:text-amber-700"
-                  href="/about"
-                >
-                  About Akres
-                </Link>
-                <Link
-                  className="block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider text-black transition hover:bg-zinc-50 hover:text-amber-700"
-                  href="/about/instructors"
-                >
-                  Instructors
-                </Link>
-              </div>
+          <aside className="relative h-screen w-[84%] max-w-[340px] overflow-y-auto bg-white px-5 pb-8 pt-5 shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
+            <div className="mb-6 flex items-center justify-end border-b border-zinc-200 pb-4">
+
+              <button
+                aria-label="Close menu"
+                className="!text-black focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
+                onClick={() => {
+                  setOpen(false);
+                  setAboutOpen(false);
+                }}
+                type="button"
+              >
+                <X size={24} />
+              </button>
             </div>
-          </li>
 
-          {NAV_ITEMS.map((item) => (
-            <li key={item.href}>
-              <Link className="!text-black transition hover:text-amber-700" href={item.href}>
-                {item.label}
+            <ul className="flex flex-col gap-4 text-sm font-bold capitalize tracking-wide">
+              <li>
+                <Link
+                  className={`flex items-center gap-2 transition ${
+                    isHomeActive
+                      ? "text-amber-700"
+                      : "!text-black hover:text-amber-700"
+                  }`}
+                  href="/"
+                >
+                  <Home className="size-4" />
+                  Home
+                </Link>
+              </li>
+
+              <li>
+                <button
+                  aria-expanded={aboutOpen}
+                  className={`flex w-full items-center justify-between transition ${
+                    isAboutActive
+                      ? "text-amber-700"
+                      : "!text-black hover:text-amber-700"
+                  }`}
+                  onClick={() => setAboutOpen((prev) => !prev)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <Info className="size-4" />
+                    About
+                  </span>
+                  <ChevronDown className={`size-4 transition-transform ${aboutOpen ? "rotate-180" : "rotate-0"}`} />
+                </button>
+                {aboutOpen ? (
+                  <div className="mt-2 space-y-2 pl-4">
+                    <Link
+                      className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
+                        pathname === "/about"
+                          ? "text-amber-700"
+                          : "text-black hover:text-amber-700"
+                      }`}
+                      href="/about"
+                    >
+                      <Info className="size-3.5" />
+                      About Akres
+                    </Link>
+                    <Link
+                      className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
+                        isInstructorsActive
+                          ? "text-amber-700"
+                          : "text-black hover:text-amber-700"
+                      }`}
+                      href="/about/instructors"
+                    >
+                      <UserRound className="size-3.5" />
+                      Instructors
+                    </Link>
+                  </div>
+                ) : null}
+              </li>
+
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                <li key={item.href}>
+                  <Link
+                    className={`flex items-center gap-2 transition ${
+                      isActivePath(item.href)
+                        ? "text-amber-700"
+                        : "!text-black hover:text-amber-700"
+                    }`}
+                    href={item.href}
+                  >
+                    <Icon className="size-4" />
+                    {item.label}
+                  </Link>
+                </li>
+                );
+              })}
+
+              <li className="border-t border-zinc-200 pt-3">
+                <Link
+                  className={`${isActivePath("/login") ? "text-amber-700" : "!text-black hover:text-amber-700"} flex items-center gap-2 transition`}
+                  href="/login"
+                >
+                  <LogIn className="size-4" />
+                  Login
+                </Link>
+              </li>
+            </ul>
+          </aside>
+        </div>
+      ) : null}
+
+      <nav
+        className={`left-0 top-0 z-40 w-full transition-all duration-300 ${
+          isHomePage
+            ? isSticky
+              ? "fixed bg-white/92 shadow-[0_12px_34px_rgba(146,64,14,0.12)] backdrop-blur"
+              : "absolute bg-white/92 shadow-[0_12px_34px_rgba(146,64,14,0.12)] backdrop-blur"
+            : "fixed bg-white/92 shadow-[0_12px_34px_rgba(146,64,14,0.12)] backdrop-blur"
+        }`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <button
+            aria-label="Toggle menu"
+            className="!text-black focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 md:hidden"
+            onClick={() => setOpen((prev) => !prev)}
+            type="button"
+          >
+            {open ? <X size={26} /> : <Menu size={26} />}
+          </button>
+
+          <Link className="hidden items-center md:inline-flex" href="/">
+            <span className="relative block h-[44px] w-[242px] shrink-0 md:h-[56px] md:w-[308px]">
+              <Image
+                alt="Akres Music Academy"
+                className="object-contain"
+                fill
+                priority
+                sizes="(max-width: 768px) 242px, 308px"
+                src="/IMG_4876-navbar.png"
+              />
+            </span>
+          </Link>
+
+          <ul className="hidden gap-8 text-xs uppercase tracking-wider md:flex">
+            <li>
+              <Link
+                className={`inline-flex items-center gap-2 transition ${
+                  isHomeActive
+                    ? "text-amber-700"
+                    : "text-zinc-600 hover:text-amber-700"
+                }`}
+                href="/"
+              >
+                Home
               </Link>
             </li>
-          ))}
-        </ul>
 
-        <Link
-          className="hidden rounded-full bg-[#09090b] px-4 py-2 font-medium !text-white shadow-[0_10px_22px_rgba(24,24,27,0.24)] transition hover:bg-[#18181b] md:inline-block"
-          href="/login"
-        >
-          Login
-        </Link>
-
-        <button
-          aria-label="Toggle menu"
-          className="!text-black focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 md:hidden"
-          onClick={() => setOpen((prev) => !prev)}
-          type="button"
-        >
-          {open ? <X size={28} /> : <Menu size={28} />}
-        </button>
-      </div>
-
-      {open ? (
-        <div className="rounded-b-xl border-t border-amber-100/70 bg-white/98 px-6 py-4 shadow-[0_12px_30px_rgba(146,64,14,0.16)] md:hidden">
-          <ul className="flex flex-col items-center gap-4 text-sm font-bold uppercase tracking-wider">
-            <li>
-              <Link className="!text-black transition hover:text-amber-700" href="/about">
+            <li className="group relative">
+              <Link
+                className={`inline-flex items-center gap-2 transition ${
+                  isAboutActive
+                    ? "text-amber-700"
+                    : "text-zinc-600 hover:text-amber-700"
+                }`}
+                href="/about"
+              >
                 About
               </Link>
-              <div className="mt-2 space-y-2 pl-4">
-                <Link
-                  className="block text-xs font-semibold tracking-wider text-black transition hover:text-amber-700"
-                  href="/about"
-                >
-                  About Akres
-                </Link>
-                <Link
-                  className="block text-xs font-semibold tracking-wider text-black transition hover:text-amber-700"
-                  href="/about/instructors"
-                >
-                  Instructors
-                </Link>
+              <div className="absolute left-1/2 top-full z-30 w-44 -translate-x-1/2 pt-1.5">
+                <div className="pointer-events-none translate-y-2 rounded-xl border border-zinc-200 bg-white p-2 opacity-0 shadow-[0_12px_30px_rgba(24,24,27,0.12)] transition duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                  <Link
+                    className={`block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider transition hover:bg-zinc-50 hover:text-amber-700 ${
+                      pathname === "/about" ? "text-amber-700" : "text-black"
+                    }`}
+                    href="/about"
+                  >
+                    About Akres
+                  </Link>
+                  <Link
+                    className={`block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider transition hover:bg-zinc-50 hover:text-amber-700 ${
+                      isInstructorsActive ? "text-amber-700" : "text-black"
+                    }`}
+                    href="/about/instructors"
+                  >
+                    Instructors
+                  </Link>
+                </div>
               </div>
             </li>
 
-            {NAV_ITEMS.map((item) => (
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
               <li key={item.href}>
-                <Link className="!text-black transition hover:text-amber-700" href={item.href}>
+                <Link
+                  className={`inline-flex items-center gap-2 transition ${
+                    isActivePath(item.href)
+                      ? "text-amber-700"
+                      : "text-zinc-600 hover:text-amber-700"
+                  }`}
+                  href={item.href}
+                >
                   {item.label}
                 </Link>
               </li>
-            ))}
-
-            <li>
-              <Link
-                className="block rounded-full bg-[#09090b] px-4 py-2 font-medium !text-white hover:bg-[#18181b]"
-                href="/login"
-              >
-                Login
-              </Link>
-            </li>
+              );
+            })}
           </ul>
+
+          <Link
+            className="hidden rounded-full bg-[#09090b] px-4 py-2 font-medium !text-white shadow-[0_10px_22px_rgba(24,24,27,0.24)] transition hover:bg-[#18181b] md:inline-block"
+            href="/login"
+          >
+            Login
+          </Link>
+
+          <span aria-hidden="true" className="block w-[26px] md:hidden" />
         </div>
-      ) : null}
-    </nav>
+      </nav>
+    </>
   );
 }
