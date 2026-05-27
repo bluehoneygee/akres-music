@@ -1,5 +1,3 @@
-"use client";
-
 export default function AboutContent() {
   return (
     <section className="flex min-h-0 flex-1 w-full items-center overflow-y-auto px-4 pb-4 pt-16 md:h-screen md:px-12 md:pt-24">

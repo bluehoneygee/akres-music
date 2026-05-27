@@ -30,6 +30,7 @@ export default function ResultsPage() {
     if (!col1 || !col2 || !col3) return;
 
     let raf = 0;
+    let running = true;
     let current = 0;
     let target = 0;
     let col2BaseOffset = col2.scrollHeight / 2;
@@ -53,11 +54,25 @@ export default function ResultsPage() {
     col3.style.transform = "translateY(0px)";
 
     const animate = () => {
+      if (!running) return;
       current += (target - current) * 0.08;
       col1.style.transform = `translateY(${-current * 0.6}px)`;
       col2.style.transform = `translateY(${-col2BaseOffset + current * 0.6}px)`;
       col3.style.transform = `translateY(${-current * 0.6}px)`;
       raf = window.requestAnimationFrame(animate);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        running = false;
+        window.cancelAnimationFrame(raf);
+        return;
+      }
+
+      if (!running) {
+        running = true;
+        raf = window.requestAnimationFrame(animate);
+      }
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -96,6 +111,7 @@ export default function ResultsPage() {
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.cancelAnimationFrame(raf);
@@ -103,6 +119,7 @@ export default function ResultsPage() {
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

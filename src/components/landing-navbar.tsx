@@ -225,7 +225,6 @@ export function LandingNavbar() {
                 alt="Akres Music Academy"
                 className="object-contain"
                 fill
-                priority
                 sizes="(max-width: 768px) 242px, 308px"
                 src="/IMG_4876-navbar.png"
               />

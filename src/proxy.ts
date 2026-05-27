@@ -8,7 +8,27 @@ export const proxy = auth;
 
 export const config = {
   matcher: [
-    "/((?!api|login|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|webp|gif|svg|ico|css|js|map|txt|xml)).*)",
+    "/dashboard/:path*",
+    "/attendance/:path*",
+    "/billing/:path*",
+    "/courses/:path*",
+    "/guardians/:path*",
+    "/instructor-availability/:path*",
+    "/instructor-calendar/:path*",
+    "/instructor-spotlight/:path*",
+    "/instructors/:path*",
+    "/instruments/:path*",
+    "/journals/:path*",
+    "/lesson-packages/:path*",
+    "/notifications/:path*",
+    "/programs/:path*",
+    "/repertoires/:path*",
+    "/reports/:path*",
+    "/showcase/:path*",
+    "/student-calendar/:path*",
+    "/students/:path*",
+    "/studio-rooms/:path*",
+    "/users/:path*",
+    "/portal/:path*",
   ],
 };
-
