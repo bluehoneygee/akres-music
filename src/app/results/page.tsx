@@ -42,11 +42,14 @@ export default function ResultsPage() {
     let current = 0;
     let target = 0;
     let col2BaseOffset = col2.scrollHeight / 2;
+    const BOTTOM_GAP_PX = 140;
 
     const getMaxScroll = () => {
       const colHeight = Math.max(col1.scrollHeight, col2.scrollHeight, col3.scrollHeight);
       const viewportHeight = window.innerHeight;
-      return Math.max(0, colHeight - viewportHeight + 700);
+      const maxByCol1 = Math.max(0, (col1.scrollHeight - viewportHeight + BOTTOM_GAP_PX) / 0.6);
+      const maxByCol3 = Math.max(0, (col3.scrollHeight - viewportHeight + BOTTOM_GAP_PX) / 0.6);
+      return Math.min(colHeight > 0 ? maxByCol1 : 0, colHeight > 0 ? maxByCol3 : 0);
     };
 
     const clamp = (v: number) => {
