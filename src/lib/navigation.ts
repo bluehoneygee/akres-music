@@ -30,8 +30,8 @@ export const appNavigation = [
     ],
   },
   {
-    label: "Overview",
-    href: "/",
+    label: "Dashboard",
+    href: "/dashboard",
     icon: LayoutDashboard,
     roles: [
       "System Manager",

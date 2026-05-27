@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
+import { ThemeInitializer } from "@/components/theme-initializer";
 
 import "./globals.css";
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Akres Music Academic",
@@ -15,13 +23,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "(()=>{try{const t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.documentElement.classList.toggle('dark',t==='dark')}catch{}})()",
-          }}
-        />
+      <body className={poppins.className}>
+        <ThemeInitializer />
         {children}
         <Toaster richColors position="top-right" />
       </body>
