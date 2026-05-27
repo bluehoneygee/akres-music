@@ -26,7 +26,11 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/results", label: "Results", icon: FileText },
   { href: "/policies", label: "Policies", icon: Info },
-  { href: "/akres-concert-series", label: "Akres Concert Series", icon: MicVocal },
+  {
+    href: "/akres-concert-series",
+    label: "Akres Concert Series",
+    icon: MicVocal,
+  },
 ];
 
 export function LandingNavbar() {
@@ -64,35 +68,43 @@ export function LandingNavbar() {
 
   return (
     <>
-      {open ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button
-            aria-label="Close menu overlay"
-            className="absolute inset-0 bg-zinc-950/35 backdrop-blur-[1px]"
-            onClick={() => {
-              setOpen(false);
-              setAboutOpen(false);
-            }}
-            type="button"
-          />
+      <div
+        aria-hidden={!open}
+        className={`fixed inset-0 z-50 transition-opacity duration-200 md:hidden ${
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        <button
+          aria-label="Close menu overlay"
+          className="absolute inset-0 bg-zinc-950/35 backdrop-blur-[1px]"
+          onClick={() => {
+            setOpen(false);
+            setAboutOpen(false);
+          }}
+          type="button"
+        />
 
-          <aside className="relative h-screen w-[84%] max-w-[340px] overflow-y-auto bg-white px-5 pb-8 pt-5 shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
-            <div className="mb-6 flex items-center justify-end border-b border-zinc-200 pb-4">
+        <aside
+          aria-hidden={!open}
+          className={`relative flex h-screen w-[84%] max-w-[340px] flex-col bg-white px-5 pb-10 pt-5 shadow-[0_20px_50px_rgba(0,0,0,0.25)] transition-transform duration-200 ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="mb-6 flex items-center justify-end border-b border-zinc-200 pb-4">
+            <button
+              aria-label="Close menu"
+              className="!text-black focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
+              onClick={() => {
+                setOpen(false);
+                setAboutOpen(false);
+              }}
+              type="button"
+            >
+              <X size={24} />
+            </button>
+          </div>
 
-              <button
-                aria-label="Close menu"
-                className="!text-black focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
-                onClick={() => {
-                  setOpen(false);
-                  setAboutOpen(false);
-                }}
-                type="button"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <ul className="flex flex-col gap-4 text-sm font-bold capitalize tracking-wide">
+          <ul className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto text-sm font-bold capitalize tracking-wide">
               <li>
                 <Link
                   className={`flex items-center gap-2 transition ${
@@ -122,56 +134,60 @@ export function LandingNavbar() {
                     <Info className="size-4" />
                     About
                   </span>
-                  <ChevronDown className={`size-4 transition-transform ${aboutOpen ? "rotate-180" : "rotate-0"}`} />
+                  <ChevronDown
+                    className={`size-4 transition-transform ${aboutOpen ? "rotate-180" : "rotate-0"}`}
+                  />
                 </button>
-                {aboutOpen ? (
-                  <div className="mt-2 space-y-2 pl-4">
-                    <Link
-                      className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
-                        pathname === "/about"
-                          ? "text-amber-700"
-                          : "text-black hover:text-amber-700"
-                      }`}
-                      href="/about"
-                    >
-                      <Info className="size-3.5" />
-                      About Akres
-                    </Link>
-                    <Link
-                      className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
-                        isInstructorsActive
-                          ? "text-amber-700"
-                          : "text-black hover:text-amber-700"
-                      }`}
-                      href="/about/instructors"
-                    >
-                      <UserRound className="size-3.5" />
-                      Instructors
-                    </Link>
-                  </div>
-                ) : null}
+                <div
+                  className={`mt-2 space-y-2 overflow-hidden pl-4 transition-[max-height,opacity] duration-200 ${
+                    aboutOpen ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <Link
+                    className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
+                      pathname === "/about"
+                        ? "text-amber-700"
+                        : "text-black hover:text-amber-700"
+                    }`}
+                    href="/about"
+                  >
+                    <Info className="size-3.5" />
+                    About Akres
+                  </Link>
+                  <Link
+                    className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
+                      isInstructorsActive
+                        ? "text-amber-700"
+                        : "text-black hover:text-amber-700"
+                    }`}
+                    href="/about/instructors"
+                  >
+                    <UserRound className="size-3.5" />
+                    Instructors
+                  </Link>
+                </div>
               </li>
 
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 return (
-                <li key={item.href}>
-                  <Link
-                    className={`flex items-center gap-2 transition ${
-                      isActivePath(item.href)
-                        ? "text-amber-700"
-                        : "!text-black hover:text-amber-700"
-                    }`}
-                    href={item.href}
-                  >
-                    <Icon className="size-4" />
-                    {item.label}
-                  </Link>
-                </li>
+                  <li key={item.href}>
+                    <Link
+                      className={`flex items-center gap-2 transition ${
+                        isActivePath(item.href)
+                          ? "text-amber-700"
+                          : "!text-black hover:text-amber-700"
+                      }`}
+                      href={item.href}
+                    >
+                      <Icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  </li>
                 );
               })}
 
-              <li className="border-t border-zinc-200 pt-3">
+              <li className="mt-auto border-t border-zinc-200 pt-6 pb-2">
                 <Link
                   className={`${isActivePath("/login") ? "text-amber-700" : "!text-black hover:text-amber-700"} flex items-center gap-2 transition`}
                   href="/login"
@@ -180,10 +196,9 @@ export function LandingNavbar() {
                   Login
                 </Link>
               </li>
-            </ul>
-          </aside>
-        </div>
-      ) : null}
+          </ul>
+        </aside>
+      </div>
 
       <nav
         className={`left-0 top-0 z-40 w-full transition-all duration-300 ${
@@ -267,18 +282,18 @@ export function LandingNavbar() {
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
-              <li key={item.href}>
-                <Link
-                  className={`inline-flex items-center gap-2 transition ${
-                    isActivePath(item.href)
-                      ? "text-amber-700"
-                      : "text-zinc-600 hover:text-amber-700"
-                  }`}
-                  href={item.href}
-                >
-                  {item.label}
-                </Link>
-              </li>
+                <li key={item.href}>
+                  <Link
+                    className={`inline-flex items-center gap-2 transition ${
+                      isActivePath(item.href)
+                        ? "text-amber-700"
+                        : "text-zinc-600 hover:text-amber-700"
+                    }`}
+                    href={item.href}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
               );
             })}
           </ul>
