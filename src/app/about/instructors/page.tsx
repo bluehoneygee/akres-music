@@ -91,10 +91,10 @@ export default function InstructorsPage() {
                       isActive ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    <h2 className="text-center text-[12px] font-semibold uppercase leading-tight tracking-[0.05em]">
+                    <h2 className="text-center text-[12px] font-semibold uppercase leading-tight tracking-[0.05em] !text-white">
                       {instructor.name}
                     </h2>
-                    <p className="mt-1 text-center text-[10px] font-medium text-white/85">
+                    <p className="mt-1 text-center text-[10px] font-medium !text-white/85">
                       {instructor.role}
                     </p>
                   </div>

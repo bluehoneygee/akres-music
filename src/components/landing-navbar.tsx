@@ -5,12 +5,12 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   ChevronDown,
-  FileText,
   Home,
   Info,
   LogIn,
   Menu,
   MicVocal,
+  Trophy,
   UserRound,
   X,
 } from "lucide-react";
@@ -24,7 +24,7 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/results", label: "Results", icon: FileText },
+  { href: "/results", label: "Results", icon: Trophy },
   { href: "/policies", label: "Policies", icon: Info },
   {
     href: "/akres-concert-series",

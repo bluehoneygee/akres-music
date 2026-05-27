@@ -21,7 +21,7 @@ export default function AkresConcertSeriesPage() {
 
         <div className="mt-6 flex justify-center">
           <Link
-            className="inline-flex items-center rounded-full bg-black px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            className="inline-flex items-center rounded-full bg-black px-5 py-2.5 text-sm font-semibold !text-white transition hover:bg-zinc-800"
             href="/"
           >
             Kembali ke Home

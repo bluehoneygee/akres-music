@@ -32,8 +32,9 @@ export function LandingFooter() {
           Bersama Akres, <span className="text-white">Tumbuh Lewat Musik</span>
         </h2>
         <p className="mt-3 text-xs leading-relaxed text-white sm:mt-4 sm:text-sm">
-          Langkah kecil dari latihan rutin membentuk progres besar. Akres Music Academy hadir untuk membantu murid
-          berkembang dengan alur belajar yang terarah.
+          Langkah kecil dari latihan rutin membentuk progres besar.
+          <span className="block">Akres Music Academy hadir untuk membantu murid berkembang</span>
+          <span className="block">dengan alur belajar yang terarah.</span>
         </p>
         <div className="mt-6 flex justify-center gap-5 text-xl sm:mt-8 sm:gap-6 sm:text-2xl">
           <Link
