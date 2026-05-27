@@ -251,7 +251,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   return (
     <Link className="block" href={card.href}>
       <article
-        className={`relative h-full min-h-0 cursor-pointer touch-none overflow-hidden p-8 md:touch-auto md:p-10 ${card.panelClassName}`}
+        className={`relative h-full min-h-0 cursor-pointer overflow-hidden p-8 md:p-10 ${card.panelClassName}`}
         data-preview-card-id={card.id}
         onClickCapture={handleClickCapture}
         onPointerEnter={handlePointerEnter}
@@ -288,14 +288,14 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
 
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-30 opacity-0"
+          className="pointer-events-none absolute inset-0 z-40 opacity-0"
           ref={textRevealRef}
         >
           <div className="relative flex h-full min-h-0 flex-col items-center justify-center text-center">
-            <h3 className="text-4xl font-semibold text-white md:text-5xl">
+            <h3 className="text-4xl font-semibold !text-white md:text-5xl">
               {card.title}
             </h3>
-            <p className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed text-white md:max-w-lg md:px-0 md:text-lg">
+            <p className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed !text-white md:max-w-lg md:px-0 md:text-lg">
               {card.description}
             </p>
           </div>
@@ -307,6 +307,8 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
 
 export function LandingInstructorResultsHover() {
   const dragPointerIdRef = useRef<number | null>(null);
+  const dragActiveRef = useRef(false);
+  const startPointRef = useRef({ x: 0, y: 0 });
   const [showMobileHint, setShowMobileHint] = useState(true);
 
   const dispatchPanelDrag = (detail: PanelDragDetail) => {
@@ -322,18 +324,32 @@ export function LandingInstructorResultsHover() {
   const handleMobilePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") return;
     dragPointerIdRef.current = event.pointerId;
+    dragActiveRef.current = false;
+    startPointRef.current = { x: event.clientX, y: event.clientY };
     setShowMobileHint(false);
-    dispatchPanelDrag({
-      active: true,
-      x: event.clientX,
-      y: event.clientY,
-      cardId: getCardIdFromPoint(event.clientX, event.clientY),
-    });
   };
 
   const handleMobilePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") return;
     if (dragPointerIdRef.current !== event.pointerId) return;
+
+    if (!dragActiveRef.current) {
+      const dx = event.clientX - startPointRef.current.x;
+      const dy = event.clientY - startPointRef.current.y;
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+      if (ady > 10 && ady > adx) {
+        dragPointerIdRef.current = null;
+        dispatchPanelDrag({ active: false, x: event.clientX, y: event.clientY, cardId: null });
+        return;
+      }
+
+      if (adx > 8 || ady > 8) {
+        dragActiveRef.current = true;
+      } else {
+        return;
+      }
+    }
 
     event.preventDefault();
     dispatchPanelDrag({
@@ -349,6 +365,7 @@ export function LandingInstructorResultsHover() {
     if (dragPointerIdRef.current !== event.pointerId) return;
 
     dragPointerIdRef.current = null;
+    dragActiveRef.current = false;
     dispatchPanelDrag({ active: false, x: event.clientX, y: event.clientY, cardId: null });
   };
 
@@ -356,6 +373,7 @@ export function LandingInstructorResultsHover() {
     <div className="h-screen">
       <div
         className="grid h-full grid-cols-1 md:grid-cols-2"
+        style={{ touchAction: "pan-y" }}
         onPointerCancel={handleMobilePointerEnd}
         onPointerDown={handleMobilePointerDown}
         onPointerMove={handleMobilePointerMove}
