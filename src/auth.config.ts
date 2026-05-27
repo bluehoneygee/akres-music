@@ -8,7 +8,14 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
-      if (pathname === "/" || pathname === "/login" || pathname === "/about" || pathname.startsWith("/about/")) {
+      if (
+        pathname === "/" ||
+        pathname === "/login" ||
+        pathname === "/about" ||
+        pathname.startsWith("/about/") ||
+        pathname === "/results" ||
+        pathname === "/opposing-scroll-gallery.html"
+      ) {
         return true;
       }
       return Boolean(auth?.user);
