@@ -229,7 +229,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="mt-4 shrink-0">
               <Button
                 className="w-full"
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: "/" })}
                 variant="glass"
               >
                 Logout
@@ -256,7 +256,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mt-4 shrink-0">
             <Button
               className="h-10 w-full px-0"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => signOut({ callbackUrl: "/" })}
               variant="glass"
             >
               ⎋
@@ -279,7 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mt-4 shrink-0 px-1 pb-1">
             <Button
               className="h-10 w-full"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => signOut({ callbackUrl: "/" })}
               variant="glass"
             >
               Logout

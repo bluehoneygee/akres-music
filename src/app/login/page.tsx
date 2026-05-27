@@ -1,4 +1,5 @@
 import { AuthError } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
@@ -72,6 +73,14 @@ export default function LoginPage({
               <p className="pt-1 text-center text-xs text-zinc-600">
                 User dibuat dan diatur dari dashboard Users oleh admin/staff.
               </p>
+              <div className="pt-1 text-center">
+                <Link
+                  className="inline-flex items-center rounded-full border border-zinc-300 bg-white/70 px-4 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-white hover:text-zinc-900"
+                  href="/"
+                >
+                  Kembali ke Home
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>
