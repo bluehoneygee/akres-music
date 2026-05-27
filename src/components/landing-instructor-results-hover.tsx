@@ -70,31 +70,35 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
       const clip = `circle(${size}px at ${x}px ${y}px)`;
       const baseMask = `radial-gradient(circle ${size}px at ${x}px ${y}px, transparent 99%, black 100%)`;
       reveal.style.clipPath = clip;
-      reveal.style.webkitClipPath = clip;
+      reveal.style.setProperty("-webkit-clip-path", clip);
       textReveal.style.clipPath = clip;
-      textReveal.style.webkitClipPath = clip;
+      textReveal.style.setProperty("-webkit-clip-path", clip);
       baseText.style.maskImage = baseMask;
-      baseText.style.webkitMaskImage = baseMask;
+      baseText.style.setProperty("-webkit-mask-image", baseMask);
     };
     updateMaskRef.current = updateMask;
 
     gsap.set(reveal, {
       autoAlpha: 0,
       clipPath: "circle(0px at 50% 50%)",
-      webkitClipPath: "circle(0px at 50% 50%)",
       willChange: "clip-path, opacity",
     });
     gsap.set(textReveal, {
       autoAlpha: 0,
       clipPath: "circle(0px at 50% 50%)",
-      webkitClipPath: "circle(0px at 50% 50%)",
       willChange: "clip-path, opacity",
     });
     gsap.set(baseText, {
       maskImage: "radial-gradient(circle 0px at 50% 50%, transparent 99%, black 100%)",
-      webkitMaskImage: "radial-gradient(circle 0px at 50% 50%, transparent 99%, black 100%)",
       willChange: "mask-image",
     });
+
+    reveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
+    textReveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
+    baseText.style.setProperty(
+      "-webkit-mask-image",
+      "radial-gradient(circle 0px at 50% 50%, transparent 99%, black 100%)",
+    );
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
     xToRef.current = gsap.quickTo(maskRef.current, "x", {
