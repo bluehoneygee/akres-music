@@ -3,28 +3,19 @@
 import { useEffect, useRef } from "react";
 
 import { LandingNavbar } from "@/components/landing-navbar";
+import { RESULTS_IMAGES } from "@/app/results/constants/results-images";
 
-const baseImages = [
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.51_p2xg8n.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.37.05_opgi1f.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.48_ff4iiv.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817141/IMG_5148_sswd48.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.37.04_trqbzh.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779817069/WhatsApp_Image_2026-05-26_at_19.36.49_moaku3.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797415/WhatsApp_Image_2026-05-26_at_18.55.37_2_rasi1m.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797513/WhatsApp_Image_2026-05-26_at_18.55.23_vbw0rz.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797558/WhatsApp_Image_2026-05-26_at_18.55.20_me1ev4.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797404/WhatsApp_Image_2026-05-26_at_18.55.37_p1omd8.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797597/WhatsApp_Image_2026-05-26_at_18.55.23_1_r91zfu.jpg",
-  "https://res.cloudinary.com/djusa1ywh/image/upload/v1779797428/WhatsApp_Image_2026-05-26_at_18.55.37_1_zzrojs.jpg",
-];
+const baseImages = RESULTS_IMAGES;
+const TARGET_IMAGE_COUNT = 32;
 
-const buildColumn = (seeds: number[]) => seeds.map((seed) => baseImages[(seed - 1) % baseImages.length]);
+const galleryImages = Array.from({ length: TARGET_IMAGE_COUNT }, (_, index) => {
+  return baseImages[index % baseImages.length];
+});
 
 const columns = [
-  buildColumn([1, 2, 3, 4, 5, 6, 7, 8]),
-  buildColumn([9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
-  buildColumn([1, 2, 3, 4, 5, 6, 7, 8]),
+  galleryImages.slice(0, 8),
+  galleryImages.slice(8, 24),
+  galleryImages.slice(24, 32),
 ];
 
 export default function ResultsPage() {
@@ -145,8 +136,6 @@ export default function ResultsPage() {
         </div>
       </section>
 
-      <h1>Our Gallery</h1>
-
       <style jsx>{`
         .results-page {
           min-height: 100vh;
@@ -183,17 +172,11 @@ export default function ResultsPage() {
         .card img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
           display: block;
+          background: #fff;
         }
 
-        h1 {
-          margin: 0;
-          padding: 1.5rem 0 2rem;
-          text-align: center;
-          font-family: Georgia, serif;
-          font-weight: 400;
-        }
       `}</style>
     </main>
   );
