@@ -45,7 +45,8 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   useEffect(() => {
     const reveal = revealRef.current;
     const image = imageRef.current;
-    if (!reveal || !image) return;
+    const cardEl = cardRef.current;
+    if (!reveal || !image || !cardEl) return;
 
     const updateMask = () => {
       const { x, y, size } = maskRef.current;
@@ -56,7 +57,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
     const tick = () => {
-      const smooth = 0.2;
+      const smooth = 0.24;
       maskRef.current.x += (targetRef.current.x - maskRef.current.x) * smooth;
       maskRef.current.y += (targetRef.current.y - maskRef.current.y) * smooth;
       updateMask();
@@ -65,7 +66,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     gsap.ticker.add(tick);
 
     maskSizeRef.current = gsap.quickTo(maskRef.current, "size", {
-      duration: 0.24,
+      duration: 0.32,
       ease: "power2.out",
       onUpdate: updateMask,
     });
@@ -95,12 +96,22 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     maskRef.current.x = startX;
     maskRef.current.y = startY;
     maskSizeRef.current?.(maskRadius);
-    gsap.to(revealRef.current, { autoAlpha: 1, duration: 0.32, ease: "power2.out" });
+    gsap.to(revealRef.current, {
+      autoAlpha: 1,
+      duration: 0.32,
+      ease: "power2.out",
+      overwrite: true,
+    });
   }
 
   function conceal() {
     maskSizeRef.current?.(0);
-    gsap.to(revealRef.current, { autoAlpha: 0, duration: 0.28, ease: "power2.inOut" });
+    gsap.to(revealRef.current, {
+      autoAlpha: 0,
+      duration: 0.28,
+      ease: "power2.inOut",
+      overwrite: true,
+    });
   }
 
   return (
@@ -110,6 +121,9 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
         onPointerEnter={reveal}
         onPointerLeave={conceal}
         onPointerMove={moveMask}
+        onPointerDown={reveal}
+        onPointerUp={conceal}
+        onPointerCancel={conceal}
         ref={cardRef}
       >
         <div

@@ -14,7 +14,8 @@ export const authConfig = {
         pathname === "/about" ||
         pathname.startsWith("/about/") ||
         pathname === "/policies" ||
-        pathname === "/results"
+        pathname === "/results" ||
+        pathname === "/akres-concert-series"
       ) {
         return true;
       }
