@@ -45,7 +45,7 @@ export default function InstructorsPage() {
     <main className="flex h-screen flex-col overflow-hidden bg-[#f5f5f5] md:block md:h-auto md:overflow-visible">
       <LandingNavbar />
 
-      <section className="relative z-0 flex flex-1 w-full items-center overflow-hidden px-3 pt-16 md:h-screen md:px-6 md:pt-20">
+      <section className="relative z-0 flex w-full flex-1 items-center overflow-hidden px-4 pt-16 md:h-screen md:px-12 md:pt-20">
         <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden md:block">
           <div className="h-full w-full bg-[#eef1f4] [filter:grayscale(1)]">
             <GridMotion gradientColor="rgba(255, 255, 255, 0.5)" items={bgItems} />
@@ -54,11 +54,7 @@ export default function InstructorsPage() {
         </div>
         <div aria-hidden className="absolute inset-0 z-0 bg-[#7b7f4a] md:hidden" />
 
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <h1 className="mb-6 text-center text-3xl font-semibold tracking-tight text-white md:text-4xl md:text-[#09090b]">
-            Meet Our Instructors
-          </h1>
-
+        <div className="relative z-10 mx-auto w-full max-w-6xl">
           <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-4 px-2 md:hidden">
             {instructors.map((instructor) => {
               const isActive = activeInstructor === instructor.name;
@@ -101,20 +97,20 @@ export default function InstructorsPage() {
             })}
           </div>
 
-          <div className="mx-auto hidden min-h-[58vh] w-full max-w-6xl flex-nowrap items-center justify-center gap-6 overflow-x-auto px-2 md:flex md:overflow-visible md:px-4">
+          <div className="mx-auto hidden min-h-[58vh] w-full max-w-6xl flex-nowrap items-center justify-center gap-6 overflow-x-auto px-2 md:flex md:overflow-visible md:px-0">
             {instructors.map((instructor) => {
               const isActive = activeInstructor === instructor.name;
 
               return (
               <article
-                className="group relative h-[350px] w-[230px] shrink-0"
+                className="group relative h-[390px] w-[250px] shrink-0"
                 key={instructor.name}
                 onClick={() => {
                   setActiveInstructor((current) => (current === instructor.name ? null : instructor.name));
                 }}
               >
                 <div
-                  className={`absolute bottom-3 left-1/2 z-0 flex h-[230px] w-[230px] -translate-x-1/2 flex-col items-center justify-start rounded-[6px] bg-[#09090d] px-4 pt-32 text-white shadow-[0_18px_42px_rgba(15,23,42,.3)] transition-all duration-500 ${
+                  className={`absolute bottom-4 left-1/2 z-0 flex h-[250px] w-[250px] -translate-x-1/2 flex-col items-center justify-start rounded-[6px] bg-[#09090d] px-4 pt-34 text-white shadow-[0_20px_48px_rgba(15,23,42,.32)] transition-all duration-500 ${
                     isActive ? "opacity-100" : "opacity-0"
                   } md:opacity-0 md:group-hover:opacity-100`}
                 >
@@ -133,7 +129,7 @@ export default function InstructorsPage() {
                 </div>
 
                 <div
-                  className={`absolute bottom-3 left-1/2 z-20 h-[230px] w-[230px] -translate-x-1/2 overflow-hidden rounded-[6px] [transform-origin:50%_0%] transition-all duration-500 ${
+                  className={`absolute bottom-4 left-1/2 z-20 h-[250px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[6px] [transform-origin:50%_0%] transition-all duration-500 ${
                     isActive ? "-translate-y-10 scale-[0.62] shadow-[0_14px_30px_rgba(15,23,42,.26)]" : ""
                   } md:group-hover:-translate-y-10 md:group-hover:scale-[0.62] md:group-hover:shadow-[0_14px_30px_rgba(15,23,42,.26)]`}
                 >
