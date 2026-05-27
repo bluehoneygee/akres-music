@@ -13,8 +13,8 @@ export const authConfig = {
         pathname === "/login" ||
         pathname === "/about" ||
         pathname.startsWith("/about/") ||
-        pathname === "/results" ||
-        pathname === "/opposing-scroll-gallery.html"
+        pathname === "/policies" ||
+        pathname === "/results"
       ) {
         return true;
       }
