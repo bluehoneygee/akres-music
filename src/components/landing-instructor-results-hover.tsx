@@ -291,11 +291,14 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
           className="pointer-events-none absolute inset-0 z-40 opacity-0"
           ref={textRevealRef}
         >
-          <div className="relative flex h-full min-h-0 flex-col items-center justify-center text-center">
-            <h3 className="text-4xl font-semibold !text-white md:text-5xl">
+          <div className="relative flex h-full min-h-0 flex-col items-center justify-center text-center text-white">
+            <h3 className="text-4xl font-semibold !text-white md:text-5xl" style={{ color: "#ffffff" }}>
               {card.title}
             </h3>
-            <p className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed !text-white md:max-w-lg md:px-0 md:text-lg">
+            <p
+              className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed !text-white md:max-w-lg md:px-0 md:text-lg"
+              style={{ color: "#ffffff" }}
+            >
               {card.description}
             </p>
           </div>
