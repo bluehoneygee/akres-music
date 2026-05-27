@@ -3,7 +3,7 @@
 import { gsap } from "gsap";
 import Link from "next/link";
 import type { MouseEvent, PointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 type PreviewCard = {
   id: string;
@@ -68,13 +68,19 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     const updateMask = () => {
       const { x, y, size } = maskRef.current;
       const clip = `circle(${size}px at ${x}px ${y}px)`;
-      const baseMask = `radial-gradient(circle ${size}px at ${x}px ${y}px, transparent 99%, black 100%)`;
       reveal.style.clipPath = clip;
       reveal.style.setProperty("-webkit-clip-path", clip);
       textReveal.style.clipPath = clip;
       textReveal.style.setProperty("-webkit-clip-path", clip);
-      baseText.style.maskImage = baseMask;
-      baseText.style.setProperty("-webkit-mask-image", baseMask);
+
+      if (size <= 1) {
+        baseText.style.maskImage = "none";
+        baseText.style.setProperty("-webkit-mask-image", "none");
+      } else {
+        const baseMask = `radial-gradient(circle ${size}px at ${x}px ${y}px, transparent 99%, black 100%)`;
+        baseText.style.maskImage = baseMask;
+        baseText.style.setProperty("-webkit-mask-image", baseMask);
+      }
     };
     updateMaskRef.current = updateMask;
 
@@ -89,16 +95,13 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
       willChange: "clip-path, opacity",
     });
     gsap.set(baseText, {
-      maskImage: "radial-gradient(circle 0px at 50% 50%, transparent 99%, black 100%)",
+      maskImage: "none",
       willChange: "mask-image",
     });
 
     reveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
     textReveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
-    baseText.style.setProperty(
-      "-webkit-mask-image",
-      "radial-gradient(circle 0px at 50% 50%, transparent 99%, black 100%)",
-    );
+    baseText.style.setProperty("-webkit-mask-image", "none");
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
     xToRef.current = gsap.quickTo(maskRef.current, "x", {
@@ -329,7 +332,6 @@ export function LandingInstructorResultsHover() {
     dragPointerIdRef.current = event.pointerId;
     dragActiveRef.current = false;
     startPointRef.current = { x: event.clientX, y: event.clientY };
-    setShowMobileHint(false);
   };
 
   const handleMobilePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -349,6 +351,9 @@ export function LandingInstructorResultsHover() {
 
       if (adx > 8 || ady > 8) {
         dragActiveRef.current = true;
+        if (showMobileHint) {
+          setShowMobileHint(false);
+        }
       } else {
         return;
       }
@@ -385,7 +390,7 @@ export function LandingInstructorResultsHover() {
         {showMobileHint ? (
           <div className="pointer-events-none absolute left-1/2 top-20 z-40 -translate-x-1/2 md:hidden">
             <p className="animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg">
-              Tap, tahan, lalu geser untuk lihat efek
+              Sentuh lalu geser perlahan untuk lihat efek
             </p>
           </div>
         ) : null}
