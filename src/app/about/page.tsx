@@ -11,7 +11,7 @@ export default function AboutPage() {
         <div className="absolute inset-0 bg-white/40" />
       </div>
 
-      <div aria-hidden className="fixed inset-0 -z-10 bg-amber-700 md:hidden" />
+      <div aria-hidden className="fixed inset-0 -z-10 bg-[#335C67] md:hidden" />
 
       <LandingNavbar />
       <AboutContent />
