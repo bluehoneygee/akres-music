@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   ChevronDown,
+  FileText,
   Home,
   Info,
   LogIn,
@@ -25,7 +26,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/results", label: "Results", icon: Trophy },
-  { href: "/policies", label: "Policies", icon: Info },
+  { href: "/policies", label: "Policies", icon: FileText },
   {
     href: "/akres-concert-series",
     label: "Akres Concert Series",

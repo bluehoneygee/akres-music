@@ -44,6 +44,7 @@ const instructors = [
 export default function InstructorsPage() {
   const bgItems = Array.from({ length: 28 }, () => "/akres-logo-full.png?v=6");
   const [activeInstructor, setActiveInstructor] = useState<string | null>(null);
+  const [showMobileHint, setShowMobileHint] = useState(true);
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f5f5f5] md:block md:h-auto md:overflow-visible">
@@ -68,6 +69,14 @@ export default function InstructorsPage() {
         />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl md:max-w-5xl">
+          {showMobileHint ? (
+            <div className="mb-2 flex justify-center md:hidden">
+              <p className="animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg">
+                Ketuk kartu untuk lihat detail instruktur
+              </p>
+            </div>
+          ) : null}
+
           <h1 className="mb-2 pt-30 text-center text-2xl font-semibold tracking-wide text-[#223A5E] md:hidden">
             Meet Our Instructors
           </h1>
@@ -81,6 +90,7 @@ export default function InstructorsPage() {
                   className="group relative h-[248px]"
                   key={`mobile-${instructor.name}`}
                   onClick={() => {
+                    setShowMobileHint(false);
                     setActiveInstructor((current) =>
                       current === instructor.name ? null : instructor.name,
                     );

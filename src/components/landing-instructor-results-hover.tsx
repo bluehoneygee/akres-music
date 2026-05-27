@@ -3,7 +3,7 @@
 import { gsap } from "gsap";
 import Link from "next/link";
 import type { MouseEvent, PointerEvent } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PreviewCard = {
   id: string;
@@ -303,6 +303,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
 
 export function LandingInstructorResultsHover() {
   const dragPointerIdRef = useRef<number | null>(null);
+  const [showMobileHint, setShowMobileHint] = useState(true);
 
   const dispatchPanelDrag = (detail: PanelDragDetail) => {
     window.dispatchEvent(new CustomEvent<PanelDragDetail>("akres-panel-drag", { detail }));
@@ -317,6 +318,7 @@ export function LandingInstructorResultsHover() {
   const handleMobilePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") return;
     dragPointerIdRef.current = event.pointerId;
+    setShowMobileHint(false);
     dispatchPanelDrag({
       active: true,
       x: event.clientX,
@@ -355,6 +357,13 @@ export function LandingInstructorResultsHover() {
         onPointerMove={handleMobilePointerMove}
         onPointerUp={handleMobilePointerEnd}
       >
+        {showMobileHint ? (
+          <div className="pointer-events-none absolute left-1/2 top-20 z-40 -translate-x-1/2 md:hidden">
+            <p className="animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg">
+              Tap, tahan, lalu geser untuk lihat efek
+            </p>
+          </div>
+        ) : null}
         {cards.map((card) => (
           <ParallaxPreviewCard card={card} key={card.id} />
         ))}

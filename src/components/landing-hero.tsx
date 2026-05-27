@@ -53,7 +53,7 @@ export function LandingHero() {
             </Link>
             <Link
               className="w-full rounded-full border border-white/80 bg-white/14 px-6 py-3 text-sm font-semibold backdrop-blur-md transition hover:border-white hover:bg-white/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/20 sm:w-auto"
-              href="https://wa.me/6281366584810?text=Halo%20Akres%20Music%20Academy%2C%20saya%20ingin%20booking%20kelas%20privat%201-on-1.%20Mohon%20info%20jadwal%2C%20biaya%2C%20dan%20pilihan%20instrumennya.%20Terima%20kasih."
+              href="https://wa.me/628983305697?text=Halo%20Akres%20Music%20Academy%2C%20saya%20ingin%20booking%20kelas%20privat%201-on-1.%20Mohon%20info%20jadwal%2C%20biaya%2C%20dan%20pilihan%20instrumennya.%20Terima%20kasih."
               rel="noopener noreferrer"
               style={{ color: "#ffffff" }}
               target="_blank"
