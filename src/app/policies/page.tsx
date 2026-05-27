@@ -19,22 +19,38 @@ const faqs: { q: string; a: ReactNode }[] = FAQS;
 
 export default function PoliciesPage() {
   return (
-    <main className="min-h-screen bg-[#f5f5f5]">
+    <main className="min-h-screen bg-[#9E2A2B]">
       <LandingNavbar />
 
-      <section className="bg-[#eef2f7] pb-10 pt-24 sm:pb-12 sm:pt-32">
-        <div className="w-full">
-          <PolicyFaqAccordion background="#eef2f7" items={policyDropdowns} scrollableAnswer />
+      <section className="bg-[#9E2A2B] pb-10 pt-24 sm:pb-12 sm:pt-32">
+        <div className="w-full px-4 sm:px-6">
+          <h2 className="text-left text-xl font-semibold text-[#E09F3E] sm:text-2xl md:text-3xl">
+            Enrollment & Fees
+          </h2>
+          <div className="mt-6 sm:mt-8">
+          <PolicyFaqAccordion
+            background="#9E2A2B"
+            items={policyDropdowns}
+            scrollableAnswer
+            triggerBackground="#F7F4D5"
+            triggerTextColor="#000000"
+          />
+          </div>
         </div>
       </section>
 
-      <section className="bg-[#ffd700] py-10 sm:py-14">
+      <section className="bg-[#E09F3E] py-10 sm:py-14">
         <div className="w-full px-4 sm:px-6">
-          <h2 className="text-center text-2xl font-semibold text-black sm:text-3xl md:text-4xl">
+          <h2 className="text-left text-xl font-semibold text-[#9E2A2B] sm:text-2xl md:text-3xl">
             Frequently Asked Questions
           </h2>
           <div className="mt-6 sm:mt-8">
-            <PolicyFaqAccordion background="#ffd700" items={faqs} />
+              <PolicyFaqAccordion
+              background="#E09F3E"
+              items={faqs}
+              triggerBackground="#F7F4D5"
+              triggerTextColor="#000000"
+            />
           </div>
         </div>
       </section>

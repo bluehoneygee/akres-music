@@ -12,12 +12,16 @@ type PolicyFaqAccordionProps = {
   items: FAQItem[];
   background?: string;
   scrollableAnswer?: boolean;
+  triggerBackground?: string;
+  triggerTextColor?: string;
 };
 
 export function PolicyFaqAccordion({
   items,
   background = "#ffd700",
   scrollableAnswer = false,
+  triggerBackground = "#000000",
+  triggerTextColor = "#ffffff",
 }: PolicyFaqAccordionProps) {
   const [openIndexes, setOpenIndexes] = useState<number[]>([]);
 
@@ -29,24 +33,25 @@ export function PolicyFaqAccordion({
         return (
           <div className="mb-4" key={faq.q}>
             <button
-              className="relative z-20 flex w-full cursor-pointer items-center gap-3 rounded-l-md border-0 bg-black px-4 py-4 text-left text-[0.95rem] font-bold !text-white sm:gap-4 sm:px-6 sm:py-5 sm:text-[1.1rem]"
+              className="relative z-20 flex w-full cursor-pointer items-center gap-3 rounded-l-md border-0 px-4 py-4 text-left text-[0.95rem] font-bold sm:gap-4 sm:px-6 sm:py-5 sm:text-[1.1rem]"
               onClick={() => {
                 const nextOpen = !isOpen;
                 setOpenIndexes((prev) =>
                   nextOpen ? [...prev, index] : prev.filter((i) => i !== index)
                 );
               }}
+              style={{ background: triggerBackground, color: triggerTextColor }}
               type="button"
             >
               <span
                 aria-hidden="true"
-                className={`inline-flex w-5 flex-none justify-center text-[1.2rem] font-black leading-none !text-white transition-transform duration-200 ease-out sm:text-[1.4rem] ${
+                className={`inline-flex w-5 flex-none justify-center text-[1.2rem] font-black leading-none transition-transform duration-200 ease-out sm:text-[1.4rem] ${
                   isOpen ? "rotate-[360deg]" : "rotate-0"
                 }`}
               >
                 {isOpen ? "×" : "+"}
               </span>
-              <span className="!text-white">{faq.q}</span>
+              <span>{faq.q}</span>
             </button>
 
             <div
