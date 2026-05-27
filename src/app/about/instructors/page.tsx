@@ -69,17 +69,17 @@ export default function InstructorsPage() {
         />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl md:max-w-5xl">
+          <h1 className="mb-2 pt-30 text-center text-2xl font-semibold tracking-wide text-[#223A5E] md:hidden">
+            Meet Our Instructors
+          </h1>
+
           {showMobileHint ? (
-            <div className="mb-2 flex justify-center md:hidden">
+            <div className="mb-2 mt-1 flex justify-center md:hidden">
               <p className="animate-pulse rounded-full bg-black/75 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg">
                 Ketuk kartu untuk lihat detail instruktur
               </p>
             </div>
           ) : null}
-
-          <h1 className="mb-2 pt-30 text-center text-2xl font-semibold tracking-wide text-[#223A5E] md:hidden">
-            Meet Our Instructors
-          </h1>
 
           <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-x-4 gap-y-2 px-0 md:hidden">
             {instructors.map((instructor) => {
