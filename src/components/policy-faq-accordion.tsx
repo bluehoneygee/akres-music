@@ -1,17 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 type FAQItem = {
   q: string;
-  a: string;
+  a: ReactNode;
 };
 
 type PolicyFaqAccordionProps = {
   items: FAQItem[];
+  background?: string;
+  scrollableAnswer?: boolean;
 };
 
-export function PolicyFaqAccordion({ items }: PolicyFaqAccordionProps) {
+export function PolicyFaqAccordion({
+  items,
+  background = "#ffd700",
+  scrollableAnswer = false,
+}: PolicyFaqAccordionProps) {
   const [openIndexes, setOpenIndexes] = useState<number[]>([]);
   const [spinMeta, setSpinMeta] = useState<{
     index: number | null;
@@ -56,7 +63,7 @@ export function PolicyFaqAccordion({ items }: PolicyFaqAccordionProps) {
             </button>
 
             <div className={`faq-answer-shell ${isOpen ? "open" : ""}`}>
-              <div className="faq-answer">{faq.a}</div>
+              <div className={`faq-answer ${scrollableAnswer ? "faq-answer-scroll" : ""}`}>{faq.a}</div>
             </div>
           </div>
         );
@@ -66,7 +73,7 @@ export function PolicyFaqAccordion({ items }: PolicyFaqAccordionProps) {
         .faq-wrap {
           width: 100%;
           padding: 20px 0 20px 24px;
-          background: #ffd700;
+          background: ${background};
         }
 
         .faq-item {
@@ -120,6 +127,11 @@ export function PolicyFaqAccordion({ items }: PolicyFaqAccordionProps) {
           padding: 36px 24px 20px;
           color: #222;
           line-height: 1.6;
+        }
+
+        .faq-answer-scroll {
+          max-height: 260px;
+          overflow-y: auto;
         }
 
         .spin-open {
