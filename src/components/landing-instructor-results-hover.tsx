@@ -3,7 +3,7 @@
 import { gsap } from "gsap";
 import Link from "next/link";
 import type { MouseEvent, PointerEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PreviewCard = {
   id: string;
@@ -26,8 +26,10 @@ const cards: PreviewCard[] = [
   {
     id: "instructors",
     title: "Instruktur",
-    description: "Mentor berpengalaman yang membimbing teknik, musikalitas, dan kesiapan tampil.",
-    image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779905374/photo-collage.png_1_ayood6.png",
+    description:
+      "Mentor berpengalaman yang membimbing teknik, musikalitas, dan kesiapan tampil.",
+    image:
+      "https://res.cloudinary.com/djusa1ywh/image/upload/v1779905374/photo-collage.png_1_ayood6.png",
     href: "/about/instructors",
     panelClassName: "bg-[#E09F3E]",
     textColor: "#9E2A2B",
@@ -35,8 +37,10 @@ const cards: PreviewCard[] = [
   {
     id: "results",
     title: "Results",
-    description: "Progres murid terukur lewat evaluasi berkala, recital, dan capaian performa.",
-    image: "https://res.cloudinary.com/djusa1ywh/image/upload/v1779904777/photo-collage.png_wtkivg.png",
+    description:
+      "Progres murid terukur lewat evaluasi berkala, recital, dan capaian performa.",
+    image:
+      "https://res.cloudinary.com/djusa1ywh/image/upload/v1779904777/photo-collage.png_wtkivg.png",
     href: "/results",
     panelClassName: "bg-[#9E2A2B]",
     textColor: "#E09F3E",
@@ -165,7 +169,11 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     };
 
     window.addEventListener("akres-panel-drag", onPanelDrag as EventListener);
-    return () => window.removeEventListener("akres-panel-drag", onPanelDrag as EventListener);
+    return () =>
+      window.removeEventListener(
+        "akres-panel-drag",
+        onPanelDrag as EventListener,
+      );
   }, [card.id]);
 
   function moveMask(event: PointerEvent<HTMLElement>) {
@@ -280,11 +288,20 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-zinc-950/20 to-transparent" />
         </div>
 
-        <div className="relative z-20 flex h-full min-h-0 flex-col items-center justify-center text-center" ref={baseTextRef}>
-          <h3 className="text-4xl font-semibold md:text-5xl" style={{ color: card.textColor }}>
+        <div
+          className="relative z-20 flex h-full min-h-0 flex-col items-center justify-center text-center"
+          ref={baseTextRef}
+        >
+          <h3
+            className="text-4xl font-semibold md:text-5xl"
+            style={{ color: card.textColor }}
+          >
             {card.title}
           </h3>
-          <p className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed md:max-w-lg md:px-0 md:text-lg" style={{ color: card.textColor }}>
+          <p
+            className="mt-4 max-w-[26ch] text-pretty px-2 text-sm leading-relaxed md:max-w-lg md:px-0 md:text-lg"
+            style={{ color: card.textColor }}
+          >
             {card.description}
           </p>
         </div>
@@ -295,7 +312,10 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
           ref={textRevealRef}
         >
           <div className="relative flex h-full min-h-0 flex-col items-center justify-center text-center text-white">
-            <h3 className="text-4xl font-semibold !text-white md:text-5xl" style={{ color: "#ffffff" }}>
+            <h3
+              className="text-4xl font-semibold !text-white md:text-5xl"
+              style={{ color: "#ffffff" }}
+            >
               {card.title}
             </h3>
             <p
@@ -318,12 +338,16 @@ export function LandingInstructorResultsHover() {
   const [showMobileHint, setShowMobileHint] = useState(true);
 
   const dispatchPanelDrag = (detail: PanelDragDetail) => {
-    window.dispatchEvent(new CustomEvent<PanelDragDetail>("akres-panel-drag", { detail }));
+    window.dispatchEvent(
+      new CustomEvent<PanelDragDetail>("akres-panel-drag", { detail }),
+    );
   };
 
   const getCardIdFromPoint = (x: number, y: number) => {
     const target = document.elementFromPoint(x, y);
-    const cardEl = target?.closest("[data-preview-card-id]") as HTMLElement | null;
+    const cardEl = target?.closest(
+      "[data-preview-card-id]",
+    ) as HTMLElement | null;
     return cardEl?.dataset.previewCardId ?? null;
   };
 
@@ -345,7 +369,12 @@ export function LandingInstructorResultsHover() {
       const ady = Math.abs(dy);
       if (ady > 10 && ady > adx) {
         dragPointerIdRef.current = null;
-        dispatchPanelDrag({ active: false, x: event.clientX, y: event.clientY, cardId: null });
+        dispatchPanelDrag({
+          active: false,
+          x: event.clientX,
+          y: event.clientY,
+          cardId: null,
+        });
         return;
       }
 
@@ -374,7 +403,12 @@ export function LandingInstructorResultsHover() {
 
     dragPointerIdRef.current = null;
     dragActiveRef.current = false;
-    dispatchPanelDrag({ active: false, x: event.clientX, y: event.clientY, cardId: null });
+    dispatchPanelDrag({
+      active: false,
+      x: event.clientX,
+      y: event.clientY,
+      cardId: null,
+    });
   };
 
   return (
