@@ -34,6 +34,9 @@ export async function filterRecordsForSession(
     const studentIds = new Set(schedules.map((schedule) => schedule.studentId));
 
     if (resource === "students") return records.filter((row) => studentIds.has(row.id));
+    if (resource === "instructors") {
+      return records.filter((row) => String(row.id ?? "") === instructorId);
+    }
     if (resource === "lesson-packages") {
       return records.filter((row) => row.instructorId === instructorId);
     }

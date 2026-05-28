@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getClientSession } from "@/lib/client-session";
 import { hourlyLessonSlotOptions, lessonDayOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export function InstructorAvailabilityBoard() {
   const [availabilityFormOpen, setAvailabilityFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sessionRole, setSessionRole] = useState("");
 
   async function loadData() {
     setLoading(true);
@@ -61,6 +63,25 @@ export function InstructorAvailabilityBoard() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSessionRole() {
+      try {
+        const session = (await getClientSession()) as { user?: { role?: string } };
+        if (mounted) setSessionRole(session.user?.role ?? "");
+      } catch {
+        if (mounted) setSessionRole("");
+      }
+    }
+
+    void loadSessionRole();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const studentsById = useMemo(() => mapById(students), [students]);
@@ -226,16 +247,18 @@ export function InstructorAvailabilityBoard() {
                 </option>
               ))}
             </select>
-            <Button
-              className="h-8 px-2 text-xs"
-              onClick={() => setAvailabilityFormOpen(true)}
-              size="sm"
-              type="button"
-              variant="default"
-            >
-              <Plus className="size-3.5" />
-              Add
-            </Button>
+            {sessionRole !== "Music Instructor" ? (
+              <Button
+                className="h-8 px-2 text-xs"
+                onClick={() => setAvailabilityFormOpen(true)}
+                size="sm"
+                type="button"
+                variant="default"
+              >
+                <Plus className="size-3.5" />
+                Add
+              </Button>
+            ) : null}
             <Button
               aria-label="Previous month"
               onClick={() => setCursorDate(viewMode === "month" ? addMonths(cursorDate, -1) : addDays(cursorDate, -7))}

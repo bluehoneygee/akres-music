@@ -1275,7 +1275,7 @@ export async function updateRecord(
   );
 
   if (result) {
-    await syncScheduleStatusFromAttendance(resource, result, updatedAt, previous);
+    await syncScheduleStatusFromAttendance(resource, result, updatedAt, previous, actor);
   }
 
   return result ? (fromMongo(result) as AnyRecord) : null;
@@ -1333,6 +1333,7 @@ async function syncScheduleStatusFromAttendance(
   attendance: Document,
   updatedAt: string,
   previous?: Document | null,
+  actor?: UpdateActor,
 ) {
   if (resource !== "student-attendance" && resource !== "instructor-attendance") return;
 
@@ -1465,23 +1466,68 @@ async function syncScheduleStatusFromAttendance(
       { session },
     );
 
-    if (
-      resource === "instructor-attendance" &&
-      attendanceStatus === "Rescheduled"
-    ) {
-      await db.collection("student-attendance").updateOne(
-        { courseScheduleId: scheduleId },
-        {
-          $set: {
-            status: "Rescheduled",
-            makeupRequired: true,
-            makeupScheduleId: String(attendance.rescheduleScheduleId || ""),
-            absenceReason: "Instructor Rescheduled",
-            updatedAt,
-          },
-        },
-        { session },
-      );
+    if (attendance.confirmed) {
+      const confirmedByUserId = actor?.id ?? String(attendance.confirmedByUserId || "");
+      const confirmedByName =
+        actor?.name || actor?.email || String(attendance.confirmedByName || "Unknown User");
+
+      if (resource === "student-attendance") {
+        const counterpartSet: Record<string, unknown> = {
+          status: attendanceStatus,
+          confirmed: true,
+          confirmedByUserId,
+          confirmedByName,
+          confirmedAt: updatedAt,
+          updatedAt,
+        };
+
+        if (attendanceStatus === "Rescheduled") {
+          counterpartSet.rescheduleRequired = true;
+          counterpartSet.rescheduleScheduleId = String(attendance.makeupScheduleId || "");
+        } else {
+          counterpartSet.substituteInstructorId = "";
+          counterpartSet.rescheduleRequired = false;
+          counterpartSet.rescheduleScheduleId = "";
+          counterpartSet.pendingRescheduleDate = "";
+          counterpartSet.pendingRescheduleFromTime = "";
+          counterpartSet.pendingRescheduleToTime = "";
+          counterpartSet.pendingRescheduleStudioRoomId = "";
+        }
+
+        await db.collection("instructor-attendance").updateOne(
+          { courseScheduleId: scheduleId },
+          { $set: counterpartSet },
+          { session },
+        );
+      } else {
+        const counterpartSet: Record<string, unknown> = {
+          status: attendanceStatus,
+          confirmed: true,
+          confirmedByUserId,
+          confirmedByName,
+          confirmedAt: updatedAt,
+          updatedAt,
+        };
+
+        if (attendanceStatus === "Rescheduled") {
+          counterpartSet.makeupRequired = true;
+          counterpartSet.makeupScheduleId = String(attendance.rescheduleScheduleId || "");
+          counterpartSet.absenceReason = "Instructor Rescheduled";
+        } else {
+          counterpartSet.makeupRequired = false;
+          counterpartSet.makeupScheduleId = "";
+          counterpartSet.pendingRescheduleDate = "";
+          counterpartSet.pendingRescheduleFromTime = "";
+          counterpartSet.pendingRescheduleToTime = "";
+          counterpartSet.pendingRescheduleStudioRoomId = "";
+        }
+
+        await db.collection("student-attendance").updateOne(
+          { courseScheduleId: scheduleId },
+          { $set: counterpartSet },
+          { session },
+        );
+      }
     }
   });
 }

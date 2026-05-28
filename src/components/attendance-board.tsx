@@ -783,9 +783,14 @@ function StudentAttendanceModal({
                 value={originalSchedule ? scheduleDateTime(originalSchedule) : "Original session"}
               />
             ) : null}
-            {rescheduledTo && String(linkedReschedule?.id ?? "") !== String(rescheduledTo.id ?? "") ? (
-              <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
-            ) : null}
+          {rescheduledTo && String(linkedReschedule?.id ?? "") !== String(rescheduledTo.id ?? "") ? (
+            <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
+          ) : null}
+          {rescheduledTo || attendance.makeupScheduleId ? (
+            <p className="text-xs font-medium text-amber-700">
+              Jatah reschedule habis.
+            </p>
+          ) : null}
 
             {needsReason ? (
               <>
@@ -1519,6 +1524,11 @@ function InstructorAttendanceModal({
             <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
           ) : attendance.rescheduleScheduleId ? (
             <RescheduleBadge label="To" value="Replacement session created" />
+          ) : null}
+          {effectiveRescheduledTo || attendance.rescheduleScheduleId ? (
+            <p className="text-xs font-medium text-amber-700">
+              Jatah reschedule habis.
+            </p>
           ) : null}
           {attendance.rescheduleRequired && !effectiveRescheduledTo && !pendingReschedule ? (
             <div className="grid gap-2">

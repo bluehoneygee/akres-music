@@ -53,8 +53,13 @@ const academicResources: SecuredResource[] = [
 ];
 
 const instructorReadResources: SecuredResource[] = [
+  "instruments",
+  "instructors",
   "students",
+  "guardians",
   "instructor-availability",
+  "rooms",
+  "courses",
   "lesson-packages",
   "schedules",
   "student-attendance",

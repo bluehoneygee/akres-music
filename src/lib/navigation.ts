@@ -52,7 +52,7 @@ export const appNavigation = [
     label: "Studio Rooms",
     href: "/studio-rooms",
     icon: Piano,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Music Instructor"],
   },
   {
     label: "Courses",
@@ -70,7 +70,7 @@ export const appNavigation = [
     label: "Instructor Calendar",
     href: "/instructor-calendar",
     icon: CalendarClock,
-    roles: ["System Manager", "Academic Staff"],
+    roles: ["System Manager", "Academic Staff", "Music Instructor"],
   },
   {
     label: "Students",
