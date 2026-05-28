@@ -76,6 +76,8 @@ export default function ResultsPage() {
     };
 
     const onWheel = (e: WheelEvent) => {
+      // Preserve browser zoom gesture (Ctrl/Cmd + wheel / trackpad zoom).
+      if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       target += e.deltaY * 0.8;
       target = clamp(target);
@@ -89,6 +91,8 @@ export default function ResultsPage() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      // Preserve pinch-to-zoom on mobile.
+      if (e.touches.length > 1) return;
       if (e.touches.length === 0) return;
       const y = e.touches[0].clientY;
       const deltaY = (lastTouchY - y) * 1.2;
