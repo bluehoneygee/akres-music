@@ -51,7 +51,6 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   const cardRef = useRef<HTMLElement>(null);
   const revealRef = useRef<HTMLDivElement>(null);
   const textRevealRef = useRef<HTMLDivElement>(null);
-  const baseTextRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const maskRef = useRef({ x: 0, y: 0, size: 0 });
   const updateMaskRef = useRef<(() => void) | null>(null);
@@ -64,10 +63,9 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   useEffect(() => {
     const reveal = revealRef.current;
     const textReveal = textRevealRef.current;
-    const baseText = baseTextRef.current;
     const image = imageRef.current;
     const cardEl = cardRef.current;
-    if (!reveal || !textReveal || !baseText || !image || !cardEl) return;
+    if (!reveal || !textReveal || !image || !cardEl) return;
 
     const updateMask = () => {
       const { x, y, size } = maskRef.current;
@@ -76,15 +74,6 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
       reveal.style.setProperty("-webkit-clip-path", clip);
       textReveal.style.clipPath = clip;
       textReveal.style.setProperty("-webkit-clip-path", clip);
-
-      if (size <= 1) {
-        baseText.style.maskImage = "none";
-        baseText.style.setProperty("-webkit-mask-image", "none");
-      } else {
-        const baseMask = `radial-gradient(circle ${size}px at ${x}px ${y}px, transparent 99%, black 100%)`;
-        baseText.style.maskImage = baseMask;
-        baseText.style.setProperty("-webkit-mask-image", baseMask);
-      }
     };
     updateMaskRef.current = updateMask;
 
@@ -98,14 +87,8 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
       clipPath: "circle(0px at 50% 50%)",
       willChange: "clip-path, opacity",
     });
-    gsap.set(baseText, {
-      maskImage: "none",
-      willChange: "mask-image",
-    });
-
     reveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
     textReveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
-    baseText.style.setProperty("-webkit-mask-image", "none");
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
     xToRef.current = gsap.quickTo(maskRef.current, "x", {
@@ -290,7 +273,6 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
 
         <div
           className="relative z-20 flex h-full min-h-0 flex-col items-center justify-center text-center"
-          ref={baseTextRef}
         >
           <h3
             className="text-4xl font-semibold md:text-5xl"
