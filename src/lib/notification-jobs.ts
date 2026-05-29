@@ -10,6 +10,20 @@ type JobResult = {
 
 export type NotificationRunResult = {
   classReminder: JobResult;
+  debug?: {
+    force: boolean;
+    mode: ReminderMode;
+    nowUtc: string;
+    schedules: Array<{
+      scheduleId: string;
+      scheduleDate: string;
+      fromTime: string;
+      stage: "morning" | "preclass3h" | "none";
+      reason: "created" | "skipped_existing" | "no_window_match" | "invalid_time";
+      targetRole?: "Music Instructor" | "Parent Portal User" | "Student Portal User";
+      recipientCount?: number;
+    }>;
+  };
 };
 
 type StudentRow = {
@@ -144,7 +158,12 @@ async function upsertNotification(params: {
 
 type ReminderMode = "all" | "morning" | "preclass3h";
 
-async function runClassReminderRule(mode: ReminderMode) {
+type RunSchedulerOptions = {
+  force?: boolean;
+  debug?: boolean;
+};
+
+async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOptions) {
   const db = await getMongoDb();
   const reminderDates = [dayOffset(0), dayOffset(1)];
 
@@ -205,6 +224,9 @@ async function runClassReminderRule(mode: ReminderMode) {
   const nowUtc = Date.now();
   const jakartaNow = getJakartaNowParts();
   const isMorningSlot = jakartaNow.hour === 7;
+  const force = options?.force === true;
+  const debugEnabled = options?.debug === true;
+  const debugSchedules: NonNullable<NotificationRunResult["debug"]>["schedules"] = [];
 
   let created = 0;
   let skipped = 0;
@@ -218,14 +240,40 @@ async function runClassReminderRule(mode: ReminderMode) {
     const courseName = String(coursesById.get(String(schedule.courseId ?? ""))?.courseName ?? "kelas musik");
     const studentDisplayName = studentName(studentsById.get(sid));
     const scheduleStartUtcMs = parseScheduleStartUtcMs(scheduleDate, fromTime);
+    if (Number.isNaN(scheduleStartUtcMs)) {
+      if (debugEnabled) {
+        debugSchedules.push({
+          scheduleId,
+          scheduleDate,
+          fromTime,
+          stage: "none",
+          reason: "invalid_time",
+        });
+      }
+      continue;
+    }
 
-    const shouldSendMorning =
-      (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
+    const shouldSendMorning = force
+      ? (mode === "all" || mode === "morning") && scheduleDate === today
+      : (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
     const diffMs = scheduleStartUtcMs - nowUtc;
     const inThreeHourWindow = diffMs >= 3 * 60 * 60 * 1000 && diffMs < (3 * 60 + 15) * 60 * 1000;
-    const shouldSendPreclass = (mode === "all" || mode === "preclass3h") && inThreeHourWindow;
+    const shouldSendPreclass = force
+      ? (mode === "all" || mode === "preclass3h") && scheduleDate === today
+      : (mode === "all" || mode === "preclass3h") && inThreeHourWindow;
 
-    if (!shouldSendMorning && !shouldSendPreclass) continue;
+    if (!shouldSendMorning && !shouldSendPreclass) {
+      if (debugEnabled) {
+        debugSchedules.push({
+          scheduleId,
+          scheduleDate,
+          fromTime,
+          stage: "none",
+          reason: "no_window_match",
+        });
+      }
+      continue;
+    }
 
     for (const targetRole of ["Parent Portal User", "Student Portal User", "Music Instructor"] as const) {
       const stages: Array<"morning" | "preclass3h"> = [];
@@ -250,15 +298,27 @@ async function runClassReminderRule(mode: ReminderMode) {
         });
         if (inserted) created += 1;
         else skipped += 1;
+        const recipientIds = resolveRecipientUserIds({
+          users,
+          targetRole,
+          studentId: sid,
+          instructorId: String(schedule.instructorId ?? ""),
+          guardianIds: (studentsById.get(sid)?.guardianIds ?? []) as string[],
+        });
+
+        if (debugEnabled) {
+          debugSchedules.push({
+            scheduleId,
+            scheduleDate,
+            fromTime,
+            stage,
+            reason: inserted ? "created" : "skipped_existing",
+            targetRole,
+            recipientCount: recipientIds.length,
+          });
+        }
 
         if (inserted) {
-          const recipientIds = resolveRecipientUserIds({
-            users,
-            targetRole,
-            studentId: sid,
-            instructorId: String(schedule.instructorId ?? ""),
-            guardianIds: (studentsById.get(sid)?.guardianIds ?? []) as string[],
-          });
           await sendPushToUsers(recipientIds, {
             title: "Akres Music Reminder",
             body: formattedMessage,
@@ -269,7 +329,18 @@ async function runClassReminderRule(mode: ReminderMode) {
     }
   }
 
-  return { created, skipped };
+  return {
+    created,
+    skipped,
+    debug: debugEnabled
+      ? {
+          force,
+          mode,
+          nowUtc: new Date(nowUtc).toISOString(),
+          schedules: debugSchedules,
+        }
+      : undefined,
+  };
 }
 
 function resolveRecipientUserIds({
@@ -312,9 +383,12 @@ function resolveRecipientUserIds({
     .map((user) => String(user._id));
 }
 
-export async function runNotificationSchedulers(mode: ReminderMode = "all") {
-  const classReminder = await runClassReminderRule(mode);
-  return { classReminder } satisfies NotificationRunResult;
+export async function runNotificationSchedulers(mode: ReminderMode = "all", options?: RunSchedulerOptions) {
+  const classReminder = await runClassReminderRule(mode, options);
+  return {
+    classReminder: { created: classReminder.created, skipped: classReminder.skipped },
+    debug: classReminder.debug,
+  } satisfies NotificationRunResult;
 }
 
 export async function listNotifications(limit = 50) {
