@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
   const modeRaw = String(request.nextUrl.searchParams.get("mode") ?? "all");
   const mode = modeRaw === "morning" || modeRaw === "preclass3h" ? modeRaw : "all";
   const force = String(request.nextUrl.searchParams.get("force") ?? "").toLowerCase() === "true";
-  const result = await runNotificationSchedulers(mode, { force });
+  const debug = String(request.nextUrl.searchParams.get("debug") ?? "").toLowerCase() === "true";
+  const result = await runNotificationSchedulers(mode, { force, debug });
   return NextResponse.json({ data: result });
 }
 
@@ -45,8 +46,9 @@ export async function GET(request: NextRequest) {
   const modeRaw = String(request.nextUrl.searchParams.get("mode") ?? "all");
   const mode = modeRaw === "morning" || modeRaw === "preclass3h" ? modeRaw : "all";
   const force = String(request.nextUrl.searchParams.get("force") ?? "").toLowerCase() === "true";
+  const debug = String(request.nextUrl.searchParams.get("debug") ?? "").toLowerCase() === "true";
   const [result, notifications] = await Promise.all([
-    runNotificationSchedulers(mode, { force }),
+    runNotificationSchedulers(mode, { force, debug }),
     listNotifications(20),
   ]);
   return NextResponse.json({ data: result, notifications });
