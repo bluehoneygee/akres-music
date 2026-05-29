@@ -100,7 +100,7 @@ jobs:
             -H "Content-Type: application/json"
 
   run-production:
-    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'production') }}
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.target == 'all' || github.event.inputs.target == 'production' }}
     name: Run Production Notifications
     runs-on: ubuntu-latest
     environment: production
