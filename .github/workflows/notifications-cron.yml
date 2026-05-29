@@ -4,8 +4,8 @@ on:
   schedule:
     # Daily morning reminder at 07:00 WIB (00:00 UTC)
     - cron: "0 0 * * *"
-    # T-3h reminder checker every 5 minutes
-    - cron: "*/5 * * * *"
+    # T-3h reminder checker every 15 minutes
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       target:
@@ -87,7 +87,7 @@ jobs:
           if [ "$CRON_EXPR" = "0 0 * * *" ]; then
             MODE="morning"
           fi
-          if [ "$CRON_EXPR" = "*/5 * * * *" ]; then
+          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
             MODE="preclass3h"
           fi
           REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE"
@@ -160,7 +160,7 @@ jobs:
           if [ "$CRON_EXPR" = "0 0 * * *" ]; then
             MODE="morning"
           fi
-          if [ "$CRON_EXPR" = "*/5 * * * *" ]; then
+          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
             MODE="preclass3h"
           fi
           curl --fail-with-body --show-error --silent \
