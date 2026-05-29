@@ -144,7 +144,11 @@ async function upsertNotification(params: {
 
 type ReminderMode = "all" | "morning" | "preclass3h";
 
-async function runClassReminderRule(mode: ReminderMode) {
+type RunSchedulerOptions = {
+  force?: boolean;
+};
+
+async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOptions) {
   const db = await getMongoDb();
   const reminderDates = [dayOffset(0), dayOffset(1)];
 
@@ -205,6 +209,7 @@ async function runClassReminderRule(mode: ReminderMode) {
   const nowUtc = Date.now();
   const jakartaNow = getJakartaNowParts();
   const isMorningSlot = jakartaNow.hour === 7;
+  const force = options?.force === true;
 
   let created = 0;
   let skipped = 0;
@@ -219,11 +224,14 @@ async function runClassReminderRule(mode: ReminderMode) {
     const studentDisplayName = studentName(studentsById.get(sid));
     const scheduleStartUtcMs = parseScheduleStartUtcMs(scheduleDate, fromTime);
 
-    const shouldSendMorning =
-      (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
+    const shouldSendMorning = force
+      ? (mode === "all" || mode === "morning") && scheduleDate === today
+      : (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
     const diffMs = scheduleStartUtcMs - nowUtc;
     const inThreeHourWindow = diffMs >= 3 * 60 * 60 * 1000 && diffMs < (3 * 60 + 15) * 60 * 1000;
-    const shouldSendPreclass = (mode === "all" || mode === "preclass3h") && inThreeHourWindow;
+    const shouldSendPreclass = force
+      ? (mode === "all" || mode === "preclass3h") && scheduleDate === today
+      : (mode === "all" || mode === "preclass3h") && inThreeHourWindow;
 
     if (!shouldSendMorning && !shouldSendPreclass) continue;
 
@@ -312,8 +320,8 @@ function resolveRecipientUserIds({
     .map((user) => String(user._id));
 }
 
-export async function runNotificationSchedulers(mode: ReminderMode = "all") {
-  const classReminder = await runClassReminderRule(mode);
+export async function runNotificationSchedulers(mode: ReminderMode = "all", options?: RunSchedulerOptions) {
+  const classReminder = await runClassReminderRule(mode, options);
   return { classReminder } satisfies NotificationRunResult;
 }
 

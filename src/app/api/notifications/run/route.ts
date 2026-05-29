@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
 
   const modeRaw = String(request.nextUrl.searchParams.get("mode") ?? "all");
   const mode = modeRaw === "morning" || modeRaw === "preclass3h" ? modeRaw : "all";
-  const result = await runNotificationSchedulers(mode);
+  const force = String(request.nextUrl.searchParams.get("force") ?? "").toLowerCase() === "true";
+  const result = await runNotificationSchedulers(mode, { force });
   return NextResponse.json({ data: result });
 }
 
@@ -43,8 +44,9 @@ export async function GET(request: NextRequest) {
 
   const modeRaw = String(request.nextUrl.searchParams.get("mode") ?? "all");
   const mode = modeRaw === "morning" || modeRaw === "preclass3h" ? modeRaw : "all";
+  const force = String(request.nextUrl.searchParams.get("force") ?? "").toLowerCase() === "true";
   const [result, notifications] = await Promise.all([
-    runNotificationSchedulers(mode),
+    runNotificationSchedulers(mode, { force }),
     listNotifications(20),
   ]);
   return NextResponse.json({ data: result, notifications });
