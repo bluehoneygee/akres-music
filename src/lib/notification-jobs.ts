@@ -223,7 +223,6 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
   const today = dayOffset(0);
   const nowUtc = Date.now();
   const jakartaNow = getJakartaNowParts();
-  const isMorningSlot = jakartaNow.hour === 7;
   const force = options?.force === true;
   const debugEnabled = options?.debug === true;
   const debugSchedules: NonNullable<NotificationRunResult["debug"]>["schedules"] = [];
@@ -255,7 +254,7 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
 
     const shouldSendMorning = force
       ? (mode === "all" || mode === "morning") && scheduleDate === today
-      : (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
+      : mode === "morning" && scheduleDate === today;
     const diffMs = scheduleStartUtcMs - nowUtc;
     const inThreeHourWindow = diffMs >= 3 * 60 * 60 * 1000 && diffMs < (3 * 60 + 15) * 60 * 1000;
     const shouldSendPreclass = force

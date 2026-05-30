@@ -2,10 +2,8 @@ name: Notifications Cron
 
 on:
   schedule:
-    # Daily morning reminder at 07:00 WIB (00:00 UTC)
-    - cron: "0 0 * * *"
-    # T-3h reminder checker every 15 minutes
-    - cron: "*/15 * * * *"
+    # Daily morning reminder at 08:00 WIB (01:00 UTC)
+    - cron: "0 1 * * *"
   workflow_dispatch:
     inputs:
       target:
@@ -83,21 +81,17 @@ jobs:
             echo "CRON_SECRET is not set for staging environment"
             exit 1
           fi
-          MODE="all"
-          if [ "$CRON_EXPR" = "0 0 * * *" ]; then
-            MODE="morning"
-          fi
-          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
-            MODE="preclass3h"
-          fi
+          MODE="morning"
           REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE"
           if [ -n "$VERCEL_BYPASS_TOKEN" ]; then
             REQUEST_URL="$REQUEST_URL&x-vercel-protection-bypass=$VERCEL_BYPASS_TOKEN&x-vercel-set-bypass-cookie=true"
           fi
-          curl --fail-with-body --show-error --silent \
+          echo "Calling: $REQUEST_URL"
+          RESPONSE=$(curl --fail-with-body --show-error --silent \
             -X POST "$REQUEST_URL" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json")
+          echo "Response: $RESPONSE"
 
   run-production:
     if: ${{ github.event_name == 'schedule' || github.event.inputs.target == 'all' || github.event.inputs.target == 'production' }}
@@ -156,14 +150,10 @@ jobs:
             echo "CRON_SECRET is not set for production environment"
             exit 1
           fi
-          MODE="all"
-          if [ "$CRON_EXPR" = "0 0 * * *" ]; then
-            MODE="morning"
-          fi
-          if [ "$CRON_EXPR" = "*/15 * * * *" ]; then
-            MODE="preclass3h"
-          fi
-          curl --fail-with-body --show-error --silent \
+          MODE="morning"
+          echo "Calling: $BASE_URL/api/notifications/run?mode=$MODE"
+          RESPONSE=$(curl --fail-with-body --show-error --silent \
             -X POST "$BASE_URL/api/notifications/run?mode=$MODE" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json")
+          echo "Response: $RESPONSE"
