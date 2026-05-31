@@ -1,8 +1,9 @@
-name: Notifications Cron
+name: Notifications Morning Reminder
 
 on:
   schedule:
     # Daily morning reminder at 08:00 WIB (01:00 UTC)
+    # Note: GitHub Actions cron may be delayed or skipped on free tier
     - cron: "0 1 * * *"
   workflow_dispatch:
     inputs:
