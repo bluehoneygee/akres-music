@@ -52,10 +52,10 @@ function loadScript(src: string) {
   });
 }
 
-const IMG_1 = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4";
-const IMG_2 = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64";
-const IMG_3 = "https://images.unsplash.com/photo-1469474968028-56623f02e42e";
-const IMG_4 = "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d";
+const IMG_1 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322483/IMG_5152_awqwhm.jpg";
+const IMG_2 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322483/IMG_5167_yk5ibc.jpg";
+const IMG_3 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322485/IMG_5172_azpc6g.jpg";
+const IMG_4 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322489/IMG_5153_rd4cyl.jpg";
 
 function srcSet(base: string) {
   return `${base}?w=500&q=80 500w, ${base}?w=800&q=80 800w, ${base}?w=1000&q=80 1000w`;
