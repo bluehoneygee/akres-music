@@ -58,6 +58,9 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   const yToRef = useRef<ReturnType<typeof gsap.quickTo> | null>(null);
   const maskSizeRef = useRef<ReturnType<typeof gsap.quickTo> | null>(null);
   const draggedRef = useRef(false);
+  const blobActiveRef = useRef(false);
+  const isCoarsePointerRef = useRef(false);
+  const nowRef = useRef(0);
   const maskRadius = 120;
 
   useEffect(() => {
@@ -65,11 +68,34 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     const textReveal = textRevealRef.current;
     const image = imageRef.current;
     const cardEl = cardRef.current;
+    const maskState = maskRef.current;
     if (!reveal || !textReveal || !image || !cardEl) return;
+
+    isCoarsePointerRef.current =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(pointer: coarse)").matches === true;
 
     const updateMask = () => {
       const { x, y, size } = maskRef.current;
-      const clip = `circle(${size}px at ${x}px ${y}px)`;
+      if (size <= 0) {
+        const clip = `circle(0px at ${x}px ${y}px)`;
+        reveal.style.clipPath = clip;
+        reveal.style.setProperty("-webkit-clip-path", clip);
+        textReveal.style.clipPath = clip;
+        textReveal.style.setProperty("-webkit-clip-path", clip);
+        return;
+      }
+
+      const t = nowRef.current;
+      const deformScale = isCoarsePointerRef.current ? 0.045 : 0.055;
+      const driftScale = isCoarsePointerRef.current ? 0.014 : 0.02;
+      const breathing = Math.sin(t * 1.5) * (size * (isCoarsePointerRef.current ? 0.018 : 0.026));
+      const base = Math.max(8, size + breathing);
+      const rx = base * (1.0 + Math.sin(t * 1.2) * deformScale);
+      const ry = base * (1.0 + Math.cos(t * 1.05) * deformScale);
+      const cx = x + Math.sin(t * 1.2) * (base * driftScale);
+      const cy = y + Math.cos(t * 1.05) * (base * driftScale);
+      const clip = `ellipse(${rx}px ${ry}px at ${cx}px ${cy}px)`;
       reveal.style.clipPath = clip;
       reveal.style.setProperty("-webkit-clip-path", clip);
       textReveal.style.clipPath = clip;
@@ -91,27 +117,36 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
     textReveal.style.setProperty("-webkit-clip-path", "circle(0px at 50% 50%)");
     gsap.set(image, { scale: 1, x: 0, y: 0 });
 
-    xToRef.current = gsap.quickTo(maskRef.current, "x", {
-      duration: 0.18,
+    xToRef.current = gsap.quickTo(maskState, "x", {
+      duration: isCoarsePointerRef.current ? 0.25 : 0.22,
       ease: "power2.out",
       onUpdate: updateMask,
     });
 
-    yToRef.current = gsap.quickTo(maskRef.current, "y", {
-      duration: 0.18,
+    yToRef.current = gsap.quickTo(maskState, "y", {
+      duration: isCoarsePointerRef.current ? 0.25 : 0.22,
       ease: "power2.out",
       onUpdate: updateMask,
     });
 
-    maskSizeRef.current = gsap.quickTo(maskRef.current, "size", {
-      duration: 0.32,
+    maskSizeRef.current = gsap.quickTo(maskState, "size", {
+      duration: isCoarsePointerRef.current ? 0.42 : 0.36,
       ease: "power2.out",
       onUpdate: updateMask,
     });
+
+    const tick = () => {
+      nowRef.current = performance.now() * 0.001;
+      if (blobActiveRef.current && maskRef.current.size > 0.5) {
+        updateMask();
+      }
+    };
+    gsap.ticker.add(tick);
 
     return () => {
       updateMaskRef.current = null;
-      gsap.killTweensOf([maskRef.current, reveal, image]);
+      gsap.killTweensOf([maskState, reveal, image]);
+      gsap.ticker.remove(tick);
       xToRef.current = null;
       yToRef.current = null;
     };
@@ -175,6 +210,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
 
     maskRef.current.x = startX;
     maskRef.current.y = startY;
+    blobActiveRef.current = true;
     updateMaskRef.current?.();
     maskSizeRef.current?.(maskRadius);
     gsap.to(revealRef.current, {
@@ -192,6 +228,7 @@ function ParallaxPreviewCard({ card }: { card: PreviewCard }) {
   }
 
   function conceal() {
+    blobActiveRef.current = false;
     maskSizeRef.current?.(0);
     gsap.to(revealRef.current, {
       autoAlpha: 0,
