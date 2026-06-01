@@ -58,7 +58,23 @@ const IMG_3 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322485/IMG
 const IMG_4 = "https://res.cloudinary.com/djusa1ywh/image/upload/v1780322489/IMG_5153_rd4cyl.jpg";
 
 function srcSet(base: string) {
+  // For Cloudinary images, use proper transformations
+  if (base.includes('cloudinary.com')) {
+    const baseUrl = base.split('/upload/')[0] + '/upload/';
+    const imagePath = base.split('/upload/')[1];
+    return `${baseUrl}q_100/${imagePath}`;
+  }
+  // For other images (Unsplash)
   return `${base}?w=500&q=80 500w, ${base}?w=800&q=80 800w, ${base}?w=1000&q=80 1000w`;
+}
+
+function displaySrc(base: string) {
+  if (base.includes('cloudinary.com')) {
+    const baseUrl = base.split('/upload/')[0] + '/upload/';
+    const imagePath = base.split('/upload/')[1];
+    return `${baseUrl}q_100/${imagePath}`;
+  }
+  return `${base}?w=1000&q=80`;
 }
 
 export default function AkresConcertSeriesPage() {
@@ -326,7 +342,7 @@ export default function AkresConcertSeriesPage() {
               alt=""
               className="pieces-slider__image"
               sizes="90vw"
-              src={`${IMG_1}?w=1000&q=80`}
+              src={displaySrc(IMG_1)}
               srcSet={srcSet(IMG_1)}
               width={966}
             />
@@ -338,7 +354,7 @@ export default function AkresConcertSeriesPage() {
               alt=""
               className="pieces-slider__image"
               sizes="90vw"
-              src={`${IMG_2}?w=1000&q=80`}
+              src={displaySrc(IMG_2)}
               srcSet={srcSet(IMG_2)}
               width={645}
             />
@@ -350,7 +366,7 @@ export default function AkresConcertSeriesPage() {
               alt=""
               className="pieces-slider__image"
               sizes="90vw"
-              src={`${IMG_3}?w=1000&q=80`}
+              src={displaySrc(IMG_3)}
               srcSet={srcSet(IMG_3)}
               width={645}
             />
@@ -362,7 +378,7 @@ export default function AkresConcertSeriesPage() {
               alt=""
               className="pieces-slider__image"
               sizes="90vw"
-              src={`${IMG_4}?w=1000&q=80`}
+              src={displaySrc(IMG_4)}
               srcSet={srcSet(IMG_4)}
               width={645}
             />
