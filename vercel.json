@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/notifications/run?mode=morning",
+      "path": "/api/cron/morning-notifications",
       "schedule": "0 1 * * *"
     }
   ]
