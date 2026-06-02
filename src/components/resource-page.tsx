@@ -7,6 +7,13 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getClientSession } from "@/lib/client-session";
 import type { ResourceName } from "@/lib/models";
 import { canAccessResource } from "@/lib/roles";
@@ -619,54 +626,64 @@ export function ResourcePage({
                 </button>
 
                 {mobileFilterOpen ? (
-                  <div className="mt-3 space-y-4 rounded-3xl border border-white/75 bg-slate-100/86 p-4 shadow-sm backdrop-blur-xl">
+                  <div className="mt-3 space-y-3 rounded-3xl border border-white/75 bg-slate-100/86 p-4 shadow-sm backdrop-blur-xl">
                     {visibleFilterFields.map((field) => {
                       const options = filterOptions[field.key] ?? [];
 
                       return (
-                        <label className="block space-y-2" key={field.key}>
+                        <div className="space-y-1" key={field.key}>
                           <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
                             {field.label}
                           </span>
-                          <select
-                            className="h-10 w-full rounded-xl border border-white/80 bg-white/82 px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
-                            onChange={(event) =>
+                          <Select
+                            value={fieldFilters[field.key] || undefined}
+                            onValueChange={(value) => {
                               setFieldFilters((current) => ({
                                 ...current,
-                                [field.key]: event.target.value,
-                              }))
-                            }
-                            value={fieldFilters[field.key] ?? ""}
+                                [field.key]: value,
+                              }));
+                            }}
                           >
-                            <option value="">All {field.label}</option>
-                            {options.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
+                              <SelectValue placeholder={`All ${field.label}`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {options.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="py-1.5">
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       );
                     })}
 
                     {sortConfig ? (
-                      <label className="block space-y-2">
+                      <div className="space-y-1">
                         <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
                           Sort
                         </span>
-                        <select
-                          className="h-10 w-full rounded-xl border border-white/80 bg-white/82 px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
-                          onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-                          value={sortDirection}
+                        <Select
+                          value={sortDirection || undefined}
+                          onValueChange={(value) => setSortDirection(value as SortDirection)}
                         >
-                          <option value="">Default order</option>
-                          <option value="asc">{sortConfig.label} A-Z</option>
-                          <option value="desc">{sortConfig.label} Z-A</option>
-                        </select>
-                      </label>
+                          <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
+                            <SelectValue placeholder="Default order" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="asc" className="py-1.5">
+                              {sortConfig.label} A-Z
+                            </SelectItem>
+                            <SelectItem value="desc" className="py-1.5">
+                              {sortConfig.label} Z-A
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     ) : null}
 
-                    <label className="block space-y-2">
+                    <label className="block space-y-1">
                       <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
                         Search
                       </span>

@@ -421,8 +421,10 @@ export function AttendanceBoard() {
               </button>
             ) : null}
           </div>
+          
+          {/* Desktop: native select */}
           <select
-            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 sm:w-[170px]"
+            className="hidden h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 md:block md:w-[170px]"
             onChange={(event) => setDayFilter(event.target.value)}
             value={dayFilter}
           >
@@ -433,14 +435,45 @@ export function AttendanceBoard() {
               </option>
             ))}
           </select>
+          
+          {/* Mobile: custom Select */}
+          <Select 
+            value={dayFilter || "ALL"} 
+            onValueChange={(val) => setDayFilter(val === "ALL" ? "" : val)}
+          >
+            <SelectTrigger className="h-10 w-full rounded-2xl border-white/50 bg-white/58 text-sm text-zinc-900 focus:border-sky-300 focus:ring-sky-200 md:hidden">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="py-1.5">Semua hari</SelectItem>
+              {indonesianDayOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value} className="py-1.5">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Desktop: native select */}
           <select
-            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 sm:w-[210px]"
+            className="hidden h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 md:block md:w-[210px]"
             onChange={(event) => setSortMode(event.target.value as "nearest" | "default")}
             value={sortMode}
           >
             <option value="nearest">Schedule terdekat</option>
             <option value="default">Default order</option>
           </select>
+          
+          {/* Mobile: custom Select */}
+          <Select value={sortMode} onValueChange={(val) => setSortMode(val as "nearest" | "default")}>
+            <SelectTrigger className="h-10 w-full rounded-2xl border-white/50 bg-white/58 text-sm text-zinc-900 focus:border-sky-300 focus:ring-sky-200 md:hidden">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nearest" className="py-1.5">Schedule terdekat</SelectItem>
+              <SelectItem value="default" className="py-1.5">Default order</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
