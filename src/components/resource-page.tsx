@@ -81,6 +81,12 @@ type RelationOption = {
   value: string;
 };
 
+type ScheduleSlotTime = {
+  dayOfWeek: string;
+  fromTime: string;
+  toTime: string;
+};
+
 export function ResourcePage({
   title,
   description,
@@ -1207,7 +1213,7 @@ function getFieldOptions(
 
   if (!field.roomAvailabilityFrom) return relationFilteredOptions;
 
-  return filterRoomAvailabilityOptions(field, draft, relationFilteredOptions, scheduleRows);
+  return filterRoomAvailabilityOptions(field, draft, relationFilteredOptions, relationOptions, scheduleRows);
 }
 
 function filterRelationOptions(
@@ -1249,6 +1255,7 @@ function filterRoomAvailabilityOptions(
   field: FieldConfig,
   draft: Record<string, RecordValue>,
   options: RelationOption[],
+  relationOptions: Record<string, RelationOption[]>,
   scheduleRows: UiRecord[],
 ) {
   if (!field.roomAvailabilityFrom) return options;
@@ -1260,6 +1267,7 @@ function filterRoomAvailabilityOptions(
   const lessonCount = Number(draft[config.lessonCountField] || 4);
   const fromTime = String(draft[config.fromTimeField] ?? "");
   const toTime = String(draft[config.toTimeField] ?? "");
+  const scheduleSlotTimes = selectedAvailabilitySlotTimes(draft, relationOptions);
 
   if (lessonMode !== "Studio") return options;
   if (!lessonStartDate || lessonDays.length === 0 || !fromTime || !toTime) return options;
@@ -1276,14 +1284,21 @@ function filterRoomAvailabilityOptions(
         dates.includes(String(schedule.scheduleDate ?? "")),
     );
 
-    const conflict = roomSchedules.find((schedule) =>
-      rangesOverlap(
+    const conflict = roomSchedules.find((schedule) => {
+      const slotTime = slotTimeForDate(
+        String(schedule.scheduleDate ?? ""),
+        scheduleSlotTimes,
         fromTime,
         toTime,
+      );
+
+      return rangesOverlap(
+        slotTime.fromTime,
+        slotTime.toTime,
         String(schedule.fromTime ?? ""),
         String(schedule.toTime ?? ""),
-      ),
-    );
+      );
+    });
 
     if (!conflict) {
       return {
@@ -1299,6 +1314,41 @@ function filterRoomAvailabilityOptions(
       unavailableReason: `${String(conflict.scheduleDate ?? "")}, ${String(conflict.fromTime ?? "")} - ${String(conflict.toTime ?? "")}`,
     };
   });
+}
+
+function selectedAvailabilitySlotTimes(
+  draft: Record<string, RecordValue>,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  const selectedSlotIds = toMultiSelectValue(draft.availabilitySlotId);
+  const slotOptions = relationOptions.availabilitySlotId ?? [];
+
+  return selectedSlotIds
+    .map((slotId) => slotOptions.find((option) => option.value === slotId)?.record)
+    .filter(Boolean)
+    .map((slot) => ({
+      dayOfWeek: String(slot?.dayOfWeek ?? ""),
+      fromTime: String(slot?.fromTime ?? ""),
+      toTime: String(slot?.toTime ?? ""),
+    }))
+    .filter((slot) => slot.dayOfWeek && slot.fromTime && slot.toTime);
+}
+
+function slotTimeForDate(
+  date: string,
+  scheduleSlotTimes: ScheduleSlotTime[],
+  fallbackFromTime: string,
+  fallbackToTime: string,
+) {
+  const dayOfWeek = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? String(new Date(`${date}T00:00:00.000Z`).getUTCDay())
+    : "";
+  const slotTime = scheduleSlotTimes.find((slot) => slot.dayOfWeek === dayOfWeek);
+
+  return {
+    fromTime: slotTime?.fromTime || fallbackFromTime,
+    toTime: slotTime?.toTime || fallbackToTime,
+  };
 }
 
 function formatRelationOptionLabel(field: FieldConfig, record: UiRecord, valueField: string) {
