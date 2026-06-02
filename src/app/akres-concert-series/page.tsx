@@ -62,7 +62,7 @@ function srcSet(base: string) {
   if (base.includes('cloudinary.com')) {
     const baseUrl = base.split('/upload/')[0] + '/upload/';
     const imagePath = base.split('/upload/')[1];
-    return `${baseUrl}q_100/${imagePath}`;
+    return `${baseUrl}f_auto,q_auto:best,e_sharpen:100/${imagePath}`;
   }
   // For other images (Unsplash)
   return `${base}?w=500&q=80 500w, ${base}?w=800&q=80 800w, ${base}?w=1000&q=80 1000w`;
@@ -72,7 +72,7 @@ function displaySrc(base: string) {
   if (base.includes('cloudinary.com')) {
     const baseUrl = base.split('/upload/')[0] + '/upload/';
     const imagePath = base.split('/upload/')[1];
-    return `${baseUrl}q_100/${imagePath}`;
+    return `${baseUrl}f_auto,q_auto:best,e_sharpen:100/${imagePath}`;
   }
   return `${base}?w=1000&q=80`;
 }
@@ -508,6 +508,16 @@ export default function AkresConcertSeriesPage() {
           text-decoration: none;
           background: rgba(10, 10, 10, 0.35);
           font-size: 0.78rem;
+        }
+
+        @media (max-width: 768px) {
+          .pieces-slider__image {
+            max-width: 100vw;
+            max-height: 100vh;
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+          }
         }
       `}</style>
     </main>
