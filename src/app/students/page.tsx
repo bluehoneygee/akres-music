@@ -1,8 +1,14 @@
+import { auth } from "@/auth";
 import { AppShell } from "@/components/app-shell";
 import { ResourcePage } from "@/components/resource-page";
 import { learningGoalOptions, levelOptions } from "@/lib/options";
+import { sessionRole } from "@/lib/session";
 
-export default function StudentsPage() {
+export default async function StudentsPage() {
+  const session = await auth();
+  const role = session ? sessionRole(session) : "";
+  const isMusicInstructor = role === "Music Instructor";
+
   return (
     <AppShell>
       <ResourcePage
@@ -18,24 +24,28 @@ export default function StudentsPage() {
             options: learningGoalOptions,
             required: true,
           },
-          {
-            key: "guardianIds",
-            label: "Guardians",
-            type: "relation",
-            relation: {
-              resource: "guardians",
-              labelFields: ["guardianName", "name", "firstName", "lastName"],
-            },
-            multiple: true,
-            quickCreate: {
-              title: "Guardian",
-              resource: "guardians",
-              fields: [
-                { key: "guardianName", label: "Guardian name", required: true },
-                { key: "mobileNumber", label: "Mobile number" },
-              ],
-            },
-          },
+          ...(isMusicInstructor
+            ? []
+            : [
+                {
+                  key: "guardianIds",
+                  label: "Guardians",
+                  type: "relation" as const,
+                  relation: {
+                    resource: "guardians" as const,
+                    labelFields: ["guardianName", "name", "firstName", "lastName"],
+                  },
+                  multiple: true,
+                  quickCreate: {
+                    title: "Guardian",
+                    resource: "guardians" as const,
+                    fields: [
+                      { key: "guardianName", label: "Guardian name", required: true },
+                      { key: "mobileNumber", label: "Mobile number" },
+                    ],
+                  },
+                },
+              ]),
           { key: "portalEnabled", label: "Portal enabled", type: "checkbox" },
           { key: "musicNotes", label: "Music notes", type: "textarea" },
         ]}

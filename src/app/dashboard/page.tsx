@@ -175,14 +175,18 @@ export default async function HomePage({
       tint: "bg-violet-100 text-violet-700",
       href: "/journals",
     },
-    {
-      label: "Tagihan unpaid",
-      value: String(openInvoices.length),
-      delta: formatCurrency(sumInvoices(openInvoices)),
-      icon: Banknote,
-      tint: "bg-amber-100 text-amber-700",
-      href: "/billing",
-    },
+    ...(role !== "Parent Portal User" && role !== "Student Portal User" && role !== "Music Instructor"
+      ? [
+          {
+            label: "Tagihan unpaid",
+            value: String(openInvoices.length),
+            delta: formatCurrency(sumInvoices(openInvoices)),
+            icon: Banknote,
+            tint: "bg-amber-100 text-amber-700",
+            href: "/billing",
+          },
+        ]
+      : []),
   ];
 
   const actionItems = [
@@ -240,7 +244,7 @@ export default async function HomePage({
 
   return (
     <AppShell>
-      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
+      <section className={`grid gap-2 sm:gap-3 ${metrics.length === 4 ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
         {metrics.map((metric) => (
           <Link href={metric.href} key={metric.label}>
             <Card className="liquid-glass no-glass-highlight shadow-none transition hover:brightness-[1.02]">
