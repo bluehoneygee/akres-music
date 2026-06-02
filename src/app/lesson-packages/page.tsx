@@ -35,6 +35,7 @@ export default function LessonPackagesPage() {
             deriveFrom: { sourceField: "courseId", sourceOptionField: "instrumentId" },
             hidden: true,
             required: true,
+            tableOnly: true,
           },
           {
             key: "studentId",
@@ -99,6 +100,7 @@ export default function LessonPackagesPage() {
             multiple: true,
             deriveFrom: { sourceField: "availabilitySlotId", sourceOptionField: "dayOfWeek" },
             hidden: true,
+            tableOnly: true,
           },
           {
             key: "fromTime",

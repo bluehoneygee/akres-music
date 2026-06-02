@@ -658,6 +658,10 @@ function normalizeLessonCount(value: unknown) {
   return lessonCount === 8 ? 8 : 4;
 }
 
+function rescheduleQuotaForLessonCount(value: unknown) {
+  return normalizeLessonCount(value) === 8 ? 2 : 1;
+}
+
 type ScheduleSlotTime = {
   availabilitySlotId?: string;
   dayOfWeek: string;
@@ -1557,6 +1561,20 @@ async function createConfirmedRescheduleSchedule(
   );
   const scheduleId = `reschedule-${String(originalSchedule.id)}`;
   const lessonPackageId = String(originalSchedule.lessonPackageId || "");
+  const originalScheduleDate = String(originalSchedule.scheduleDate || "");
+  const today = formatDate(new Date());
+  const minRescheduleDate = originalScheduleDate > today ? originalScheduleDate : today;
+  const maxRescheduleDate = addOneMonthFromDate(
+    String(originalSchedule.lessonStartDate || originalScheduleDate),
+  );
+
+  if (pendingDate < minRescheduleDate) {
+    throw new Error(`Reschedule tidak boleh sebelum ${minRescheduleDate}.`);
+  }
+
+  if (maxRescheduleDate && pendingDate > maxRescheduleDate) {
+    throw new Error(`Reschedule tidak boleh melewati ${maxRescheduleDate}.`);
+  }
 
   if (resource === "student-attendance") {
     const counterpartInstructorAttendance = await db
@@ -1588,14 +1606,28 @@ async function createConfirmedRescheduleSchedule(
   }
 
   if (lessonPackageId) {
+    const lessonPackage = await db
+      .collection("lesson-packages")
+      .findOne<Document>({ id: lessonPackageId }, { session });
+    const originalScheduleCount = await db.collection("schedules").countDocuments({
+      lessonPackageId,
+      originalScheduleId: "",
+      scheduleStatus: { $ne: "Cancelled" },
+    }, { session });
+    const lessonCountForQuota =
+      Number(lessonPackage?.lessonCount || originalSchedule.lessonCount || originalScheduleCount || 4);
+    const rescheduleQuota = rescheduleQuotaForLessonCount(lessonCountForQuota);
     const existingRescheduleCount = await db.collection("schedules").countDocuments({
       lessonPackageId,
       originalScheduleId: { $ne: "" },
       id: { $ne: scheduleId },
+      scheduleStatus: { $ne: "Cancelled" },
     }, { session });
 
-    if (existingRescheduleCount >= 1) {
-      throw new Error("Reschedule hanya boleh 1x untuk setiap lesson package.");
+    if (existingRescheduleCount >= rescheduleQuota) {
+      throw new Error(
+        `Kuota reschedule package sudah habis (${existingRescheduleCount}/${rescheduleQuota}).`,
+      );
     }
   }
 

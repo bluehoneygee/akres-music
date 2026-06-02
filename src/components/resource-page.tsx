@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { ChevronDown, Edit3, Filter, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -64,6 +64,7 @@ export type FieldConfig = {
   writeOnly?: boolean;
   hidden?: boolean;
   hideOnCreate?: boolean;
+  tableOnly?: boolean;
   quickCreate?: {
     title: string;
     resource: ResourceName;
@@ -80,6 +81,7 @@ type RelationOption = {
   unavailableReason?: string;
   value: string;
 };
+type SortDirection = "" | "asc" | "desc";
 
 type ScheduleSlotTime = {
   dayOfWeek: string;
@@ -120,11 +122,19 @@ export function ResourcePage({
   const [loading, setLoading] = useState(true);
   const [sessionRole, setSessionRole] = useState<string>("");
   const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({});
+  const [sortDirection, setSortDirection] = useState<SortDirection>("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
   const [scheduleRows, setScheduleRows] = useState<UiRecord[]>([]);
   const fieldsSignature = useMemo(() => JSON.stringify(fields), [fields]);
-  const formFields = fields.filter(
-    (field) => !field.hidden && (!field.hideOnCreate || editingId),
+  const formFields = useMemo(
+    () =>
+      fields.filter(
+        (field) => !field.hidden && !field.tableOnly && (!field.hideOnCreate || editingId),
+      ),
+    [editingId, fields],
   );
   const isParentStudentsView = resource === "students" && sessionRole === "Parent Portal User";
   const hidePortalEnabledColumn = [
@@ -138,14 +148,48 @@ export function ResourcePage({
       : canAccessResource({ role: sessionRole, resource, action: "create" }) &&
         canAccessResource({ role: sessionRole, resource, action: "update" }) &&
         canAccessResource({ role: sessionRole, resource, action: "delete" });
-  const tableFields = fields.filter(
-    (field) =>
-      !field.writeOnly &&
-      !(isParentStudentsView && field.key === "portalEnabled") &&
-      !(hidePortalEnabledColumn && field.key === "portalEnabled"),
+  const tableFields = useMemo(
+    () =>
+      fields.filter(
+        (field) =>
+          !field.writeOnly &&
+          (!field.hidden || field.tableOnly) &&
+          !(isParentStudentsView && field.key === "portalEnabled") &&
+          !(hidePortalEnabledColumn && field.key === "portalEnabled"),
+      ),
+    [fields, hidePortalEnabledColumn, isParentStudentsView],
   );
   const showActionsColumn = !isParentStudentsView && canWriteResource;
   const canCreate = allowCreate && !isParentStudentsView && canWriteResource;
+  const filterAllowlist = useMemo(() => getResourceFilterAllowlist(resource), [resource]);
+  const sortConfig = useMemo(() => getResourceSortConfig(resource), [resource]);
+  const filterableFields = useMemo(
+    () =>
+      tableFields.filter(
+        (field) =>
+          (!filterAllowlist || filterAllowlist.includes(field.key)) &&
+          isFilterVisibleForRole(resource, sessionRole, field) &&
+          isFilterableField(field, rows),
+      ),
+    [filterAllowlist, resource, rows, sessionRole, tableFields],
+  );
+  const filterOptions = useMemo(
+    () => buildFieldFilterOptions(rows, filterableFields, relationOptions),
+    [rows, filterableFields, relationOptions],
+  );
+  const visibleFilterFields = useMemo(
+    () => filterableFields.filter((field) => (filterOptions[field.key] ?? []).length > 0),
+    [filterOptions, filterableFields],
+  );
+  const filteredRows = useMemo(
+    () => filterRows(rows, tableFields, relationOptions, searchTerm, fieldFilters),
+    [rows, tableFields, relationOptions, searchTerm, fieldFilters],
+  );
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows, sortConfig, sortDirection),
+    [filteredRows, sortConfig, sortDirection],
+  );
+  const hasFiltering = Boolean(searchTerm.trim()) || hasActiveFilters(fieldFilters);
 
   const fetchRelationOptions = useCallback(async (field: FieldConfig): Promise<
     readonly [string, RelationOption[]]
@@ -469,7 +513,13 @@ export function ResourcePage({
         <Card className="liquid-glass">
           <CardHeader>
             <CardTitle className="text-base">
-              {loading ? <span className="block h-5 w-28 animate-pulse rounded-lg bg-white/45" /> : `${rows.length} records`}
+              {loading ? (
+                <span className="block h-5 w-28 animate-pulse rounded-lg bg-white/45" />
+              ) : hasFiltering ? (
+                `${filteredRows.length} of ${rows.length} records`
+              ) : (
+                `${rows.length} records`
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -478,6 +528,186 @@ export function ResourcePage({
                 {error}
               </div>
             ) : null}
+            <div className="mb-4">
+              <div className="no-scrollbar hidden items-center gap-2 overflow-x-auto pb-1 sm:flex">
+                <div className="relative w-[280px] shrink-0">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 pl-9 pr-9 text-sm text-zinc-900 outline-none backdrop-blur-xl transition placeholder:text-zinc-400 focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder={`Search ${title.toLowerCase()}`}
+                    type="search"
+                    value={searchTerm}
+                  />
+                  {searchTerm ? (
+                    <button
+                      aria-label="Clear search"
+                      className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-zinc-500 transition hover:bg-white/70 hover:text-zinc-900"
+                      onClick={() => setSearchTerm("")}
+                      type="button"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                {visibleFilterFields.length > 0 ? (
+                  <>
+                    {visibleFilterFields.map((field) => {
+                      const options = filterOptions[field.key] ?? [];
+
+                      return (
+                        <select
+                          className="h-9 min-w-[150px] shrink-0 rounded-2xl border border-white/50 bg-white/58 px-3 text-xs text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                          key={field.key}
+                          onChange={(event) =>
+                            setFieldFilters((current) => ({
+                              ...current,
+                              [field.key]: event.target.value,
+                            }))
+                          }
+                          value={fieldFilters[field.key] ?? ""}
+                        >
+                          <option value="">All {field.label}</option>
+                          {options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })}
+                    {hasActiveFilters(fieldFilters) ? (
+                      <Button
+                        className="shrink-0"
+                        onClick={() => setFieldFilters({})}
+                        size="sm"
+                        type="button"
+                        variant="glass"
+                      >
+                        <X className="size-3.5" />
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null}
+                {sortConfig ? (
+                  <select
+                    className="h-9 w-fit min-w-[160px] shrink-0 rounded-2xl border border-white/50 bg-white/58 px-3 text-xs text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+                    onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+                    value={sortDirection}
+                  >
+                    <option value="">Default order</option>
+                    <option value="asc">{sortConfig.label} A-Z</option>
+                    <option value="desc">{sortConfig.label} Z-A</option>
+                  </select>
+                ) : null}
+              </div>
+
+              <div className="sm:hidden">
+                <button
+                  className="flex h-10 w-full items-center justify-between rounded-full border border-emerald-800/55 bg-white/70 px-4 text-sm font-medium text-slate-800 shadow-[0_2px_0_rgba(21,128,61,0.25)] backdrop-blur-xl"
+                  onClick={() => setMobileFilterOpen((current) => !current)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <Filter className="size-4" />
+                    Filter
+                  </span>
+                  <ChevronDown
+                    className={`size-4 transition-transform ${mobileFilterOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {mobileFilterOpen ? (
+                  <div className="mt-3 space-y-4 rounded-3xl border border-white/75 bg-slate-100/86 p-4 shadow-sm backdrop-blur-xl">
+                    {visibleFilterFields.map((field) => {
+                      const options = filterOptions[field.key] ?? [];
+
+                      return (
+                        <label className="block space-y-2" key={field.key}>
+                          <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                            {field.label}
+                          </span>
+                          <select
+                            className="h-10 w-full rounded-xl border border-white/80 bg-white/82 px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
+                            onChange={(event) =>
+                              setFieldFilters((current) => ({
+                                ...current,
+                                [field.key]: event.target.value,
+                              }))
+                            }
+                            value={fieldFilters[field.key] ?? ""}
+                          >
+                            <option value="">All {field.label}</option>
+                            {options.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    })}
+
+                    {sortConfig ? (
+                      <label className="block space-y-2">
+                        <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                          Sort
+                        </span>
+                        <select
+                          className="h-10 w-full rounded-xl border border-white/80 bg-white/82 px-3 text-sm text-slate-800 outline-none transition focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
+                          onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+                          value={sortDirection}
+                        >
+                          <option value="">Default order</option>
+                          <option value="asc">{sortConfig.label} A-Z</option>
+                          <option value="desc">{sortConfig.label} Z-A</option>
+                        </select>
+                      </label>
+                    ) : null}
+
+                    <label className="block space-y-2">
+                      <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                        Search
+                      </span>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                        <input
+                          className="h-10 w-full rounded-xl border border-white/80 bg-white/82 pl-9 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
+                          onChange={(event) => setSearchTerm(event.target.value)}
+                          placeholder={`Search ${title.toLowerCase()}`}
+                          type="search"
+                          value={searchTerm}
+                        />
+                        {searchTerm ? (
+                          <button
+                            aria-label="Clear search"
+                            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                            onClick={() => setSearchTerm("")}
+                            type="button"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </label>
+
+                    {hasActiveFilters(fieldFilters) ? (
+                      <Button
+                        className="w-full"
+                        onClick={() => setFieldFilters({})}
+                        size="sm"
+                        type="button"
+                        variant="glass"
+                      >
+                        <X className="size-3.5" />
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-max max-w-full border-separate border-spacing-y-2 text-left text-sm sm:w-full sm:min-w-[820px]">
                 <thead className="text-xs uppercase text-zinc-500">
@@ -493,7 +723,7 @@ export function ResourcePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {sortedRows.map((row) => (
                     <tr className="bg-white/42" key={row.id}>
                       {tableFields.map((field, index) => (
                         <td
@@ -523,6 +753,15 @@ export function ResourcePage({
                   ))}
                 </tbody>
               </table>
+              {!loading && sortedRows.length === 0 ? (
+                <div className="rounded-2xl border border-white/45 bg-white/38 px-4 py-6 text-center text-sm text-zinc-500">
+                  {rows.length === 0
+                    ? "No records yet."
+                    : searchTerm.trim()
+                      ? "No records match this search."
+                      : "No records match the current filters."}
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -1552,6 +1791,167 @@ function formatValue(
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "-";
   return formatDisplayText(value);
+}
+
+function filterRows(
+  rows: UiRecord[],
+  fields: FieldConfig[],
+  relationOptions: Record<string, RelationOption[]>,
+  searchTerm: string,
+  fieldFilters: Record<string, string>,
+) {
+  const query = searchTerm.trim().toLowerCase();
+
+  return rows.filter((row) => {
+    const matchesFilters = Object.entries(fieldFilters).every(([fieldKey, filterValue]) => {
+      if (!filterValue) return true;
+      const field = fields.find((item) => item.key === fieldKey);
+      if (!field) return true;
+      return fieldFilterValues(row[field.key], field).includes(filterValue);
+    });
+
+    if (!matchesFilters) return false;
+    if (!query) return true;
+
+    const values = [row.id, ...fields.map((field) => formatValue(row[field.key], field, relationOptions))];
+    return values.some((value) => String(value).toLowerCase().includes(query));
+  });
+}
+
+function sortRows(
+  rows: UiRecord[],
+  sortConfig: ReturnType<typeof getResourceSortConfig>,
+  sortDirection: SortDirection,
+) {
+  if (!sortConfig || !sortDirection) return rows;
+
+  return [...rows].sort((left, right) => {
+    const leftValue = sortConfig.value(left);
+    const rightValue = sortConfig.value(right);
+    const result = leftValue.localeCompare(rightValue, undefined, { sensitivity: "base" });
+    return sortDirection === "asc" ? result : -result;
+  });
+}
+
+function isFilterableField(field: FieldConfig, rows: UiRecord[]) {
+  if (field.key === "portalEnabled") return false;
+  if (field.key === "guardianIds") return false;
+  if (field.type === "textarea" || field.type === "number" || field.type === "time") return false;
+  if (field.type === "select" || field.type === "relation" || field.type === "checkbox") return true;
+
+  const uniqueValues = new Set(
+    rows.flatMap((row) => fieldFilterValues(row[field.key], field)).filter(Boolean),
+  );
+
+  return uniqueValues.size > 1 && uniqueValues.size <= 20;
+}
+
+function isFilterVisibleForRole(
+  resource: ResourceName | "users",
+  role: string,
+  field: FieldConfig,
+) {
+  if (role === "Music Instructor" && resource === "lesson-packages" && field.key === "instructorId") {
+    return false;
+  }
+
+  if (
+    role === "Student Portal User" &&
+    resource === "lesson-packages" &&
+    field.key === "studentId"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function getResourceFilterAllowlist(resource: ResourceName | "users") {
+  if (resource === "users") return ["role"];
+  if (resource === "instruments") return ["instrumentCategory"];
+  return null;
+}
+
+function getResourceSortConfig(resource: ResourceName | "users") {
+  if (resource === "instructors") {
+    return {
+      label: "Instructor name",
+      value: (row: UiRecord) => String(row.instructorName ?? ""),
+    };
+  }
+
+  if (resource === "students") {
+    return {
+      label: "Student name",
+      value: (row: UiRecord) =>
+        `${String(row.firstName ?? "")} ${String(row.lastName ?? "")}`.trim(),
+    };
+  }
+
+  if (resource === "guardians") {
+    return {
+      label: "Guardian name",
+      value: (row: UiRecord) => String(row.guardianName ?? ""),
+    };
+  }
+
+  return null;
+}
+
+function buildFieldFilterOptions(
+  rows: UiRecord[],
+  fields: FieldConfig[],
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  return Object.fromEntries(
+    fields.map((field) => {
+      const values = Array.from(
+        new Set(rows.flatMap((row) => fieldFilterValues(row[field.key], field)).filter(Boolean)),
+      ).sort((left, right) =>
+        filterOptionLabel(field, left, relationOptions).localeCompare(
+          filterOptionLabel(field, right, relationOptions),
+        ),
+      );
+
+      return [
+        field.key,
+        values.map((value) => ({
+          value,
+          label: filterOptionLabel(field, value, relationOptions),
+        })),
+      ];
+    }),
+  ) as Record<string, Array<{ label: string; value: string }>>;
+}
+
+function fieldFilterValues(value: unknown, field: FieldConfig) {
+  if (field.type === "checkbox") return [String(Boolean(value))];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (value === null || value === undefined || value === "") return [];
+  return [String(value)];
+}
+
+function filterOptionLabel(
+  field: FieldConfig,
+  value: string,
+  relationOptions: Record<string, RelationOption[]>,
+) {
+  if (field.type === "select" && field.options) {
+    return formatDisplayText(optionLabel(field.options, value));
+  }
+
+  if (field.type === "relation") {
+    return formatDisplayText(
+      relationOptions[field.key]?.find((option) => option.value === value)?.label ?? value,
+    );
+  }
+
+  if (field.type === "checkbox") return value === "true" ? "Yes" : "No";
+  return formatDisplayText(value);
+}
+
+function hasActiveFilters(fieldFilters: Record<string, string>) {
+  return Object.values(fieldFilters).some(Boolean);
 }
 
 function optionLabel(options: { label: string; value: string }[], value: unknown) {

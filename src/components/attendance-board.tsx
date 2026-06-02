@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, UserRound } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Search, UserRound, X } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -48,6 +48,16 @@ type CombinedAttendanceGroup = {
   course: Row | null;
 };
 
+const indonesianDayOptions = [
+  { label: "Minggu", value: "0" },
+  { label: "Senin", value: "1" },
+  { label: "Selasa", value: "2" },
+  { label: "Rabu", value: "3" },
+  { label: "Kamis", value: "4" },
+  { label: "Jumat", value: "5" },
+  { label: "Sabtu", value: "6" },
+];
+
 export function AttendanceBoard() {
   const [packages, setPackages] = useState<Row[]>([]);
   const [students, setStudents] = useState<Row[]>([]);
@@ -59,6 +69,9 @@ export function AttendanceBoard() {
   const [instructorAvailability, setInstructorAvailability] = useState<Row[]>([]);
   const [studioRooms, setStudioRooms] = useState<Row[]>([]);
   const [activeTab, setActiveTab] = useState<"students" | "instructors">("students");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
+  const [sortMode, setSortMode] = useState<"nearest" | "default">("nearest");
   const [sessionRole, setSessionRole] = useState<string>("");
   const [selectedPackageByGroup, setSelectedPackageByGroup] = useState<Record<string, string>>({});
   const [selectedStudentSession, setSelectedStudentSession] = useState<SelectedSession | null>(null);
@@ -240,6 +253,15 @@ export function AttendanceBoard() {
     () => combineAttendanceGroups(instructorPackageGroups),
     [instructorPackageGroups],
   );
+  const visibleStudentGroups = useMemo(
+    () => prepareAttendanceGroups(studentGroups, searchTerm, dayFilter, sortMode),
+    [dayFilter, searchTerm, sortMode, studentGroups],
+  );
+  const visibleInstructorGroups = useMemo(
+    () => prepareAttendanceGroups(instructorGroups, searchTerm, dayFilter, sortMode),
+    [dayFilter, instructorGroups, searchTerm, sortMode],
+  );
+  const activeGroups = activeTab === "students" ? visibleStudentGroups : visibleInstructorGroups;
   const selectedStudentAttendance = selectedStudentSession
     ? attendance.find((row) => row.courseScheduleId === selectedStudentSession.schedule.id) ??
       selectedStudentSession.attendance
@@ -377,6 +399,51 @@ export function AttendanceBoard() {
         </Button>
       </div>
 
+      <Card className="liquid-glass">
+        <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 pl-9 pr-9 text-sm text-zinc-900 outline-none backdrop-blur-xl transition placeholder:text-zinc-400 focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by student name"
+              type="search"
+              value={searchTerm}
+            />
+            {searchTerm ? (
+              <button
+                aria-label="Clear attendance search"
+                className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-zinc-500 transition hover:bg-white/70 hover:text-zinc-900"
+                onClick={() => setSearchTerm("")}
+                type="button"
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <select
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 sm:w-[170px]"
+            onChange={(event) => setDayFilter(event.target.value)}
+            value={dayFilter}
+          >
+            <option value="">Semua hari</option>
+            {indonesianDayOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 px-3 text-sm text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200 sm:w-[210px]"
+            onChange={(event) => setSortMode(event.target.value as "nearest" | "default")}
+            value={sortMode}
+          >
+            <option value="nearest">Schedule terdekat</option>
+            <option value="default">Default order</option>
+          </select>
+        </CardContent>
+      </Card>
+
       <div className="space-y-3">
         {loading ? (
           <Card className="liquid-glass">
@@ -387,15 +454,17 @@ export function AttendanceBoard() {
           </Card>
         ) : null}
 
-        {!loading && (activeTab === "students" ? studentGroups : instructorGroups).length === 0 ? (
+        {!loading && activeGroups.length === 0 ? (
           <Card className="liquid-glass">
             <CardContent className="p-5 text-sm text-zinc-500">
-              Belum ada attendance. Buat Lesson Package dulu supaya schedules dan attendance otomatis muncul.
+              {searchTerm.trim() || dayFilter
+                ? "Tidak ada attendance yang cocok dengan filter."
+                : "Belum ada attendance. Buat Lesson Package dulu supaya schedules dan attendance otomatis muncul."}
             </CardContent>
           </Card>
         ) : null}
 
-        {activeTab === "students" ? studentGroups.map((combinedGroup) => {
+        {activeTab === "students" ? visibleStudentGroups.map((combinedGroup) => {
           const group = selectedAttendanceGroup(
             combinedGroup,
             selectedPackageByGroup[combinedGroup.id],
@@ -458,7 +527,7 @@ export function AttendanceBoard() {
             </CardContent>
           </Card>
           );
-        }) : instructorGroups.map((combinedGroup) => {
+        }) : visibleInstructorGroups.map((combinedGroup) => {
           const group = selectedAttendanceGroup(
             combinedGroup,
             selectedPackageByGroup[combinedGroup.id],
@@ -526,8 +595,10 @@ export function AttendanceBoard() {
         {selectedStudentSession ? (
           <StudentAttendanceModal
             attendance={selectedStudentAttendance}
+            attendanceRows={attendance}
             disabled={readOnlyPortal || savingId === selectedStudentAttendance?.id}
             instructorAvailability={instructorAvailability}
+            instructorAttendanceRows={instructorAttendance}
             onClose={() => setSelectedStudentSession(null)}
             onUpdate={updateAttendance}
           schedule={selectedStudentSession.schedule}
@@ -540,7 +611,9 @@ export function AttendanceBoard() {
         {selectedInstructorSession ? (
           <InstructorAttendanceModal
             attendance={selectedInstructorAttendance}
+            attendanceRows={attendance}
             disabled={readOnlyPortal || savingId === selectedInstructorAttendance?.id}
+            instructorAttendanceRows={instructorAttendance}
             instructorAvailability={instructorAvailability}
             onClose={() => setSelectedInstructorSession(null)}
           onCreateRescheduleSession={createInstructorRescheduleSession}
@@ -624,7 +697,7 @@ function SessionCard({
   const status = String(attendance?.status ?? "Pending");
   const isDraftReschedule = Boolean(schedule.isDraftReschedule);
   const confirmed = Boolean(attendance?.confirmed);
-  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
+  const rescheduledTo = rescheduleTargetForSchedule(schedules, schedule);
 
   return (
     <button
@@ -636,6 +709,9 @@ function SessionCard({
         <div className="min-w-0">
           <p className="text-[8px] font-medium uppercase text-zinc-500 sm:text-xs">Session {sessionNumber}</p>
           <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-950 sm:mt-1 sm:text-base">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-[8px] font-medium text-zinc-600 sm:text-xs">
+            {indonesianDayName(schedule.scheduleDate)}
+          </p>
           <p className="text-[8px] text-zinc-500 sm:text-xs">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
@@ -678,7 +754,9 @@ function SessionCard({
 
 function StudentAttendanceModal({
   attendance,
+  attendanceRows,
   disabled,
+  instructorAttendanceRows,
   instructorAvailability,
   onClose,
   onUpdate,
@@ -689,7 +767,9 @@ function StudentAttendanceModal({
   sessionNumber,
 }: {
   attendance: Row | null;
+  attendanceRows: Row[];
   disabled: boolean;
+  instructorAttendanceRows: Row[];
   instructorAvailability: Row[];
   onClose: () => void;
   onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>;
@@ -705,13 +785,29 @@ function StudentAttendanceModal({
   const confirmed = Boolean(attendance?.confirmed);
   const requiresReschedule = status === "Rescheduled";
   const pendingReschedule = pendingRescheduleLabel(attendance);
-  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
-    !requiresReschedule || Boolean(attendance?.makeupScheduleId || pendingReschedule)
-  );
   const controlDisabled = disabled || confirmed;
   const linkedReschedule = schedulesById.get(String(attendance?.makeupScheduleId ?? ""));
   const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
-  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
+  const rescheduledTo = rescheduleTargetForSchedule(schedules, schedule);
+  const studentConfirmedRescheduleUsed = Boolean(attendance?.makeupScheduleId || linkedReschedule || rescheduledTo);
+  const studentDraftReschedule = Boolean(pendingReschedule) && !studentConfirmedRescheduleUsed;
+  const packageQuota = packageRescheduleQuota(schedule, schedules);
+  const packageUsage = packageRescheduleUsage({
+    attendanceRows,
+    instructorAttendanceRows,
+    schedule,
+    schedules,
+  });
+  const ownRescheduleUsed = studentConfirmedRescheduleUsed || studentDraftReschedule;
+  const packageQuotaAvailable = packageUsage.used < packageUsage.limit || ownRescheduleUsed;
+  const rescheduleQuotaMessage = `Kuota reschedule package sudah habis (${packageUsage.used}/${packageUsage.limit}).`;
+  const canSelectStudentReschedule =
+    status === "Rescheduled"
+      ? packageQuotaAvailable
+      : !ownRescheduleUsed && packageQuotaAvailable;
+  const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
+    !requiresReschedule || studentDraftReschedule
+  );
   const [replacementOpen, setReplacementOpen] = useState(false);
   const [replacementStatus, setReplacementStatus] = useState(status);
   const [rescheduleFromTime, setRescheduleFromTime] = useState(String(schedule.fromTime ?? ""));
@@ -754,7 +850,12 @@ function StudentAttendanceModal({
                 const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
                 const opensReplacement = nextStatus === "Rescheduled";
 
-                if (opensReplacement && !attendance.makeupScheduleId && !pendingReschedule) {
+                if (opensReplacement && !canSelectStudentReschedule) {
+                  toast.error(ownRescheduleUsed ? "Sesi ini sudah pernah di-reschedule." : rescheduleQuotaMessage);
+                  return;
+                }
+
+                if (opensReplacement && canSelectStudentReschedule && !attendance.makeupScheduleId && !pendingReschedule) {
                   setReplacementStatus(nextStatus);
                   setReplacementOpen(true);
                   return;
@@ -766,16 +867,33 @@ function StudentAttendanceModal({
                   absenceReason: clearsReschedule ? "" : attendance.absenceReason,
                   makeupRequired: clearsReschedule ? false : attendance.makeupRequired,
                   makeupScheduleId: clearsReschedule ? "" : attendance.makeupScheduleId,
+                  pendingRescheduleDate: clearsReschedule ? "" : attendance.pendingRescheduleDate,
+                  pendingRescheduleFromTime: clearsReschedule ? "" : attendance.pendingRescheduleFromTime,
+                  pendingRescheduleStudioRoomId: clearsReschedule ? "" : attendance.pendingRescheduleStudioRoomId,
+                  pendingRescheduleToTime: clearsReschedule ? "" : attendance.pendingRescheduleToTime,
                 });
               }}
               value={status}
             >
               {studentAttendanceStatusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+                <option
+                  disabled={option.value === "Rescheduled" && !canSelectStudentReschedule}
+                  key={option.value}
+                  value={option.value}
+                >
+                  {option.value === "Rescheduled" && !canSelectStudentReschedule
+                    ? `${option.label} (${packageQuota}x jatah habis)`
+                    : option.label}
                 </option>
               ))}
             </select>
+            {!canSelectStudentReschedule ? (
+              <p className="rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-800">
+                {ownRescheduleUsed
+                  ? "Sesi ini sudah pernah di-reschedule."
+                  : `${rescheduleQuotaMessage} Package ${packageQuota === 2 ? "8 sesi" : "4 sesi"} hanya bisa reschedule ${packageQuota}x.`}
+              </p>
+            ) : null}
 
             {schedule.originalScheduleId ? (
               <RescheduleBadge
@@ -786,7 +904,7 @@ function StudentAttendanceModal({
           {rescheduledTo && String(linkedReschedule?.id ?? "") !== String(rescheduledTo.id ?? "") ? (
             <RescheduleBadge label="To" value={scheduleDateTime(rescheduledTo)} />
           ) : null}
-          {rescheduledTo || attendance.makeupScheduleId ? (
+          {studentConfirmedRescheduleUsed ? (
             <p className="text-xs font-medium text-amber-700">
               Jatah reschedule habis.
             </p>
@@ -832,10 +950,14 @@ function StudentAttendanceModal({
                   />
                 ) : pendingReschedule ? (
                   <RescheduleBadge label="To" value={`${pendingReschedule} (draft)`} />
-                ) : (
+                ) : canSelectStudentReschedule ? (
                   <Button
                     disabled={controlDisabled}
                     onClick={() => {
+                      if (!canSelectStudentReschedule) {
+                        toast.error(ownRescheduleUsed ? "Sesi ini sudah pernah di-reschedule." : rescheduleQuotaMessage);
+                        return;
+                      }
                       setReplacementStatus(status);
                       setReplacementOpen(true);
                     }}
@@ -845,7 +967,7 @@ function StudentAttendanceModal({
                   >
                     Set replacement schedule
                   </Button>
-                )}
+                ) : null}
               </>
             ) : null}
             {canConfirm ? (
@@ -920,8 +1042,8 @@ function AttendanceModalShell({
   variantFn: (status: string) => "success" | "outline" | "warning" | "danger";
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
-      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[460px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
+    <div className="attendance-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
+      <div className="attendance-modal-surface max-h-[calc(100dvh-24px)] w-full max-w-[460px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
@@ -948,6 +1070,7 @@ function AttendanceModalShell({
         </div>
         <div className="mt-4">{children}</div>
       </div>
+      <AttendanceModalStyle />
     </div>
   );
 }
@@ -960,6 +1083,77 @@ function RescheduleBadge({ label, value }: { label: string; value: string }) {
       </span>
       <span className="min-w-0 break-words font-medium">{value}</span>
     </div>
+  );
+}
+
+function AttendanceModalStyle() {
+  return (
+    <style>{`
+      .attendance-modal-overlay .attendance-modal-surface {
+        background: rgba(255, 255, 255, 0.94) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+        color: #18181b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .text-zinc-950,
+      .attendance-modal-overlay .attendance-modal-surface .text-zinc-900 {
+        color: #09090b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .text-zinc-600 {
+        color: #52525b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .text-zinc-500 {
+        color: #71717a !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .text-zinc-400 {
+        color: #a1a1aa !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .text-white {
+        color: #ffffff !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .bg-zinc-950 {
+        background-color: #09090b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .border-zinc-950 {
+        border-color: #09090b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface input,
+      .attendance-modal-overlay .attendance-modal-surface select {
+        background: rgba(255, 255, 255, 0.58) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        color: #18181b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface option {
+        background: #ffffff !important;
+        color: #18181b !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface .max-h-40,
+      .attendance-modal-overlay .attendance-modal-surface .max-h-44 {
+        background: rgba(255, 255, 255, 0.42) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface button[aria-pressed="true"] {
+        background: #09090b !important;
+        border-color: #09090b !important;
+        color: #ffffff !important;
+      }
+
+      .attendance-modal-overlay .attendance-modal-surface button[aria-pressed="false"] {
+        background: rgba(255, 255, 255, 0.52) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        color: #18181b !important;
+      }
+    `}</style>
   );
 }
 
@@ -1052,8 +1246,8 @@ function ReplacementScheduleModal({
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
-      <div className="max-h-[calc(100dvh-24px)] w-full max-w-[420px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
+    <div className="attendance-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/35 p-3 backdrop-blur-sm">
+      <div className="attendance-modal-surface max-h-[calc(100dvh-24px)] w-full max-w-[420px] overflow-y-auto rounded-3xl border border-white/55 bg-white/92 p-4 text-zinc-900 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/80 dark:bg-zinc-900/92 dark:text-zinc-100">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-400">
@@ -1301,7 +1495,7 @@ function InstructorSessionCard({
 }) {
   const status = String(attendance?.status ?? "Pending");
   const confirmed = Boolean(attendance?.confirmed);
-  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
+  const rescheduledTo = rescheduleTargetForSchedule(schedules, schedule);
 
   return (
     <button
@@ -1313,6 +1507,9 @@ function InstructorSessionCard({
         <div className="min-w-0">
           <p className="text-[8px] font-medium uppercase text-zinc-500 sm:text-xs">Session {sessionNumber}</p>
           <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-950 sm:mt-1 sm:text-base">{String(schedule.scheduleDate ?? "-")}</p>
+          <p className="text-[8px] font-medium text-zinc-600 sm:text-xs">
+            {indonesianDayName(schedule.scheduleDate)}
+          </p>
           <p className="text-[8px] text-zinc-500 sm:text-xs">
             {String(schedule.fromTime ?? "-")} - {String(schedule.toTime ?? "-")}
           </p>
@@ -1374,7 +1571,9 @@ function PackageSelector({
 
 function InstructorAttendanceModal({
   attendance,
+  attendanceRows,
   disabled,
+  instructorAttendanceRows,
   instructorAvailability,
   onClose,
   onCreateRescheduleSession,
@@ -1386,7 +1585,9 @@ function InstructorAttendanceModal({
   sessionNumber,
 }: {
   attendance: Row | null;
+  attendanceRows: Row[];
   disabled: boolean;
+  instructorAttendanceRows: Row[];
   instructorAvailability: Row[];
   onClose: () => void;
   onCreateRescheduleSession: (payload: {
@@ -1409,10 +1610,28 @@ function InstructorAttendanceModal({
   const pendingReschedule = pendingRescheduleLabel(attendance);
   const linkedReschedule = schedulesById.get(String(attendance?.rescheduleScheduleId ?? ""));
   const originalSchedule = schedulesById.get(String(schedule.originalScheduleId ?? ""));
-  const rescheduledTo = findRescheduledToSchedule(schedules, String(schedule.id ?? ""));
+  const rescheduledTo = rescheduleTargetForSchedule(schedules, schedule);
   const effectiveRescheduledTo = linkedReschedule ?? rescheduledTo;
+  const instructorConfirmedRescheduleUsed = Boolean(
+    attendance?.rescheduleScheduleId || effectiveRescheduledTo,
+  );
+  const instructorDraftReschedule = Boolean(pendingReschedule) && !instructorConfirmedRescheduleUsed;
+  const packageQuota = packageRescheduleQuota(schedule, schedules);
+  const packageUsage = packageRescheduleUsage({
+    attendanceRows,
+    instructorAttendanceRows,
+    schedule,
+    schedules,
+  });
+  const ownRescheduleUsed = instructorConfirmedRescheduleUsed || instructorDraftReschedule;
+  const packageQuotaAvailable = packageUsage.used < packageUsage.limit || ownRescheduleUsed;
+  const rescheduleQuotaMessage = `Kuota reschedule package sudah habis (${packageUsage.used}/${packageUsage.limit}).`;
+  const canSelectInstructorReschedule =
+    status === "Rescheduled"
+      ? packageQuotaAvailable
+      : !ownRescheduleUsed && packageQuotaAvailable;
   const canConfirm = Boolean(attendance) && !confirmed && status !== "Pending" && (
-    !requiresReschedule || Boolean(attendance?.rescheduleScheduleId || pendingReschedule)
+    !requiresReschedule || instructorDraftReschedule
   );
   const controlDisabled = disabled || confirmed;
   const [rescheduleDate, setRescheduleDate] = useState("");
@@ -1495,22 +1714,45 @@ function InstructorAttendanceModal({
               const nextStatus = event.target.value;
               const clearsReschedule = nextStatus === "Present" || nextStatus === "Pending";
               const needsReschedule = nextStatus === "Rescheduled";
+
+              if (needsReschedule && !canSelectInstructorReschedule) {
+                toast.error(ownRescheduleUsed ? "Sesi ini sudah pernah di-reschedule." : rescheduleQuotaMessage);
+                return;
+              }
+
               void onUpdate(attendance.id, {
                 ...attendance,
                 status: nextStatus,
                 substituteInstructorId: "",
                 rescheduleRequired: clearsReschedule ? false : needsReschedule || attendance.rescheduleRequired,
                 rescheduleScheduleId: clearsReschedule ? "" : attendance.rescheduleScheduleId,
+                pendingRescheduleDate: clearsReschedule ? "" : attendance.pendingRescheduleDate,
+                pendingRescheduleFromTime: clearsReschedule ? "" : attendance.pendingRescheduleFromTime,
+                pendingRescheduleStudioRoomId: clearsReschedule ? "" : attendance.pendingRescheduleStudioRoomId,
+                pendingRescheduleToTime: clearsReschedule ? "" : attendance.pendingRescheduleToTime,
               });
             }}
             value={status}
           >
             {instructorAttendanceStatusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option
+                disabled={option.value === "Rescheduled" && !canSelectInstructorReschedule}
+                key={option.value}
+                value={option.value}
+              >
+                {option.value === "Rescheduled" && !canSelectInstructorReschedule
+                  ? `${option.label} (${packageQuota}x jatah habis)`
+                  : option.label}
               </option>
             ))}
           </select>
+          {!canSelectInstructorReschedule ? (
+            <p className="rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-800">
+              {ownRescheduleUsed
+                ? "Sesi ini sudah pernah di-reschedule."
+                : `${rescheduleQuotaMessage} Package ${packageQuota === 2 ? "8 sesi" : "4 sesi"} hanya bisa reschedule ${packageQuota}x.`}
+            </p>
+          ) : null}
 
           {schedule.originalScheduleId ? (
             <RescheduleBadge
@@ -1525,12 +1767,12 @@ function InstructorAttendanceModal({
           ) : attendance.rescheduleScheduleId ? (
             <RescheduleBadge label="To" value="Replacement session created" />
           ) : null}
-          {effectiveRescheduledTo || attendance.rescheduleScheduleId ? (
+          {instructorConfirmedRescheduleUsed ? (
             <p className="text-xs font-medium text-amber-700">
               Jatah reschedule habis.
             </p>
           ) : null}
-          {attendance.rescheduleRequired && !effectiveRescheduledTo && !pendingReschedule ? (
+          {attendance.rescheduleRequired && canSelectInstructorReschedule && !effectiveRescheduledTo && !pendingReschedule ? (
             <div className="grid gap-2">
               <div className="grid max-h-40 gap-2 overflow-y-auto rounded-2xl border border-white/50 bg-white/42 p-2 backdrop-blur-xl dark:border-zinc-700/80 dark:bg-zinc-800/55">
                 {slotOptions.map((slot) => {
@@ -1624,8 +1866,12 @@ function InstructorAttendanceModal({
                 </select>
               ) : null}
               <Button
-                disabled={controlDisabled}
+                disabled={controlDisabled || !canSelectInstructorReschedule}
                 onClick={() => {
+                  if (!canSelectInstructorReschedule) {
+                    toast.error(ownRescheduleUsed ? "Sesi ini sudah pernah di-reschedule." : rescheduleQuotaMessage);
+                    return;
+                  }
                   if (needsStudioOverride && !studioRoomId) {
                     toast.error("Pilih studio room pengganti dulu");
                     return;
@@ -1799,6 +2045,58 @@ function selectedAttendanceGroup(group: CombinedAttendanceGroup, selectedId?: st
   return group.groups.find((packageGroup) => packageGroup.id === selectedId) ?? group.groups[0];
 }
 
+function prepareAttendanceGroups(
+  groups: CombinedAttendanceGroup[],
+  searchTerm: string,
+  dayFilter: string,
+  sortMode: "nearest" | "default",
+) {
+  const query = searchTerm.trim().toLowerCase();
+  const filtered = groups.filter((group) => {
+    const matchesSearch = query ? studentName(group.student).toLowerCase().includes(query) : true;
+    const matchesDay = dayFilter ? groupHasDay(group, dayFilter) : true;
+    return matchesSearch && matchesDay;
+  });
+
+  if (sortMode !== "nearest") return filtered;
+
+  return [...filtered].sort((left, right) => {
+    const leftTime = nearestScheduleTime(left);
+    const rightTime = nearestScheduleTime(right);
+
+    if (leftTime !== rightTime) return leftTime - rightTime;
+    return studentName(left.student).localeCompare(studentName(right.student), undefined, {
+      sensitivity: "base",
+    });
+  });
+}
+
+function groupHasDay(group: CombinedAttendanceGroup, dayFilter: string) {
+  return group.groups
+    .flatMap((packageGroup) => packageGroup.sessions)
+    .some(({ schedule }) => scheduleDayValue(schedule.scheduleDate) === dayFilter);
+}
+
+function nearestScheduleTime(group: CombinedAttendanceGroup) {
+  const now = Date.now();
+  const sessionTimes = group.groups
+    .flatMap((packageGroup) => packageGroup.sessions)
+    .map(({ schedule }) => scheduleStartTime(schedule))
+    .filter((value) => Number.isFinite(value));
+  const upcoming = sessionTimes.filter((value) => value >= now).sort((left, right) => left - right);
+  if (upcoming[0] !== undefined) return upcoming[0];
+
+  const past = sessionTimes.sort((left, right) => right - left);
+  return past[0] ?? Number.MAX_SAFE_INTEGER;
+}
+
+function scheduleStartTime(schedule: Row) {
+  const date = String(schedule.scheduleDate ?? "");
+  const fromTime = String(schedule.fromTime ?? "00:00");
+  const timestamp = new Date(`${date}T${fromTime}:00`).getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+}
+
 function packageSortKey(group: AttendanceGroup) {
   return String(group.package?.billingPeriod ?? group.package?.lessonStartDate ?? group.id);
 }
@@ -1823,6 +2121,22 @@ function scheduleDateTime(schedule: Row) {
   const fromTime = String(schedule.fromTime ?? "-");
   const toTime = String(schedule.toTime ?? "-");
   return `${date}, ${fromTime} - ${toTime}`;
+}
+
+function indonesianDayName(value: unknown) {
+  const dateValue = String(value ?? "");
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (!dateValue || Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", { weekday: "long" }).format(date);
+}
+
+function scheduleDayValue(value: unknown) {
+  const dateValue = String(value ?? "");
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (!dateValue || Number.isNaN(date.getTime())) return "";
+
+  return String(date.getDay());
 }
 
 function pendingRescheduleLabel(attendance: Row | null) {
@@ -1865,6 +2179,85 @@ function findRescheduledToSchedule(schedules: Row[], scheduleId: string) {
         String(row.scheduleStatus ?? "").toLowerCase() !== "cancelled",
     ) ?? null
   );
+}
+
+function rescheduleTargetForSchedule(schedules: Row[], schedule: Row) {
+  const originalScheduleId = String(schedule.originalScheduleId || schedule.id || "");
+  return findRescheduledToSchedule(schedules, originalScheduleId);
+}
+
+function packageRescheduleQuota(schedule: Row, schedules: Row[]) {
+  const lessonCount = Number(schedule.lessonCount || "");
+  if (Number.isFinite(lessonCount) && lessonCount > 0) return lessonCount >= 8 ? 2 : 1;
+
+  const packageId = String(schedule.lessonPackageId ?? "");
+  const originalCount = schedules.filter(
+    (row) =>
+      String(row.lessonPackageId ?? "") === packageId &&
+      !String(row.originalScheduleId ?? "") &&
+      String(row.scheduleStatus ?? "").toLowerCase() !== "cancelled",
+  ).length;
+
+  return originalCount >= 8 ? 2 : 1;
+}
+
+function packageRescheduleUsage({
+  attendanceRows,
+  instructorAttendanceRows,
+  schedule,
+  schedules,
+}: {
+  attendanceRows: Row[];
+  instructorAttendanceRows: Row[];
+  schedule: Row;
+  schedules: Row[];
+}) {
+  const packageId = String(schedule.lessonPackageId ?? "");
+  const limit = packageRescheduleQuota(schedule, schedules);
+  const originalScheduleIds = new Set(
+    schedules
+      .filter(
+        (row) =>
+          String(row.lessonPackageId ?? "") === packageId &&
+          !String(row.originalScheduleId ?? ""),
+      )
+      .map((row) => String(row.id ?? ""))
+      .filter(Boolean),
+  );
+  const usedOriginalIds = new Set<string>();
+
+  for (const row of schedules) {
+    const originalScheduleId = String(row.originalScheduleId ?? "");
+    if (
+      String(row.lessonPackageId ?? "") === packageId &&
+      originalScheduleId &&
+      originalScheduleIds.has(originalScheduleId) &&
+      String(row.scheduleStatus ?? "").toLowerCase() !== "cancelled"
+    ) {
+      usedOriginalIds.add(originalScheduleId);
+    }
+  }
+
+  for (const row of [...attendanceRows, ...instructorAttendanceRows]) {
+    const courseScheduleId = String(row.courseScheduleId ?? "");
+    const hasPendingReschedule = Boolean(
+      String(row.pendingRescheduleDate ?? "") ||
+        String(row.pendingRescheduleFromTime ?? "") ||
+        String(row.pendingRescheduleToTime ?? ""),
+    );
+    if (
+      String(row.lessonPackageId ?? "") === packageId &&
+      originalScheduleIds.has(courseScheduleId) &&
+      hasPendingReschedule
+    ) {
+      usedOriginalIds.add(courseScheduleId);
+    }
+  }
+
+  return {
+    limit,
+    used: usedOriginalIds.size,
+  };
 }
 
 function studentProgressLabel(sessions: SessionRow[]) {
@@ -1995,10 +2388,11 @@ function buildRescheduleDateOptions({
   const lessonMode = String(schedule.lessonMode ?? "");
   const studioRoomId = String(schedule.studioRoomId ?? "");
   const skipIds = new Set([String(schedule.id ?? ""), String(schedule.originalScheduleId ?? "")]);
-  const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startDate = getMinRescheduleDate(schedule);
   const maxRescheduleDate = getMaxRescheduleDate(schedule);
-  const endDate = maxRescheduleDate && maxRescheduleDate < startDate ? startDate : (maxRescheduleDate ?? startDate);
+  if (!maxRescheduleDate || maxRescheduleDate < startDate) return [];
+
+  const endDate = maxRescheduleDate;
   const options: RescheduleDateOption[] = [];
 
   for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
@@ -2070,6 +2464,21 @@ function getMaxRescheduleDate(schedule: Row) {
   const result = new Date(year, month - 1, day);
   result.setMonth(result.getMonth() + 1);
   return result;
+}
+
+function getMinRescheduleDate(schedule: Row) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const scheduleDate = parseDateOnly(String(schedule.scheduleDate ?? ""));
+
+  if (scheduleDate && scheduleDate > today) return scheduleDate;
+  return today;
+}
+
+function parseDateOnly(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function dayNameToIndex(dayName: string) {
