@@ -583,18 +583,6 @@ export function ResourcePage({
                         </select>
                       );
                     })}
-                    {hasActiveFilters(fieldFilters) ? (
-                      <Button
-                        className="shrink-0"
-                        onClick={() => setFieldFilters({})}
-                        size="sm"
-                        type="button"
-                        variant="glass"
-                      >
-                        <X className="size-3.5" />
-                        Clear filters
-                      </Button>
-                    ) : null}
                   </>
                 ) : null}
                 {sortConfig ? (
@@ -636,23 +624,26 @@ export function ResourcePage({
                             {field.label}
                           </span>
                           <Select
-                            value={fieldFilters[field.key] || undefined}
                             onValueChange={(value) => {
                               setFieldFilters((current) => ({
                                 ...current,
-                                [field.key]: value,
+                                [field.key]: value === "ALL" ? "" : value,
                               }));
                             }}
+                            value={fieldFilters[field.key] || "ALL"}
                           >
                             <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
-                              <SelectValue placeholder={`All ${field.label}`} />
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {options.map((option) => (
-                                <SelectItem key={option.value} value={option.value} className="py-1.5">
-                                  {option.label}
-                                </SelectItem>
-                              ))}
+                              <SelectItem className="py-1.5" value="ALL">
+                                All {field.label}
+                              </SelectItem>
+                            {options.map((option) => (
+                              <SelectItem className="py-1.5" key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -665,17 +656,22 @@ export function ResourcePage({
                           Sort
                         </span>
                         <Select
-                          value={sortDirection || undefined}
-                          onValueChange={(value) => setSortDirection(value as SortDirection)}
+                          onValueChange={(value) =>
+                            setSortDirection(value === "DEFAULT" ? "" : (value as SortDirection))
+                          }
+                          value={sortDirection || "DEFAULT"}
                         >
                           <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
-                            <SelectValue placeholder="Default order" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="asc" className="py-1.5">
+                            <SelectItem className="py-1.5" value="DEFAULT">
+                              Default order
+                            </SelectItem>
+                            <SelectItem className="py-1.5" value="asc">
                               {sortConfig.label} A-Z
                             </SelectItem>
-                            <SelectItem value="desc" className="py-1.5">
+                            <SelectItem className="py-1.5" value="desc">
                               {sortConfig.label} Z-A
                             </SelectItem>
                           </SelectContent>
@@ -708,19 +704,6 @@ export function ResourcePage({
                         ) : null}
                       </div>
                     </label>
-
-                    {hasActiveFilters(fieldFilters) ? (
-                      <Button
-                        className="w-full"
-                        onClick={() => setFieldFilters({})}
-                        size="sm"
-                        type="button"
-                        variant="glass"
-                      >
-                        <X className="size-3.5" />
-                        Clear filters
-                      </Button>
-                    ) : null}
                   </div>
                 ) : null}
               </div>
