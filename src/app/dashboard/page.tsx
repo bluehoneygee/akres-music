@@ -244,7 +244,7 @@ export default async function HomePage({
 
   return (
     <AppShell>
-      <section className={`grid gap-2 sm:gap-3 ${metrics.length === 4 ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
+      <section className={`grid gap-2 sm:gap-3 ${metrics.length === 4 ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-3"}`}>
         {metrics.map((metric) => (
           <Link href={metric.href} key={metric.label}>
             <Card className="liquid-glass no-glass-highlight shadow-none transition hover:brightness-[1.02]">
