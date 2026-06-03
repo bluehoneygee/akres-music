@@ -16,10 +16,15 @@ on:
           - all
           - staging
           - production
+      force:
+        description: "Force run outside the normal reminder window"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   run-staging:
-    if: ${{ github.event_name == 'schedule' || github.event.inputs.target == 'all' || github.event.inputs.target == 'staging' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'all' || github.event.inputs.target == 'staging') }}
     name: Run Staging Notifications
     runs-on: ubuntu-latest
     environment: staging
@@ -72,6 +77,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_BYPASS_TOKEN }}
           CRON_EXPR: ${{ github.event.schedule }}
+          FORCE_RUN: ${{ github.event.inputs.force }}
         run: |
           BASE_URL="${AUTH_URL:-${APP_URL:-${AUTH_URL_SECRET:-$APP_URL_SECRET}}}"
           if [ -z "$BASE_URL" ]; then
@@ -83,7 +89,10 @@ jobs:
             exit 1
           fi
           MODE="morning"
-          REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE"
+          REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE&debug=true"
+          if [ "$FORCE_RUN" = "true" ]; then
+            REQUEST_URL="$REQUEST_URL&force=true"
+          fi
           if [ -n "$VERCEL_BYPASS_TOKEN" ]; then
             REQUEST_URL="$REQUEST_URL&x-vercel-protection-bypass=$VERCEL_BYPASS_TOKEN&x-vercel-set-bypass-cookie=true"
           fi
@@ -141,6 +150,7 @@ jobs:
           APP_URL_SECRET: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           CRON_EXPR: ${{ github.event.schedule }}
+          FORCE_RUN: ${{ github.event.inputs.force }}
         run: |
           BASE_URL="${AUTH_URL:-${APP_URL:-${AUTH_URL_SECRET:-$APP_URL_SECRET}}}"
           if [ -z "$BASE_URL" ]; then
@@ -152,9 +162,13 @@ jobs:
             exit 1
           fi
           MODE="morning"
-          echo "Calling: $BASE_URL/api/notifications/run?mode=$MODE"
+          REQUEST_URL="$BASE_URL/api/notifications/run?mode=$MODE&debug=true"
+          if [ "$FORCE_RUN" = "true" ]; then
+            REQUEST_URL="$REQUEST_URL&force=true"
+          fi
+          echo "Calling: $REQUEST_URL"
           RESPONSE=$(curl --fail-with-body --show-error --silent \
-            -X POST "$BASE_URL/api/notifications/run?mode=$MODE" \
+            -X POST "$REQUEST_URL" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")
           echo "Response: $RESPONSE"

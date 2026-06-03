@@ -22,6 +22,8 @@ export type NotificationRunResult = {
       reason: "created" | "skipped_existing" | "no_window_match" | "invalid_time";
       targetRole?: "Music Instructor" | "Parent Portal User" | "Student Portal User";
       recipientCount?: number;
+      pushSent?: number;
+      pushSkipped?: number;
     }>;
   };
 };
@@ -82,6 +84,11 @@ function getJakartaNowParts() {
     hour: value("hour"),
     minute: value("minute"),
   };
+}
+
+function isMorningReminderWindow(jakartaNow: ReturnType<typeof getJakartaNowParts>) {
+  // GitHub Actions scheduled jobs can be delayed. Avoid sending stale "morning" reminders at noon/afternoon.
+  return jakartaNow.hour === 8 && jakartaNow.minute <= 30;
 }
 
 function parseScheduleStartUtcMs(scheduleDate: string, fromTime: string) {
@@ -223,6 +230,7 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
   const today = dayOffset(0);
   const nowUtc = Date.now();
   const jakartaNow = getJakartaNowParts();
+  const isMorningSlot = isMorningReminderWindow(jakartaNow);
   const force = options?.force === true;
   const debugEnabled = options?.debug === true;
   const debugSchedules: NonNullable<NotificationRunResult["debug"]>["schedules"] = [];
@@ -254,7 +262,7 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
 
     const shouldSendMorning = force
       ? (mode === "all" || mode === "morning") && scheduleDate === today
-      : mode === "morning" && scheduleDate === today;
+      : (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
     const diffMs = scheduleStartUtcMs - nowUtc;
     const inThreeHourWindow = diffMs >= 3 * 60 * 60 * 1000 && diffMs < (3 * 60 + 15) * 60 * 1000;
     const shouldSendPreclass = force
@@ -305,6 +313,14 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
           guardianIds: (studentsById.get(sid)?.guardianIds ?? []) as string[],
         });
 
+        const pushResult = inserted
+          ? await sendPushToUsers(recipientIds, {
+              title: "Akres Music Reminder",
+              body: formattedMessage,
+              url: "/notifications",
+            })
+          : undefined;
+
         if (debugEnabled) {
           debugSchedules.push({
             scheduleId,
@@ -314,14 +330,8 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
             reason: inserted ? "created" : "skipped_existing",
             targetRole,
             recipientCount: recipientIds.length,
-          });
-        }
-
-        if (inserted) {
-          await sendPushToUsers(recipientIds, {
-            title: "Akres Music Reminder",
-            body: formattedMessage,
-            url: "/notifications",
+            pushSent: pushResult?.sent,
+            pushSkipped: pushResult?.skipped,
           });
         }
       }
