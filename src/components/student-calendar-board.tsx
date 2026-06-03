@@ -26,18 +26,33 @@ export function StudentCalendarBoard() {
   async function loadData() {
     setLoading(true);
     try {
-      const [scheduleRows, studentRows, courseRows, instructorRows, roomRows] = await Promise.all([
-        fetchRows("schedules"),
-        fetchRows("students"),
-        fetchRows("courses"),
-        fetchRows("instructors"),
-        fetchRows("rooms"),
-      ]);
-      setSchedules(scheduleRows);
+      const params = new URLSearchParams({
+        board: "student-calendar",
+        month: monthValue(cursorDate),
+        view: viewMode,
+      });
+      const response = await fetch(`/api/calendar-board?${params.toString()}`, { cache: "no-store" });
+      const json = (await response.json()) as {
+        data?: {
+          courses?: Row[];
+          instructors?: Row[];
+          rooms?: Row[];
+          schedules?: Row[];
+          students?: Row[];
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load student calendar");
+      }
+
+      const studentRows = json.data?.students ?? [];
+      setSchedules(json.data?.schedules ?? []);
       setStudents(studentRows);
-      setCourses(courseRows);
-      setInstructors(instructorRows);
-      setRooms(roomRows);
+      setCourses(json.data?.courses ?? []);
+      setInstructors(json.data?.instructors ?? []);
+      setRooms(json.data?.rooms ?? []);
       setSelectedStudentId((current) => current || studentRows[0]?.id || "");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load student calendar");
@@ -48,7 +63,7 @@ export function StudentCalendarBoard() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [cursorDate, viewMode]);
 
   const studentsById = useMemo(() => mapById(students), [students]);
   const coursesById = useMemo(() => mapById(courses), [courses]);
@@ -342,13 +357,6 @@ function DayDetailModal({
   );
 }
 
-async function fetchRows(resource: string) {
-  const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-  const json = (await response.json()) as { data?: Row[]; error?: string };
-  if (!response.ok) throw new Error(json.error ?? `Unable to load ${resource}`);
-  return Array.isArray(json.data) ? json.data : [];
-}
-
 function mapById(rows: Row[]) {
   return new Map(rows.map((row) => [row.id, row]));
 }
@@ -368,6 +376,10 @@ function mapRescheduledToByOriginalId(rows: Row[]) {
 
 function startOfMonth(value: Date) {
   return new Date(Date.UTC(value.getFullYear(), value.getMonth(), 1));
+}
+
+function monthValue(value: Date) {
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function monthTitle(value: Date) {

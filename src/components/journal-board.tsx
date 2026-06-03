@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getClientSession } from "@/lib/client-session";
 import { progressRatingOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
@@ -63,32 +62,32 @@ export function JournalBoard() {
     setLoading(true);
 
     try {
-      const [
-        attendanceRows,
-        scheduleRows,
-        studentRows,
-        instructorRows,
-        instrumentRows,
-        repertoireRows,
-        journalRows,
-      ] = await Promise.all([
-        fetchRows("student-attendance"),
-        fetchRows("schedules"),
-        fetchRows("students"),
-        fetchRows("instructors"),
-        fetchRows("instruments"),
-        fetchRows("repertoires"),
-        fetchRows("journals"),
-      ]);
+      const response = await fetch("/api/journal-board", { cache: "no-store" });
+      const json = (await response.json()) as {
+        attendance?: Row[];
+        error?: string;
+        instructors?: Row[];
+        instruments?: Row[];
+        journals?: Row[];
+        repertoires?: Row[];
+        role?: string;
+        schedules?: Row[];
+        students?: Row[];
+      };
 
-      setAttendance(attendanceRows);
-      setSchedules(scheduleRows);
-      setStudents(studentRows);
-      setInstructors(instructorRows);
-      setInstruments(instrumentRows);
-      setRepertoires(repertoireRows);
-      setJournals(journalRows);
-      setDrafts(buildDrafts(journalRows));
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load journals");
+      }
+
+      setAttendance(json.attendance ?? []);
+      setSchedules(json.schedules ?? []);
+      setStudents(json.students ?? []);
+      setInstructors(json.instructors ?? []);
+      setInstruments(json.instruments ?? []);
+      setRepertoires(json.repertoires ?? []);
+      setJournals(json.journals ?? []);
+      setDrafts(buildDrafts(json.journals ?? []));
+      setSessionRole(json.role ?? "");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load journals");
     } finally {
@@ -98,22 +97,6 @@ export function JournalBoard() {
 
   useEffect(() => {
     void loadData();
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadSessionRole() {
-      try {
-        const session = (await getClientSession()) as { user?: { role?: string } };
-        if (mounted) setSessionRole(session.user?.role ?? "");
-      } catch {
-        if (mounted) setSessionRole("");
-      }
-    }
-    void loadSessionRole();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const lines = useMemo(() => {
@@ -443,17 +426,6 @@ export function JournalBoard() {
       </Card>
     </div>
   );
-}
-
-async function fetchRows(resource: string) {
-  const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-  const json = (await response.json()) as { data?: Row[]; error?: string };
-
-  if (!response.ok) {
-    throw new Error(json.error ?? `Unable to load ${resource}`);
-  }
-
-  return Array.isArray(json.data) ? json.data : [];
 }
 
 function buildDrafts(journals: Row[]) {

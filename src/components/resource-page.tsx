@@ -1,9 +1,33 @@
 "use client";
 
-import { ChevronDown, Edit3, Filter, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
+import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { TABLE_PAGE_SIZE, useDebouncedValue, useResourceRows } from "@/components/resource-page-hooks";
+import { invalidateResourceOptionsCache, useResourceOptions } from "@/components/resource-page-options";
+import { ResourceFilterBar, ResourcePagination, ResourceTable } from "@/components/resource-page-parts";
+import {
+  applyDerivedValues,
+  buildFieldFilterOptions,
+  clearFilteredDependentValues,
+  clearHiddenDependentValues,
+  formatValue,
+  getAvailabilityDateOptions,
+  getDerivedValue,
+  getFieldOptions,
+  getNextMultiSelectValue,
+  getResourceFilterAllowlist,
+  getResourceSortConfig,
+  getSelectOptions,
+  hasActiveFilters,
+  isFieldVisible,
+  isFilterableField,
+  isFilterCandidateField,
+  isFilterVisibleForRole,
+  isRecordValueEqual,
+  toMultiSelectValue,
+} from "@/components/resource-page-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getClientSession } from "@/lib/client-session";
 import type { ResourceName } from "@/lib/models";
 import { canAccessResource } from "@/lib/roles";
 import { formatDisplayText } from "@/lib/utils";
@@ -79,16 +102,17 @@ export type FieldConfig = {
   };
 };
 
-type RecordValue = string | number | boolean | string[];
-type UiRecord = Record<string, RecordValue> & { id: string };
-type RelationOption = {
+export type RecordValue = string | number | boolean | string[];
+export type UiRecord = Record<string, RecordValue> & { id: string };
+export type RelationOption = {
   disabled?: boolean;
   label: string;
   record: UiRecord;
   unavailableReason?: string;
   value: string;
 };
-type SortDirection = "" | "asc" | "desc";
+type RelationOptionLookup = Record<string, Map<string, RelationOption>>;
+export type SortDirection = "" | "asc" | "desc";
 
 type ScheduleSlotTime = {
   dayOfWeek: string;
@@ -119,23 +143,32 @@ export function ResourcePage({
       ) as Record<string, RecordValue>,
     [fields],
   );
-  const [rows, setRows] = useState<UiRecord[]>([]);
   const [draft, setDraft] = useState<Record<string, RecordValue>>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<UiRecord | null>(null);
   const [quickCreateField, setQuickCreateField] = useState<FieldConfig | null>(null);
   const [quickCreateDraft, setQuickCreateDraft] = useState<Record<string, RecordValue>>({});
-  const [loading, setLoading] = useState(true);
   const [sessionRole, setSessionRole] = useState<string>("");
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({});
   const [sortDirection, setSortDirection] = useState<SortDirection>("");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const [relationOptions, setRelationOptions] = useState<Record<string, RelationOption[]>>({});
+  const [page, setPage] = useState(1);
   const [scheduleRows, setScheduleRows] = useState<UiRecord[]>([]);
   const fieldsSignature = useMemo(() => JSON.stringify(fields), [fields]);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 180);
+  const { fetchRelationOptions, relationOptions, setRelationOptions } = useResourceOptions(fields);
+  const relationOptionLookup = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(relationOptions).map(([fieldKey, options]) => [
+          fieldKey,
+          new Map(options.map((option) => [option.value, option])),
+        ]),
+      ) as RelationOptionLookup,
+    [relationOptions],
+  );
   const formFields = useMemo(
     () =>
       fields.filter(
@@ -170,171 +203,123 @@ export function ResourcePage({
   const canCreate = allowCreate && !isParentStudentsView && canWriteResource;
   const filterAllowlist = useMemo(() => getResourceFilterAllowlist(resource), [resource]);
   const sortConfig = useMemo(() => getResourceSortConfig(resource), [resource]);
-  const filterableFields = useMemo(
+  const filterCandidateFields = useMemo(
     () =>
       tableFields.filter(
         (field) =>
           (!filterAllowlist || filterAllowlist.includes(field.key)) &&
           isFilterVisibleForRole(resource, sessionRole, field) &&
-          isFilterableField(field, rows),
+          isFilterCandidateField(field),
       ),
-    [filterAllowlist, resource, rows, sessionRole, tableFields],
+    [filterAllowlist, resource, sessionRole, tableFields],
+  );
+  const tableFieldKeys = useMemo(
+    () => tableFields.map((field) => field.key).join(","),
+    [tableFields],
+  );
+  const visibleFilterFieldKeys = useMemo(
+    () => filterCandidateFields.map((field) => field.key).join(","),
+    [filterCandidateFields],
+  );
+  const {
+    error,
+    filterFacets,
+    loadRows,
+    loading,
+    rows,
+    setError,
+    totalRows,
+  } = useResourceRows({
+    debouncedSearchTerm,
+    fieldFilters,
+    onRole: setSessionRole,
+    page,
+    resource,
+    sortDirection,
+    tableFieldKeys,
+    visibleFilterFieldKeys,
+  });
+  const filterableFields = useMemo(
+    () =>
+      filterCandidateFields.filter((field) => isFilterableField(field, rows, filterFacets[field.key])),
+    [filterCandidateFields, filterFacets, rows],
   );
   const filterOptions = useMemo(
-    () => buildFieldFilterOptions(rows, filterableFields, relationOptions),
-    [rows, filterableFields, relationOptions],
+    () => buildFieldFilterOptions(filterFacets, rows, filterableFields, relationOptions, relationOptionLookup),
+    [filterFacets, rows, filterableFields, relationOptions, relationOptionLookup],
   );
   const visibleFilterFields = useMemo(
     () => filterableFields.filter((field) => (filterOptions[field.key] ?? []).length > 0),
     [filterOptions, filterableFields],
   );
-  const filteredRows = useMemo(
-    () => filterRows(rows, tableFields, relationOptions, searchTerm, fieldFilters),
-    [rows, tableFields, relationOptions, searchTerm, fieldFilters],
-  );
-  const sortedRows = useMemo(
-    () => sortRows(filteredRows, sortConfig, sortDirection),
-    [filteredRows, sortConfig, sortDirection],
-  );
+  const totalPages = Math.max(1, Math.ceil(totalRows / TABLE_PAGE_SIZE));
+  const paginatedRows = rows;
   const hasFiltering = Boolean(searchTerm.trim()) || hasActiveFilters(fieldFilters);
+  const needsScheduleRows = fields.some((field) => field.roomAvailabilityFrom || field.availabilityDateFrom);
 
-  const fetchRelationOptions = useCallback(async (field: FieldConfig): Promise<
-    readonly [string, RelationOption[]]
-  > => {
-    if (!field.relation) return [field.key, []];
-
-    const response = await fetch(`/api/${field.relation.resource}`, { cache: "no-store" });
-    const json = (await response.json()) as { data?: UiRecord[] };
-    const records = (Array.isArray(json.data) ? json.data : []).filter((record) =>
-      field.relation?.activeOnly ? record.isActive !== false : true,
-    );
-    const valueField = field.relation.valueField ?? "id";
-
-    return [
-      field.key,
-      records.map((record) => ({
-        value: String(record[valueField] ?? record.id),
-        label: formatRelationOptionLabel(field, record, valueField),
-        record,
-      })),
-    ] as const;
-  }, []);
 
   const loadSchedulesForAvailability = useCallback(async () => {
+    const month =
+      String(draft.billingPeriod ?? "") ||
+      String(draft.lessonStartDate ?? "").slice(0, 7);
+    const params = new URLSearchParams();
+    if (month) params.set("month", month);
+    if (draft.studentId) params.set("studentId", String(draft.studentId));
+    if (draft.instructorId) params.set("instructorId", String(draft.instructorId));
+    if (draft.studioRoomId) params.set("roomId", String(draft.studioRoomId));
+    if (draft.fromTime) params.set("fromTime", String(draft.fromTime));
+    if (draft.toTime) params.set("toTime", String(draft.toTime));
+
+    if (!params.toString()) {
+      setScheduleRows([]);
+      return;
+    }
+
     try {
-      const response = await fetch("/api/schedules", { cache: "no-store" });
+      const response = await fetch(`/api/schedule-conflicts?${params.toString()}`, {
+        cache: "no-store",
+      });
       const json = (await response.json()) as { data?: UiRecord[] };
-      setScheduleRows(Array.isArray(json.data) ? json.data : []);
+      setScheduleRows(json.data ?? []);
     } catch {
       setScheduleRows([]);
     }
-  }, []);
-
-  const loadRows = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-      const json = (await response.json()) as { data?: UiRecord[]; error?: string };
-
-      if (!response.ok) {
-        setRows([]);
-        setError(json.error ?? "Unable to load records");
-        toast.error(json.error ?? "Unable to load records");
-        return;
-      }
-
-      setRows(Array.isArray(json.data) ? json.data : []);
-    } catch {
-      setRows([]);
-      setError("Unable to connect to the server");
-      toast.error("Unable to connect to the server");
-    } finally {
-      setLoading(false);
-    }
-  }, [resource]);
+  }, [
+    draft.billingPeriod,
+    draft.fromTime,
+    draft.instructorId,
+    draft.lessonStartDate,
+    draft.studioRoomId,
+    draft.studentId,
+    draft.toTime,
+  ]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadRows();
-    });
-  }, [loadRows]);
+    if (!formOpen || !needsScheduleRows) return;
+    void loadSchedulesForAvailability();
+  }, [
+    draft.availabilitySlotId,
+    draft.billingPeriod,
+    draft.fromTime,
+    draft.instructorId,
+    draft.lessonDays,
+    draft.lessonMode,
+    draft.lessonStartDate,
+    draft.studioRoomId,
+    draft.studentId,
+    draft.toTime,
+    formOpen,
+    loadSchedulesForAvailability,
+    needsScheduleRows,
+  ]);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadSessionRole() {
-      try {
-        const session = (await getClientSession()) as { user?: { role?: string } };
-        if (mounted) {
-          setSessionRole(session.user?.role ?? "");
-        }
-      } catch {
-        if (mounted) {
-          setSessionRole("");
-        }
-      }
-    }
-
-    void loadSessionRole();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    setPage(1);
+  }, [debouncedSearchTerm, fieldFilters, sortDirection, resource]);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadRelationOptions() {
-      const relationFields = fields.filter((field) => field.type === "relation" && field.relation);
-      const entries = await Promise.all(
-        relationFields.map(async (field) => {
-          try {
-            return await fetchRelationOptions(field);
-          } catch {
-            return [field.key, []] as const;
-          }
-        }),
-      );
-
-      if (mounted) {
-        setRelationOptions(Object.fromEntries(entries));
-      }
-    }
-
-    void loadRelationOptions();
-
-    return () => {
-      mounted = false;
-    };
-  }, [fieldsSignature, fields, fetchRelationOptions]);
-
-  useEffect(() => {
-    if (!fields.some((field) => field.roomAvailabilityFrom || field.availabilityDateFrom)) return;
-
-    let mounted = true;
-
-    async function loadSchedules() {
-      try {
-        const response = await fetch("/api/schedules", { cache: "no-store" });
-        const json = (await response.json()) as { data?: UiRecord[] };
-
-        if (mounted) {
-          setScheduleRows(Array.isArray(json.data) ? json.data : []);
-        }
-      } catch {
-        if (mounted) setScheduleRows([]);
-      }
-    }
-
-    void loadSchedules();
-
-    return () => {
-      mounted = false;
-    };
-  }, [fieldsSignature, fields]);
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -409,6 +394,7 @@ export function ResourcePage({
     }
 
     toast.success(editingId ? "Record updated" : "Record created");
+    invalidateResourceOptionsCache([resource]);
     setEditingId(null);
     setFormOpen(false);
     setDraft(emptyDraft);
@@ -433,7 +419,7 @@ export function ResourcePage({
     await loadRows();
   }
 
-  function editRow(row: UiRecord) {
+  const editRow = useCallback((row: UiRecord) => {
     setEditingId(row.id);
     setDraft(
       Object.fromEntries(
@@ -441,7 +427,13 @@ export function ResourcePage({
       ) as Record<string, RecordValue>,
     );
     setFormOpen(true);
-  }
+  }, [emptyDraft, fields]);
+
+  const renderTableValue = useCallback(
+    (row: UiRecord, field: FieldConfig) =>
+      formatValue(row[field.key], field, relationOptions, relationOptionLookup),
+    [relationOptionLookup, relationOptions],
+  );
 
   function openCreateRecord() {
     setEditingId(null);
@@ -480,6 +472,7 @@ export function ResourcePage({
     }
 
     const [fieldKey, options] = await fetchRelationOptions(quickCreateField);
+    invalidateResourceOptionsCache([quickCreateField.quickCreate.resource]);
     setRelationOptions((current) => ({ ...current, [fieldKey]: options }));
     setDraft((current) => ({
       ...current,
@@ -523,9 +516,9 @@ export function ResourcePage({
               {loading ? (
                 <span className="block h-5 w-28 animate-pulse rounded-lg bg-white/45" />
               ) : hasFiltering ? (
-                `${filteredRows.length} of ${rows.length} records`
+                `${totalRows} matching records`
               ) : (
-                `${rows.length} records`
+                `${totalRows} records`
               )}
             </CardTitle>
           </CardHeader>
@@ -535,234 +528,38 @@ export function ResourcePage({
                 {error}
               </div>
             ) : null}
-            <div className="mb-4">
-              <div className="no-scrollbar hidden items-center gap-2 overflow-x-auto pb-1 sm:flex">
-                <div className="relative w-[280px] shrink-0">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" />
-                  <input
-                    className="h-10 w-full rounded-2xl border border-white/50 bg-white/58 pl-9 pr-9 text-sm text-zinc-900 outline-none backdrop-blur-xl transition placeholder:text-zinc-400 focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder={`Search ${title.toLowerCase()}`}
-                    type="search"
-                    value={searchTerm}
-                  />
-                  {searchTerm ? (
-                    <button
-                      aria-label="Clear search"
-                      className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-zinc-500 transition hover:bg-white/70 hover:text-zinc-900"
-                      onClick={() => setSearchTerm("")}
-                      type="button"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-                {visibleFilterFields.length > 0 ? (
-                  <>
-                    {visibleFilterFields.map((field) => {
-                      const options = filterOptions[field.key] ?? [];
-
-                      return (
-                        <select
-                          className="h-9 min-w-[150px] shrink-0 rounded-2xl border border-white/50 bg-white/58 px-3 text-xs text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
-                          key={field.key}
-                          onChange={(event) =>
-                            setFieldFilters((current) => ({
-                              ...current,
-                              [field.key]: event.target.value,
-                            }))
-                          }
-                          value={fieldFilters[field.key] ?? ""}
-                        >
-                          <option value="">All {field.label}</option>
-                          {options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      );
-                    })}
-                  </>
-                ) : null}
-                {sortConfig ? (
-                  <select
-                    className="h-9 w-fit min-w-[160px] shrink-0 rounded-2xl border border-white/50 bg-white/58 px-3 text-xs text-zinc-900 outline-none backdrop-blur-xl transition focus:border-sky-300 focus:bg-white/75 focus:ring-2 focus:ring-sky-200"
-                    onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-                    value={sortDirection}
-                  >
-                    <option value="">Default order</option>
-                    <option value="asc">{sortConfig.label} A-Z</option>
-                    <option value="desc">{sortConfig.label} Z-A</option>
-                  </select>
-                ) : null}
-              </div>
-
-              <div className="sm:hidden">
-                <button
-                  className="flex h-10 w-full items-center justify-between rounded-full border border-emerald-800/55 bg-white/70 px-4 text-sm font-medium text-slate-800 shadow-[0_2px_0_rgba(21,128,61,0.25)] backdrop-blur-xl"
-                  onClick={() => setMobileFilterOpen((current) => !current)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
-                    <Filter className="size-4" />
-                    Filter
-                  </span>
-                  <ChevronDown
-                    className={`size-4 transition-transform ${mobileFilterOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-
-                {mobileFilterOpen ? (
-                  <div className="mt-3 space-y-3 rounded-3xl border border-white/75 bg-slate-100/86 p-4 shadow-sm backdrop-blur-xl">
-                    {visibleFilterFields.map((field) => {
-                      const options = filterOptions[field.key] ?? [];
-
-                      return (
-                        <div className="space-y-1" key={field.key}>
-                          <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
-                            {field.label}
-                          </span>
-                          <Select
-                            onValueChange={(value) => {
-                              setFieldFilters((current) => ({
-                                ...current,
-                                [field.key]: value === "ALL" ? "" : value,
-                              }));
-                            }}
-                            value={fieldFilters[field.key] || "ALL"}
-                          >
-                            <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem className="py-1.5" value="ALL">
-                                All {field.label}
-                              </SelectItem>
-                            {options.map((option) => (
-                              <SelectItem className="py-1.5" key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      );
-                    })}
-
-                    {sortConfig ? (
-                      <div className="space-y-1">
-                        <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
-                          Sort
-                        </span>
-                        <Select
-                          onValueChange={(value) =>
-                            setSortDirection(value === "DEFAULT" ? "" : (value as SortDirection))
-                          }
-                          value={sortDirection || "DEFAULT"}
-                        >
-                          <SelectTrigger className="h-10 w-full rounded-xl border-white/80 bg-white/82 text-sm text-slate-800 focus:border-emerald-700/50 focus:ring-emerald-700/15">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem className="py-1.5" value="DEFAULT">
-                              Default order
-                            </SelectItem>
-                            <SelectItem className="py-1.5" value="asc">
-                              {sortConfig.label} A-Z
-                            </SelectItem>
-                            <SelectItem className="py-1.5" value="desc">
-                              {sortConfig.label} Z-A
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-
-                    <label className="block space-y-1">
-                      <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
-                        Search
-                      </span>
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-                        <input
-                          className="h-10 w-full rounded-xl border border-white/80 bg-white/82 pl-9 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-700/50 focus:ring-2 focus:ring-emerald-700/15"
-                          onChange={(event) => setSearchTerm(event.target.value)}
-                          placeholder={`Search ${title.toLowerCase()}`}
-                          type="search"
-                          value={searchTerm}
-                        />
-                        {searchTerm ? (
-                          <button
-                            aria-label="Clear search"
-                            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                            onClick={() => setSearchTerm("")}
-                            type="button"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        ) : null}
-                      </div>
-                    </label>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-max max-w-full border-separate border-spacing-y-2 text-left text-sm sm:w-full sm:min-w-[820px]">
-                <thead className="text-xs uppercase text-zinc-500">
-                  <tr>
-                    {tableFields.map((field) => (
-                      <th className="whitespace-nowrap px-3 py-2 font-medium" key={field.key}>
-                        {field.label}
-                      </th>
-                    ))}
-                    {showActionsColumn ? (
-                      <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Actions</th>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedRows.map((row) => (
-                    <tr className="bg-white/42" key={row.id}>
-                      {tableFields.map((field, index) => (
-                        <td
-                          className={`whitespace-nowrap px-3 py-3 text-zinc-700 ${index === 0 ? "rounded-l-2xl font-medium text-zinc-950" : ""}`}
-                          key={field.key}
-                        >
-                          {formatValue(row[field.key], field, relationOptions)}
-                        </td>
-                      ))}
-                      {showActionsColumn ? (
-                        <td className="rounded-r-2xl px-3 py-3">
-                          <div className="flex justify-end gap-2">
-                            <Button onClick={() => editRow(row)} size="icon" variant="glass">
-                              <Edit3 className="size-4" />
-                            </Button>
-                            <Button
-                              onClick={() => setPendingDelete(row)}
-                              size="icon"
-                              variant="glass"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!loading && sortedRows.length === 0 ? (
-                <div className="rounded-2xl border border-white/45 bg-white/38 px-4 py-6 text-center text-sm text-zinc-500">
-                  {rows.length === 0
-                    ? "No records yet."
-                    : searchTerm.trim()
-                      ? "No records match this search."
-                      : "No records match the current filters."}
-                </div>
-              ) : null}
-            </div>
+            <ResourceFilterBar
+              fieldFilters={fieldFilters}
+              filterOptions={filterOptions}
+              mobileFilterOpen={mobileFilterOpen}
+              searchTerm={searchTerm}
+              setFieldFilters={setFieldFilters}
+              setMobileFilterOpen={setMobileFilterOpen}
+              setSearchTerm={setSearchTerm}
+              setSortDirection={setSortDirection}
+              sortConfig={sortConfig}
+              sortDirection={sortDirection}
+              title={title}
+              visibleFilterFields={visibleFilterFields}
+            />
+            <ResourceTable
+              loading={loading}
+              onDelete={setPendingDelete}
+              onEdit={editRow}
+              renderValue={renderTableValue}
+              rows={paginatedRows}
+              searchTerm={searchTerm}
+              showActionsColumn={showActionsColumn}
+              tableFields={tableFields}
+              totalRows={totalRows}
+            />
+            <ResourcePagination
+              onPageChange={setPage}
+              page={page}
+              pageSize={TABLE_PAGE_SIZE}
+              totalPages={totalPages}
+              totalRows={totalRows}
+            />
           </CardContent>
         </Card>
       </div>
@@ -1094,866 +891,4 @@ export function ResourcePage({
       ) : null}
     </div>
   );
-}
-
-function isFieldVisible(field: FieldConfig, draft: Record<string, RecordValue>) {
-  if (!field.visibleWhen) return true;
-
-  return String(draft[field.visibleWhen.field] ?? "") === field.visibleWhen.value;
-}
-
-function clearHiddenDependentValues(
-  fields: FieldConfig[],
-  changedField: string,
-  changedValue: string,
-) {
-  return Object.fromEntries(
-    fields
-      .filter(
-        (field) =>
-          field.visibleWhen?.field === changedField && field.visibleWhen.value !== changedValue,
-      )
-      .map((field) => [field.key, field.multiple ? [] : ""]),
-  );
-}
-
-function isRecordValueEqual(left: RecordValue | undefined, right: RecordValue | undefined) {
-  if (Array.isArray(left) || Array.isArray(right)) {
-    const leftArray = Array.isArray(left) ? left.map(String) : [String(left ?? "")];
-    const rightArray = Array.isArray(right) ? right.map(String) : [String(right ?? "")];
-
-    return (
-      leftArray.length === rightArray.length &&
-      leftArray.every((value, index) => value === rightArray[index])
-    );
-  }
-
-  return left === right;
-}
-
-function clearFilteredDependentValues(fields: FieldConfig[], changedField: string) {
-  return Object.fromEntries(
-    fields
-      .filter((field) => field.relationFilter?.sourceField === changedField)
-      .map((field) => [field.key, field.multiple ? [] : ""]),
-  );
-}
-
-function getNextMultiSelectValue({
-  checked,
-  currentValues,
-  draft,
-  field,
-  option,
-  relationOptions,
-}: {
-  checked: boolean;
-  currentValues: string[];
-  draft: Record<string, RecordValue>;
-  field: FieldConfig;
-  option: RelationOption | { label: string; value: string };
-  relationOptions: Record<string, RelationOption[]>;
-}) {
-  if (checked) return currentValues.filter((value) => value !== option.value);
-
-  const limit = Number(draft.lessonCount) === 8 ? 2 : 1;
-
-  if (field.key === "availabilitySlotId") {
-    const selectedOptions = currentValues
-      .map((value) => relationOptions[field.key]?.find((item) => item.value === value))
-      .filter(Boolean);
-    const optionDay = optionDayOfWeek(option);
-    const hasSameDay = selectedOptions.some((item) => optionDayOfWeek(item!) === optionDay);
-
-    if (hasSameDay) {
-      toast.error("Slot di hari yang sama sudah dipilih. Uncheck slot lama dulu.", {
-        id: "availability-slot-same-day",
-      });
-      return null;
-    }
-
-    if (currentValues.length >= limit) {
-      toast.error(limit === 2 ? "Paket B hanya bisa memilih 2 slots." : "Paket A hanya bisa memilih 1 slot.", {
-        id: "availability-slot-limit",
-      });
-      return null;
-    }
-
-    return [...currentValues, option.value];
-  }
-
-  if (field.key === "availableDate") {
-    const optionDay = optionDayOfWeek(option);
-    const selectedOptions = currentValues
-      .map((value) => ({ label: value, value }))
-      .filter((item) => optionDayOfWeek(item) !== optionDay);
-    const nextValues = [...selectedOptions.map((item) => item.value), option.value].sort();
-
-    if (nextValues.length > limit) {
-      toast.error(
-        limit === 2 ? "Paket B hanya bisa memilih 2 tanggal awal." : "Paket A hanya bisa memilih 1 tanggal awal.",
-        { id: "available-date-limit" },
-      );
-      return null;
-    }
-
-    return nextValues;
-  }
-
-  return [...currentValues, option.value];
-}
-
-function optionDayOfWeek(option: { label: string; record?: UiRecord; value: string }) {
-  if (option.record?.dayOfWeek !== undefined) return String(option.record.dayOfWeek);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(option.value)) {
-    return String(new Date(`${option.value}T00:00:00.000Z`).getUTCDay());
-  }
-
-  return "";
-}
-
-function applyDerivedValues(
-  fields: FieldConfig[],
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-  scheduleRows: UiRecord[] = [],
-) {
-  const updates = Object.fromEntries(
-    fields
-      .filter((field) => field.deriveFrom)
-      .map((field) => [field.key, getDerivedValue(field, draft, relationOptions)])
-      .filter(([, value]) => value !== undefined),
-  ) as Record<string, RecordValue>;
-
-  const nextDraft = { ...draft, ...updates };
-
-  const availabilityDateField = fields.find((field) => field.availabilityDateFrom);
-  if (availabilityDateField) {
-    const options = getAvailabilityDateOptions(availabilityDateField, nextDraft, relationOptions, scheduleRows);
-    const optionValues = new Set(options.map((option) => option.value));
-
-    if (availabilityDateField.multiple) {
-      const currentDates = toMultiSelectValue(nextDraft[availabilityDateField.key]);
-      const nextDates = currentDates.filter((date) => optionValues.has(date));
-
-      nextDraft[availabilityDateField.key] =
-        nextDates.length > 0 ? nextDates : options[0]?.value ? [options[0].value] : [];
-      if (fields.some((field) => field.key === "lessonStartDate")) {
-        nextDraft.lessonStartDate = toMultiSelectValue(nextDraft[availabilityDateField.key]).sort()[0] ?? "";
-      }
-    } else {
-      const currentDate = String(nextDraft[availabilityDateField.key] ?? "");
-      const nextDate = optionValues.has(currentDate) ? currentDate : options[0]?.value ?? "";
-
-      nextDraft[availabilityDateField.key] = nextDate;
-      if (fields.some((field) => field.key === "lessonStartDate")) {
-        nextDraft.lessonStartDate = nextDate;
-      }
-    }
-  } else if (
-    fields.some((field) => field.key === "lessonStartDate") &&
-    nextDraft.availabilitySlotId &&
-    nextDraft.billingPeriod
-  ) {
-    const options = getAvailabilityDateOptions(
-      {
-        key: "lessonStartDate",
-        label: "Lesson start date",
-        availabilityDateFrom: {
-          monthField: "billingPeriod",
-          slotField: "availabilitySlotId",
-        },
-      },
-      nextDraft,
-      relationOptions,
-      scheduleRows,
-    );
-
-    if (options[0]?.value) nextDraft.lessonStartDate = options[0].value;
-  }
-
-  return nextDraft;
-}
-
-function getSelectOptions(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-  scheduleRows: UiRecord[] = [],
-) {
-  if (field.availabilityDateFrom) {
-    return getAvailabilityDateOptions(field, draft, relationOptions, scheduleRows);
-  }
-
-  return field.options ?? [];
-}
-
-function getAvailabilityDateOptions(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-  scheduleRows: UiRecord[] = [],
-) {
-  if (!field.availabilityDateFrom) return [];
-
-  const monthValue = String(draft[field.availabilityDateFrom.monthField] ?? "");
-  const slotIds = toMultiSelectValue(draft[field.availabilityDateFrom.slotField]);
-  const slotOptions = relationOptions[field.availabilityDateFrom.slotField] ?? [];
-  const slots = slotIds
-    .map((slotId) => slotOptions.find((option) => option.value === slotId)?.record)
-    .filter(Boolean);
-  const instructorId = String(draft.instructorId ?? "");
-  const studentId = String(draft.studentId ?? "");
-  const dates = slots.flatMap((slot) => {
-    const slotDayOfWeek = String(slot?.dayOfWeek ?? "");
-    const slotFromTime = String(slot?.fromTime ?? "");
-    const slotToTime = String(slot?.toTime ?? "");
-
-    return datesInMonthForDay(monthValue, slotDayOfWeek).map((date) => {
-      const conflictSchedules = scheduleRows.filter((schedule) => {
-        if (isNonBlockingScheduleStatus(schedule.scheduleStatus)) return false;
-        if (String(schedule.scheduleDate ?? "") !== date) return false;
-        const isInstructorConflict =
-          Boolean(instructorId) && String(schedule.instructorId ?? "") === instructorId;
-        const isStudentConflict =
-          Boolean(studentId) && String(schedule.studentId ?? "") === studentId;
-        if (!isInstructorConflict && !isStudentConflict) return false;
-        return rangesOverlap(
-          slotFromTime,
-          slotToTime,
-          String(schedule.fromTime ?? ""),
-          String(schedule.toTime ?? ""),
-        );
-      });
-
-      const conflictReasons = new Set<string>();
-      conflictSchedules.forEach((schedule) => {
-        if (instructorId && String(schedule.instructorId ?? "") === instructorId) {
-          conflictReasons.add("Instructor");
-        }
-        if (studentId && String(schedule.studentId ?? "") === studentId) {
-          conflictReasons.add("Student");
-        }
-      });
-      const reasonLabel =
-        conflictReasons.size === 0
-          ? ""
-          : conflictReasons.size === 2
-            ? "student + instructor"
-            : Array.from(conflictReasons)[0].toLowerCase();
-      const conflictSchedule = conflictSchedules[0];
-
-      return {
-        disabled: conflictSchedules.length > 0,
-        label: `${lessonDayLabel(slot?.dayOfWeek)}, ${date}${conflictSchedule ? ` · Booked (${reasonLabel})` : ""}`,
-        reasonLabel,
-        hasInstructorConflict: conflictReasons.has("Instructor"),
-        hasStudentConflict: conflictReasons.has("Student"),
-        unavailableReason: conflictSchedule
-          ? `${String(conflictSchedule.fromTime ?? "")} - ${String(conflictSchedule.toTime ?? "")}`
-          : undefined,
-        value: date,
-      };
-    });
-  });
-  const today = todayDateString();
-  const uniqueDates = new Map<
-    string,
-    {
-      label: string;
-      value: string;
-      disabled?: boolean;
-      unavailableReason?: string;
-      reasonLabel?: string;
-      totalSlots: number;
-      blockedSlots: number;
-      reasonSet: Set<string>;
-      hasInstructorConflict: boolean;
-      hasStudentConflict: boolean;
-    }
-  >();
-  dates
-    .filter((date) => date.value >= today)
-    .forEach((date) => {
-      const current = uniqueDates.get(date.value);
-      if (!current) {
-        uniqueDates.set(date.value, {
-          ...date,
-          totalSlots: 1,
-          blockedSlots: date.disabled ? 1 : 0,
-          reasonSet: date.reasonLabel ? new Set([date.reasonLabel]) : new Set<string>(),
-          hasInstructorConflict: Boolean(date.hasInstructorConflict),
-          hasStudentConflict: Boolean(date.hasStudentConflict),
-        });
-        return;
-      }
-
-      if (date.reasonLabel) {
-        if (date.reasonLabel === "student + instructor") {
-          current.reasonSet.add("student");
-          current.reasonSet.add("instructor");
-        } else {
-          current.reasonSet.add(date.reasonLabel);
-        }
-      }
-      current.totalSlots += 1;
-      if (date.disabled) current.blockedSlots += 1;
-      current.hasInstructorConflict = current.hasInstructorConflict || Boolean(date.hasInstructorConflict);
-      current.hasStudentConflict = current.hasStudentConflict || Boolean(date.hasStudentConflict);
-      if (!current.unavailableReason && date.unavailableReason) {
-        current.unavailableReason = date.unavailableReason;
-      }
-      uniqueDates.set(date.value, current);
-    });
-
-  return Array.from(uniqueDates.values())
-    .map((date) => {
-      const bookedStatus =
-        date.hasInstructorConflict && date.hasStudentConflict
-          ? "student + instructor"
-          : date.hasInstructorConflict
-            ? "instructor"
-            : date.hasStudentConflict
-              ? "student"
-              : "";
-      const isFullyBooked = date.blockedSlots >= date.totalSlots;
-      const baseLabel = date.label.split(" · Booked")[0];
-
-      return {
-        value: date.value,
-        disabled: isFullyBooked,
-        label: bookedStatus ? `${baseLabel} · Booked (${bookedStatus})` : baseLabel,
-        unavailableReason: date.unavailableReason,
-      };
-    })
-    .sort((left, right) => left.value.localeCompare(right.value));
-}
-
-function todayDateString() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function getFieldOptions(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-  scheduleRows: UiRecord[] = [],
-) {
-  const options = relationOptions[field.key] ?? [];
-
-  const relationFilteredOptions = field.relationFilter
-    ? filterRelationOptions(field, draft, relationOptions, options)
-    : options;
-
-  if (!field.roomAvailabilityFrom) return relationFilteredOptions;
-
-  return filterRoomAvailabilityOptions(field, draft, relationFilteredOptions, relationOptions, scheduleRows);
-}
-
-function filterRelationOptions(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-  options: RelationOption[],
-) {
-  if (!field.relationFilter) return options;
-
-  const sourceValue = draft[field.relationFilter.sourceField];
-  if (!sourceValue) return [];
-
-  const sourceOptions = relationOptions[field.relationFilter.sourceField] ?? [];
-  const sourceRecord = sourceOptions.find((option) => option.value === String(sourceValue))?.record;
-  const expectedValue = field.relationFilter.sourceOptionField
-    ? sourceRecord?.[field.relationFilter.sourceOptionField]
-    : sourceValue;
-
-  if (!expectedValue) return [];
-
-  return options.filter((option) => {
-    const optionValue = option.record[field.relationFilter!.optionField];
-
-    if (field.relationFilter!.mode === "includes") {
-      return Array.isArray(optionValue)
-        ? optionValue.map(String).includes(String(expectedValue))
-        : String(optionValue || "")
-            .split(",")
-            .map((item) => item.trim())
-            .includes(String(expectedValue));
-    }
-
-    return String(optionValue) === String(expectedValue);
-  });
-}
-
-function filterRoomAvailabilityOptions(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  options: RelationOption[],
-  relationOptions: Record<string, RelationOption[]>,
-  scheduleRows: UiRecord[],
-) {
-  if (!field.roomAvailabilityFrom) return options;
-
-  const config = field.roomAvailabilityFrom;
-  const lessonMode = String(draft[config.lessonModeField] ?? "");
-  const lessonStartDate = String(draft[config.startDateField] ?? "");
-  const lessonDays = toMultiSelectValue(draft[config.lessonDaysField]);
-  const lessonCount = Number(draft[config.lessonCountField] || 4);
-  const fromTime = String(draft[config.fromTimeField] ?? "");
-  const toTime = String(draft[config.toTimeField] ?? "");
-  const scheduleSlotTimes = selectedAvailabilitySlotTimes(draft, relationOptions);
-
-  if (lessonMode !== "Studio") return options;
-  if (!lessonStartDate || lessonDays.length === 0 || !fromTime || !toTime) return options;
-
-  const dates = expandLessonDates(lessonStartDate, lessonDays, lessonCount);
-  if (dates.length === 0) return options;
-
-  return options.map((option) => {
-    const roomSchedules = scheduleRows.filter(
-      (schedule) =>
-        String(schedule.studioRoomId ?? "") === option.value &&
-        String(schedule.lessonMode ?? "") === "Studio" &&
-        !isNonBlockingScheduleStatus(schedule.scheduleStatus) &&
-        dates.includes(String(schedule.scheduleDate ?? "")),
-    );
-
-    const conflict = roomSchedules.find((schedule) => {
-      const slotTime = slotTimeForDate(
-        String(schedule.scheduleDate ?? ""),
-        scheduleSlotTimes,
-        fromTime,
-        toTime,
-      );
-
-      return rangesOverlap(
-        slotTime.fromTime,
-        slotTime.toTime,
-        String(schedule.fromTime ?? ""),
-        String(schedule.toTime ?? ""),
-      );
-    });
-
-    if (!conflict) {
-      return {
-        ...option,
-        label: `${option.label} · Available`,
-      };
-    }
-
-    return {
-      ...option,
-      disabled: true,
-      label: `${option.label} · Booked`,
-      unavailableReason: `${String(conflict.scheduleDate ?? "")}, ${String(conflict.fromTime ?? "")} - ${String(conflict.toTime ?? "")}`,
-    };
-  });
-}
-
-function selectedAvailabilitySlotTimes(
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-) {
-  const selectedSlotIds = toMultiSelectValue(draft.availabilitySlotId);
-  const slotOptions = relationOptions.availabilitySlotId ?? [];
-
-  return selectedSlotIds
-    .map((slotId) => slotOptions.find((option) => option.value === slotId)?.record)
-    .filter(Boolean)
-    .map((slot) => ({
-      dayOfWeek: String(slot?.dayOfWeek ?? ""),
-      fromTime: String(slot?.fromTime ?? ""),
-      toTime: String(slot?.toTime ?? ""),
-    }))
-    .filter((slot) => slot.dayOfWeek && slot.fromTime && slot.toTime);
-}
-
-function slotTimeForDate(
-  date: string,
-  scheduleSlotTimes: ScheduleSlotTime[],
-  fallbackFromTime: string,
-  fallbackToTime: string,
-) {
-  const dayOfWeek = /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? String(new Date(`${date}T00:00:00.000Z`).getUTCDay())
-    : "";
-  const slotTime = scheduleSlotTimes.find((slot) => slot.dayOfWeek === dayOfWeek);
-
-  return {
-    fromTime: slotTime?.fromTime || fallbackFromTime,
-    toTime: slotTime?.toTime || fallbackToTime,
-  };
-}
-
-function formatRelationOptionLabel(field: FieldConfig, record: UiRecord, valueField: string) {
-  if (field.relation?.resource === "instructor-availability") {
-    return [
-      lessonDayLabel(record.dayOfWeek),
-      `${String(record.fromTime ?? "")} - ${String(record.toTime ?? "")}`,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
-  return formatDisplayText(
-    field.relation!.labelFields
-      .map((labelField) => record[labelField])
-      .filter(Boolean)
-      .join(" ") || String(record[valueField] ?? record.id),
-  );
-}
-
-function lessonDayLabel(value: unknown) {
-  const labels: Record<string, string> = {
-    "0": "Sunday",
-    "1": "Monday",
-    "2": "Tuesday",
-    "3": "Wednesday",
-    "4": "Thursday",
-    "5": "Friday",
-    "6": "Saturday",
-  };
-
-  return labels[String(value ?? "")] ?? "";
-}
-
-function datesInMonthForDay(monthValue: string, dayOfWeekValue: string) {
-  if (!/^\d{4}-\d{2}$/.test(monthValue)) return [];
-
-  const targetDay = Number(dayOfWeekValue);
-  if (!Number.isInteger(targetDay) || targetDay < 0 || targetDay > 6) return [];
-
-  const [year, month] = monthValue.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  const dates: string[] = [];
-
-  while (date.getUTCMonth() === month - 1) {
-    if (date.getUTCDay() === targetDay) {
-      dates.push(date.toISOString().slice(0, 10));
-    }
-    date.setUTCDate(date.getUTCDate() + 1);
-  }
-
-  return dates;
-}
-
-function expandLessonDates(
-  lessonStartDate: string,
-  lessonDays: string[],
-  lessonCount: number,
-) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(lessonStartDate)) return [];
-
-  const [year, month, day] = lessonStartDate.split("-").map(Number);
-  const current = new Date(Date.UTC(year, month - 1, day));
-  const selectedDays = new Set(
-    lessonDays.map(Number).filter((dayOfWeek) => dayOfWeek >= 0 && dayOfWeek <= 6),
-  );
-  const maxDates = Number.isFinite(lessonCount) && lessonCount > 0 ? lessonCount : 4;
-  const dates: string[] = [];
-
-  if (Number.isNaN(current.getTime()) || selectedDays.size === 0) return [];
-
-  for (let attempts = 0; dates.length < maxDates && attempts < 370; attempts += 1) {
-    if (selectedDays.has(current.getUTCDay())) {
-      dates.push(current.toISOString().slice(0, 10));
-    }
-
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-
-  return dates;
-}
-
-function rangesOverlap(
-  leftFrom: string,
-  leftTo: string,
-  rightFrom: string,
-  rightTo: string,
-) {
-  const startA = timeToMinutes(leftFrom);
-  const endA = timeToMinutes(leftTo);
-  const startB = timeToMinutes(rightFrom);
-  const endB = timeToMinutes(rightTo);
-
-  if ([startA, endA, startB, endB].some((value) => Number.isNaN(value))) return false;
-  return startA < endB && startB < endA;
-}
-
-function isNonBlockingScheduleStatus(status: unknown) {
-  const normalized = String(status ?? "").toLowerCase();
-  return normalized === "cancelled" || normalized === "rescheduled";
-}
-
-function timeToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
-
-  return hours * 60 + minutes;
-}
-
-function getDerivedValue(
-  field: FieldConfig,
-  draft: Record<string, RecordValue>,
-  relationOptions: Record<string, RelationOption[]>,
-) {
-  if (!field.deriveFrom) return undefined;
-
-  const sourceValue = draft[field.deriveFrom.sourceField];
-  if (!sourceValue) return field.multiple ? [] : "";
-
-  const sourceOptions = relationOptions[field.deriveFrom.sourceField] ?? [];
-  const sourceRecords = toMultiSelectValue(sourceValue)
-    .map((value) => sourceOptions.find((option) => option.value === value)?.record)
-    .filter(Boolean);
-  const sourceRecord = sourceRecords[0];
-  const derivedValue = sourceRecord?.[field.deriveFrom.sourceOptionField];
-
-  if (sourceRecords.length > 1) {
-    const derivedValues = Array.from(
-      new Set(
-        sourceRecords
-          .map((record) => record?.[field.deriveFrom!.sourceOptionField])
-          .filter((value) => value !== undefined && value !== "")
-          .map(String),
-      ),
-    );
-
-    if (field.multiple) return derivedValues;
-    if (derivedValues.length === 1) return derivedValues[0];
-
-    const currentValue = String(draft[field.key] ?? "");
-    return currentValue || derivedValues[0] || "";
-  }
-
-  if (Array.isArray(derivedValue)) return derivedValue.map(String);
-  if (field.multiple) return derivedValue ? [String(derivedValue)] : [];
-
-  return String(derivedValue ?? "");
-}
-
-function toMultiSelectValue(value: RecordValue | undefined) {
-  if (Array.isArray(value)) return value.map(String);
-
-  return String(value ?? "")
-    .split(",")
-    .filter(Boolean);
-}
-
-function formatValue(
-  value: unknown,
-  field?: FieldConfig,
-  relationOptions?: Record<string, RelationOption[]>,
-) {
-  if (field?.type === "select" && field.options) {
-    const options = field.options;
-
-    if (Array.isArray(value)) {
-      return (
-        value
-          .map((item) => optionLabel(options, item))
-          .map(formatDisplayText)
-          .join(", ") || "-"
-      );
-    }
-
-    if (value === null || value === undefined || value === "") return "-";
-
-    return formatDisplayText(optionLabel(options, value));
-  }
-
-  if (field?.type === "relation" && relationOptions) {
-    const options = relationOptions[field.key] ?? [];
-
-    if (Array.isArray(value)) {
-      const mappedLabels = value
-        .map((item) => options.find((option) => option.value === String(item))?.label)
-        .filter((label): label is string => Boolean(label));
-
-      return (
-        mappedLabels
-          .map((item) => formatDisplayText(item))
-          .join(", ") || "-"
-      );
-    }
-
-    if (value === null || value === undefined || value === "") return "-";
-
-    return formatDisplayText(options.find((option) => option.value === String(value))?.label ?? "-");
-  }
-
-  if (Array.isArray(value)) return value.map(formatDisplayText).join(", ") || "-";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (value === null || value === undefined || value === "") return "-";
-  return formatDisplayText(value);
-}
-
-function filterRows(
-  rows: UiRecord[],
-  fields: FieldConfig[],
-  relationOptions: Record<string, RelationOption[]>,
-  searchTerm: string,
-  fieldFilters: Record<string, string>,
-) {
-  const query = searchTerm.trim().toLowerCase();
-
-  return rows.filter((row) => {
-    const matchesFilters = Object.entries(fieldFilters).every(([fieldKey, filterValue]) => {
-      if (!filterValue) return true;
-      const field = fields.find((item) => item.key === fieldKey);
-      if (!field) return true;
-      return fieldFilterValues(row[field.key], field).includes(filterValue);
-    });
-
-    if (!matchesFilters) return false;
-    if (!query) return true;
-
-    const values = [row.id, ...fields.map((field) => formatValue(row[field.key], field, relationOptions))];
-    return values.some((value) => String(value).toLowerCase().includes(query));
-  });
-}
-
-function sortRows(
-  rows: UiRecord[],
-  sortConfig: ReturnType<typeof getResourceSortConfig>,
-  sortDirection: SortDirection,
-) {
-  if (!sortConfig || !sortDirection) return rows;
-
-  return [...rows].sort((left, right) => {
-    const leftValue = sortConfig.value(left);
-    const rightValue = sortConfig.value(right);
-    const result = leftValue.localeCompare(rightValue, undefined, { sensitivity: "base" });
-    return sortDirection === "asc" ? result : -result;
-  });
-}
-
-function isFilterableField(field: FieldConfig, rows: UiRecord[]) {
-  if (field.key === "portalEnabled") return false;
-  if (field.key === "guardianIds") return false;
-  if (field.type === "textarea" || field.type === "number" || field.type === "time") return false;
-  if (field.type === "select" || field.type === "relation" || field.type === "checkbox") return true;
-
-  const uniqueValues = new Set(
-    rows.flatMap((row) => fieldFilterValues(row[field.key], field)).filter(Boolean),
-  );
-
-  return uniqueValues.size > 1 && uniqueValues.size <= 20;
-}
-
-function isFilterVisibleForRole(
-  resource: ResourceName | "users",
-  role: string,
-  field: FieldConfig,
-) {
-  if (role === "Music Instructor" && resource === "lesson-packages" && field.key === "instructorId") {
-    return false;
-  }
-
-  if (
-    role === "Student Portal User" &&
-    resource === "lesson-packages" &&
-    field.key === "studentId"
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function getResourceFilterAllowlist(resource: ResourceName | "users") {
-  if (resource === "users") return ["role"];
-  if (resource === "instruments") return ["instrumentCategory"];
-  return null;
-}
-
-function getResourceSortConfig(resource: ResourceName | "users") {
-  if (resource === "instructors") {
-    return {
-      label: "Instructor name",
-      value: (row: UiRecord) => String(row.instructorName ?? ""),
-    };
-  }
-
-  if (resource === "students") {
-    return {
-      label: "Student name",
-      value: (row: UiRecord) =>
-        `${String(row.firstName ?? "")} ${String(row.lastName ?? "")}`.trim(),
-    };
-  }
-
-  if (resource === "guardians") {
-    return {
-      label: "Guardian name",
-      value: (row: UiRecord) => String(row.guardianName ?? ""),
-    };
-  }
-
-  return null;
-}
-
-function buildFieldFilterOptions(
-  rows: UiRecord[],
-  fields: FieldConfig[],
-  relationOptions: Record<string, RelationOption[]>,
-) {
-  return Object.fromEntries(
-    fields.map((field) => {
-      const values = Array.from(
-        new Set(rows.flatMap((row) => fieldFilterValues(row[field.key], field)).filter(Boolean)),
-      ).sort((left, right) =>
-        filterOptionLabel(field, left, relationOptions).localeCompare(
-          filterOptionLabel(field, right, relationOptions),
-        ),
-      );
-
-      return [
-        field.key,
-        values.map((value) => ({
-          value,
-          label: filterOptionLabel(field, value, relationOptions),
-        })),
-      ];
-    }),
-  ) as Record<string, Array<{ label: string; value: string }>>;
-}
-
-function fieldFilterValues(value: unknown, field: FieldConfig) {
-  if (field.type === "checkbox") return [String(Boolean(value))];
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (value === null || value === undefined || value === "") return [];
-  return [String(value)];
-}
-
-function filterOptionLabel(
-  field: FieldConfig,
-  value: string,
-  relationOptions: Record<string, RelationOption[]>,
-) {
-  if (field.type === "select" && field.options) {
-    return formatDisplayText(optionLabel(field.options, value));
-  }
-
-  if (field.type === "relation") {
-    return formatDisplayText(
-      relationOptions[field.key]?.find((option) => option.value === value)?.label ?? value,
-    );
-  }
-
-  if (field.type === "checkbox") return value === "true" ? "Yes" : "No";
-  return formatDisplayText(value);
-}
-
-function hasActiveFilters(fieldFilters: Record<string, string>) {
-  return Object.values(fieldFilters).some(Boolean);
-}
-
-function optionLabel(options: { label: string; value: string }[], value: unknown) {
-  return options.find((option) => option.value === String(value))?.label ?? String(value);
 }

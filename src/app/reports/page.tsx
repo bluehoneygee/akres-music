@@ -11,11 +11,10 @@ import { auth } from "@/auth";
 import { AppShell } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { readDatabase } from "@/lib/db";
+import { listScopedRecordsProjected } from "@/lib/scoped-records";
 import type { CourseSchedule, Invoice, LessonJournal, Student, StudentAttendance } from "@/lib/models";
 import { sessionRole } from "@/lib/session";
 import { formatDisplayText } from "@/lib/utils";
-import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -28,29 +27,40 @@ export default async function ReportsPage({
   const session = await auth();
   const role = session ? sessionRole(session) : "";
   const isPortal = role === "Parent Portal User" || role === "Student Portal User";
-  const db = await readDatabase();
-  const students = session
-    ? await filterTypedRecordsForSession("students", db.students, session)
-    : db.students;
-  const schedules = session
-    ? await filterTypedRecordsForSession("schedules", db.schedules, session)
-    : db.schedules;
-  const attendance = session
-    ? await filterTypedRecordsForSession("student-attendance", db["student-attendance"], session)
-    : db["student-attendance"];
-  const journals = session
-    ? await filterTypedRecordsForSession("journals", db.journals, session)
-    : db.journals;
-  const invoices = session
-    ? await filterTypedRecordsForSession("invoices", db.invoices, session)
-    : db.invoices;
-  const schedulesById = new Map(schedules.map((row) => [row.id, row]));
   const today = new Date();
   const period = readQueryValue(params.period) || "this_month";
   const defaultFrom = toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
   const defaultTo = toDateInputValue(new Date(today.getFullYear(), today.getMonth() + 1, 0));
   const from = readQueryValue(params.from) || defaultFrom;
   const to = readQueryValue(params.to) || defaultTo;
+  const [students, schedules, attendance, journals, invoices] = await Promise.all([
+    listScopedRecordsProjected<Student>("students", ["firstName", "lastName", "skillLevel"], session),
+    listScopedRecordsProjected<CourseSchedule>(
+      "schedules",
+      ["studentId", "scheduleDate", "fromTime", "toTime", "scheduleStatus"],
+      session,
+    ),
+    listScopedRecordsProjected<StudentAttendance>(
+      "student-attendance",
+      ["studentId", "courseScheduleId", "date", "status"],
+      session,
+      {
+        filter: attendanceDateFilter({ from, period, to, today }),
+      },
+    ),
+    listScopedRecordsProjected<LessonJournal>(
+      "journals",
+      ["studentId", "confirmed", "parentVisible", "lessonDate", "materialCovered", "progressRating", "homework"],
+      session,
+      {
+        filter: { confirmed: true },
+        sort: { lessonDate: -1, createdAt: -1 },
+      },
+    ),
+    listScopedRecordsProjected<Invoice>("invoices", ["studentId", "status", "amount"], session),
+  ]);
+  const schedulesById = new Map(schedules.map((row) => [row.id, row]));
+  const studentsById = new Map(students.map((row) => [row.id, row]));
   const attendanceInRange = attendance.filter((row) =>
     isAttendanceInRange({
       from,
@@ -215,7 +225,7 @@ export default async function ReportsPage({
                   <ScheduleLine
                     key={schedule.id}
                     schedule={schedule}
-                    student={db.students.find((student) => student.id === schedule.studentId)}
+                    student={studentsById.get(schedule.studentId)}
                   />
                 ))}
               </CardContent>
@@ -394,6 +404,34 @@ function isAttendanceInRange({
   const end = parseDateAtMidnight(to);
   if (!start || !end) return true;
   return attendanceDate >= start && attendanceDate <= end;
+}
+
+function attendanceDateFilter({
+  from,
+  period,
+  to,
+  today,
+}: {
+  from: string;
+  period: string;
+  to: string;
+  today: Date;
+}) {
+  if (period === "last_30_days") {
+    return {
+      date: {
+        $gte: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)),
+        $lte: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate())),
+      },
+    };
+  }
+
+  return {
+    date: {
+      $gte: from,
+      $lte: to,
+    },
+  };
 }
 
 function formatCurrency(value: number) {

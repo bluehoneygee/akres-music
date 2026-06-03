@@ -36,22 +36,37 @@ export function StudioRoomBoard() {
     setLoading(true);
 
     try {
-      const [roomRows, scheduleRows, studentRows, courseRows, instructorRows] = await Promise.all([
-        fetchRows("rooms"),
-        fetchRows("schedules"),
-        fetchRows("students"),
-        fetchRows("courses"),
-        fetchRows("instructors"),
-      ]);
+      const params = new URLSearchParams({
+        board: "studio-room",
+        month: monthValue(monthDate),
+        view: "month",
+      });
+      const response = await fetch(`/api/calendar-board?${params.toString()}`, { cache: "no-store" });
+      const json = (await response.json()) as {
+        data?: {
+          courses?: Row[];
+          instructors?: Row[];
+          rooms?: Row[];
+          schedules?: Row[];
+          students?: Row[];
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load studio rooms");
+      }
+
+      const roomRows = json.data?.rooms ?? [];
       const activeRooms = roomRows
         .filter((room) => room.isActive !== false)
         .sort((left, right) => String(left.roomName ?? "").localeCompare(String(right.roomName ?? "")));
 
       setRooms(activeRooms);
-      setSchedules(scheduleRows);
-      setStudents(studentRows);
-      setCourses(courseRows);
-      setInstructors(instructorRows);
+      setSchedules(json.data?.schedules ?? []);
+      setStudents(json.data?.students ?? []);
+      setCourses(json.data?.courses ?? []);
+      setInstructors(json.data?.instructors ?? []);
       setSelectedRoomId((current) => current || activeRooms[0]?.id || "");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load studio rooms");
@@ -62,7 +77,7 @@ export function StudioRoomBoard() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [monthDate]);
 
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId);
   const monthCells = useMemo(() => buildMonthCells(monthDate), [monthDate]);
@@ -341,17 +356,6 @@ function RoomDayDetailModal({
   );
 }
 
-async function fetchRows(resource: string) {
-  const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-  const json = (await response.json()) as { data?: Row[]; error?: string };
-
-  if (!response.ok) {
-    throw new Error(json.error ?? `Unable to load ${resource}`);
-  }
-
-  return Array.isArray(json.data) ? json.data : [];
-}
-
 function availableBlocksForDay(booked: Row[], date: Date) {
   const operatingHours = getOperatingHours(date);
   const sorted = [...booked].sort((left, right) =>
@@ -426,6 +430,10 @@ function groupByDate(rows: Row[]) {
 
 function startOfMonth(value: Date) {
   return new Date(Date.UTC(value.getFullYear(), value.getMonth(), 1));
+}
+
+function monthValue(value: Date) {
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function startOfWeek(value: Date) {

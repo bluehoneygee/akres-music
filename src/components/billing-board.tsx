@@ -6,7 +6,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getClientSession } from "@/lib/client-session";
 import { formatDisplayText } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
@@ -35,20 +34,27 @@ export function BillingBoard() {
     setLoading(true);
 
     try {
-      const [invoiceRows, packageRows, studentRows, courseRows, instrumentRows] =
-        await Promise.all([
-          fetchRows("invoices"),
-          fetchRows("lesson-packages"),
-          fetchRows("students"),
-          fetchRows("courses"),
-          fetchRows("instruments"),
-        ]);
+      const response = await fetch("/api/billing-board", { cache: "no-store" });
+      const json = (await response.json()) as {
+        courses?: Row[];
+        error?: string;
+        instruments?: Row[];
+        invoices?: Row[];
+        lessonPackages?: Row[];
+        role?: string;
+        students?: Row[];
+      };
 
-      setInvoices(invoiceRows);
-      setPackages(packageRows);
-      setStudents(studentRows);
-      setCourses(courseRows);
-      setInstruments(instrumentRows);
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load billing");
+      }
+
+      setInvoices(json.invoices ?? []);
+      setPackages(json.lessonPackages ?? []);
+      setStudents(json.students ?? []);
+      setCourses(json.courses ?? []);
+      setInstruments(json.instruments ?? []);
+      setSessionRole(json.role ?? "");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load billing");
     } finally {
@@ -58,29 +64,6 @@ export function BillingBoard() {
 
   useEffect(() => {
     void loadData();
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadSessionRole() {
-      try {
-        const session = (await getClientSession()) as { user?: { role?: string } };
-        if (mounted) {
-          setSessionRole(session.user?.role ?? "");
-        }
-      } catch {
-        if (mounted) {
-          setSessionRole("");
-        }
-      }
-    }
-
-    void loadSessionRole();
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const lines = useMemo(() => {
@@ -271,17 +254,6 @@ export function BillingBoard() {
       </Card>
     </div>
   );
-}
-
-async function fetchRows(resource: string) {
-  const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-  const json = (await response.json()) as { data?: Row[]; error?: string };
-
-  if (!response.ok) {
-    throw new Error(json.error ?? `Unable to load ${resource}`);
-  }
-
-  return Array.isArray(json.data) ? json.data : [];
 }
 
 function mapById(rows: Row[]) {

@@ -1,6 +1,6 @@
 import type { ClientSession, Collection, Db, Document, Filter } from "mongodb";
 
-import type { AnyRecord, Database, ResourceName } from "@/lib/models";
+import type { AnyRecord, ResourceName } from "@/lib/models";
 import { getMongoClient, getMongoDb } from "@/lib/mongodb";
 import { seedDatabase } from "@/lib/seed";
 
@@ -46,6 +46,56 @@ export async function ensureSeedData() {
   }
 
   await seedPromise;
+  await ensureIndexes();
+}
+
+let indexPromise: Promise<void> | null = null;
+
+async function ensureIndexes() {
+  if (!indexPromise) {
+    indexPromise = (async () => {
+      const db = await getMongoDb();
+      await Promise.all([
+        db.collection("schedules").createIndex({ lessonPackageId: 1 }),
+        db.collection("schedules").createIndex({ studentId: 1 }),
+        db.collection("schedules").createIndex({ instructorId: 1 }),
+        db.collection("schedules").createIndex({ scheduleDate: 1 }),
+        db.collection("schedules").createIndex({ scheduleMonth: 1 }),
+        db.collection("student-attendance").createIndex({ courseScheduleId: 1 }),
+        db.collection("student-attendance").createIndex({ date: 1 }),
+        db.collection("student-attendance").createIndex({ studentId: 1, date: 1 }),
+        db.collection("instructor-attendance").createIndex({ courseScheduleId: 1 }),
+        db.collection("instructor-attendance").createIndex({ attendanceDate: 1 }),
+        db.collection("instructor-attendance").createIndex({ instructorId: 1, attendanceDate: 1 }),
+        db.collection("lesson-packages").createIndex({ studentId: 1 }),
+        db.collection("lesson-packages").createIndex({ instructorId: 1 }),
+        db.collection("lesson-packages").createIndex({ billingPeriod: 1 }),
+        db.collection("schedules").createIndex({ instructorId: 1, scheduleDate: 1 }),
+        db.collection("schedules").createIndex({ studentId: 1, scheduleDate: 1 }),
+        db.collection("schedules").createIndex({ studioRoomId: 1, scheduleDate: 1 }),
+        db.collection("schedules").createIndex({ studioRoomId: 1, scheduleMonth: 1 }),
+        db.collection("schedules").createIndex({ instructorId: 1, scheduleMonth: 1 }),
+        db.collection("schedules").createIndex({ studentId: 1, scheduleMonth: 1 }),
+        db.collection("lesson-packages").createIndex({ instructorId: 1, createdAt: -1 }),
+        db.collection("lesson-packages").createIndex({ studentId: 1, createdAt: -1 }),
+        db.collection("invoices").createIndex({ studentId: 1, billingPeriod: -1 }),
+        db.collection("invoices").createIndex({ lessonPackageId: 1 }),
+        db.collection("invoices").createIndex({ status: 1, billingPeriod: -1 }),
+        db.collection("users").createIndex({ email: 1 }),
+        db.collection("users").createIndex({ role: 1 }),
+        db.collection("notifications").createIndex({ targetRole: 1, studentId: 1, createdAt: -1 }),
+        db.collection("notifications").createIndex({ readByUserIds: 1 }),
+        db.collection("journals").createIndex({ studentId: 1, parentVisible: 1, confirmed: 1 }),
+        db.collection("journals").createIndex({ confirmed: 1, lessonDate: -1 }),
+        db.collection("journals").createIndex({ studentId: 1, confirmed: 1, lessonDate: -1 }),
+        db.collection("schedules").createIndex({ scheduleStatus: 1, scheduleDate: 1 }),
+        db.collection("courses").createIndex({ instrumentId: 1 }),
+        db.collection("instructor-availability").createIndex({ instructorId: 1, active: 1 }),
+      ]);
+    })();
+  }
+
+  await indexPromise;
 }
 
 async function seed() {
@@ -368,25 +418,83 @@ function fromMongo<T extends Document>(record: T): Omit<T, "_id"> & { id: string
   } as Omit<T, "_id"> & { id: string };
 }
 
-export async function readDatabase(): Promise<Database> {
-  await ensureSeedData();
-  const db = await getMongoDb();
-  const entries = await Promise.all(
-    resources.map(async (resource) => {
-      const records = await db.collection(resource).find({}).sort({ createdAt: -1 }).toArray();
-      return [resource, records.map(fromMongo)] as const;
-    }),
-  );
+export async function listRecordsPage({
+  fields,
+  filter,
+  limit,
+  page,
+  resource,
+  sort,
+}: {
+  fields?: string[];
+  filter: Filter<Document>;
+  limit: number;
+  page: number;
+  resource: ResourceName;
+  sort: Record<string, 1 | -1>;
+}) {
+  const records = await collection(resource);
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safePage = Math.max(page, 1);
+  const skip = (safePage - 1) * safeLimit;
+  const projection = fields?.length
+    ? Object.fromEntries(["id", "createdAt", ...fields].filter(Boolean).map((field) => [field, 1]))
+    : undefined;
+  const findCursor = records.find(filter);
+  if (projection) findCursor.project(projection);
+  const [rows, total] = await Promise.all([
+    findCursor.sort(sort).skip(skip).limit(safeLimit).toArray(),
+    records.countDocuments(filter),
+  ]);
 
-  return Object.fromEntries(entries) as Database;
+  const data =
+    resource === "lesson-packages"
+      ? await hydrateLessonPackageInstruments(rows).then((hydratedRows) => hydratedRows.map(fromMongo))
+      : rows.map(fromMongo);
+
+  return {
+    data,
+    limit: safeLimit,
+    page: safePage,
+    total,
+  };
 }
 
-export async function listRecords(resource: ResourceName) {
-  const records = await (await collection(resource)).find({}).sort({ createdAt: -1 }).toArray();
+export async function distinctRecordValues(
+  resource: ResourceName,
+  filter: Filter<Document>,
+  fields: string[],
+) {
+  const records = await collection(resource);
+  const entries = await Promise.all(
+    fields.map(async (field) => [field, await records.distinct(field, filter)] as const),
+  );
 
-  if (resource === "lesson-packages") {
-    return hydrateLessonPackageInstruments(records).then((rows) => rows.map(fromMongo));
+  return Object.fromEntries(entries) as Record<string, unknown[]>;
+}
+
+export async function listRecordsProjected(
+  resource: ResourceName,
+  fields: string[],
+  filter: Filter<Document> = {},
+  options?: {
+    limit?: number;
+    sort?: Record<string, 1 | -1>;
+  },
+) {
+  const projection = Object.fromEntries(
+    ["id", "createdAt", ...fields.filter(Boolean)].map((field) => [field, 1]),
+  );
+  const cursor = (await collection(resource))
+    .find(filter)
+    .project(projection)
+    .sort(options?.sort ?? { createdAt: -1 });
+
+  if (options?.limit && options.limit > 0) {
+    cursor.limit(Math.min(options.limit, 500));
   }
+
+  const records = await cursor.toArray();
 
   return records.map(fromMongo);
 }

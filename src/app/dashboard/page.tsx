@@ -15,16 +15,20 @@ import { LatestJournalList } from "@/components/latest-journal-list";
 import { UpcomingScheduleList } from "@/components/upcoming-schedule-list";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { readDatabase } from "@/lib/db";
+import { listScopedRecordsProjected } from "@/lib/scoped-records";
 import type {
+  Course,
   CourseSchedule,
+  Instructor,
   Invoice,
+  LessonJournal,
+  LessonPackage,
+  StudioRoom,
   Student,
   StudentAttendance,
 } from "@/lib/models";
 import { sessionRole } from "@/lib/session";
 import { formatDisplayText } from "@/lib/utils";
-import { filterTypedRecordsForSession } from "@/lib/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -48,32 +52,71 @@ export default async function HomePage({
   const session = await auth();
   const role = session ? sessionRole(session) : "";
   const isPortal = role === "Parent Portal User" || role === "Student Portal User";
-  const db = await readDatabase();
-
-  const students = session
-    ? await filterTypedRecordsForSession("students", db.students, session)
-    : db.students;
-  const lessonPackages = session
-    ? await filterTypedRecordsForSession("lesson-packages", db["lesson-packages"], session)
-    : db["lesson-packages"];
-  const schedules = session
-    ? await filterTypedRecordsForSession("schedules", db.schedules, session)
-    : db.schedules;
-  const instructors = session
-    ? await filterTypedRecordsForSession("instructors", db.instructors, session)
-    : db.instructors;
-  const journals = session
-    ? await filterTypedRecordsForSession("journals", db.journals, session)
-    : db.journals;
-  const attendance = session
-    ? await filterTypedRecordsForSession("student-attendance", db["student-attendance"], session)
-    : db["student-attendance"];
-  const invoices = session
-    ? await filterTypedRecordsForSession("invoices", db.invoices, session)
-    : db.invoices;
-  const schedulesById = new Map(schedules.map((row) => [row.id, row]));
   const today = new Date();
   const period = readQueryValue(params.period) || "this_month";
+  const defaultFrom = toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
+  const defaultTo = toDateInputValue(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  const from = readQueryValue(params.from) || defaultFrom;
+  const to = readQueryValue(params.to) || defaultTo;
+  const [
+    students,
+    lessonPackages,
+    schedules,
+    instructors,
+    journals,
+    attendance,
+    invoices,
+    courses,
+    rooms,
+  ] = await Promise.all([
+    listScopedRecordsProjected<Student>("students", ["firstName", "lastName"], session),
+    listScopedRecordsProjected<LessonPackage>("lesson-packages", ["status"], session, {
+      filter: { status: "Active" },
+    }),
+    listScopedRecordsProjected<CourseSchedule>(
+      "schedules",
+      [
+        "studentId",
+        "instructorId",
+        "courseId",
+        "studioRoomId",
+        "lessonMode",
+        "homeVisitAddress",
+        "scheduleStatus",
+        "scheduleDate",
+        "fromTime",
+      ],
+      session,
+    ),
+    listScopedRecordsProjected<Instructor>("instructors", ["instructorName"], session),
+    listScopedRecordsProjected<LessonJournal>(
+      "journals",
+      ["studentId", "confirmed", "parentVisible", "lessonDate", "progressRating", "materialCovered", "homework"],
+      session,
+      {
+        filter: { confirmed: true },
+        sort: { lessonDate: -1, createdAt: -1 },
+      },
+    ),
+    listScopedRecordsProjected<StudentAttendance>(
+      "student-attendance",
+      ["studentId", "courseScheduleId", "date", "status", "confirmed"],
+      session,
+      {
+        filter: attendanceDateFilter({ from, period, to, today }),
+      },
+    ),
+    listScopedRecordsProjected<Invoice>("invoices", ["studentId", "status", "amount"], session, {
+      filter: { status: { $ne: "Paid" } },
+    }),
+    listScopedRecordsProjected<Course>("courses", ["courseName"], session),
+    listScopedRecordsProjected<StudioRoom>("rooms", ["roomName"], session),
+  ]);
+  const schedulesById = new Map(schedules.map((row) => [row.id, row]));
+  const studentsById = new Map(students.map((row) => [row.id, row]));
+  const instructorsById = new Map(instructors.map((row) => [row.id, row]));
+  const coursesById = new Map(courses.map((row) => [row.id, row]));
+  const roomsById = new Map(rooms.map((row) => [row.id, row]));
   const isParentPortal = role === "Parent Portal User";
   const isStudentPortal = role === "Student Portal User";
   const isInstructor = role === "Music Instructor";
@@ -88,10 +131,6 @@ export default async function HomePage({
     allowInstructorScope,
   });
   const targetId = readQueryValue(params.targetId) || "";
-  const defaultFrom = toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
-  const defaultTo = toDateInputValue(new Date(today.getFullYear(), today.getMonth() + 1, 0));
-  const from = readQueryValue(params.from) || defaultFrom;
-  const to = readQueryValue(params.to) || defaultTo;
   const attendanceInRange = attendance.filter((row) =>
     isAttendanceInRange({
       from,
@@ -211,10 +250,10 @@ export default async function HomePage({
       : []),
   ];
   const upcomingScheduleItems = upcomingSchedules.map((item) => {
-    const student = db.students.find((row) => row.id === item.studentId);
-    const instructor = instructors.find((row) => row.id === item.instructorId);
-    const course = db.courses.find((row) => row.id === item.courseId);
-    const room = db.rooms.find((row) => row.id === item.studioRoomId);
+    const student = studentsById.get(item.studentId);
+    const instructor = instructorsById.get(item.instructorId);
+    const course = coursesById.get(item.courseId);
+    const room = roomsById.get(item.studioRoomId);
 
     return {
       id: item.id,
@@ -230,7 +269,7 @@ export default async function HomePage({
     } as const;
   });
   const latestJournalItems = latestJournals.map((journal) => {
-    const student = db.students.find((row) => row.id === journal.studentId);
+    const student = studentsById.get(journal.studentId);
     return {
       id: journal.id,
       studentName: formatDisplayText(student ? studentName(student) : "Unknown Student"),
@@ -548,6 +587,34 @@ function isAttendanceInRange({
   const end = parseDateAtMidnight(to);
   if (!start || !end) return true;
   return attendanceDate >= start && attendanceDate <= end;
+}
+
+function attendanceDateFilter({
+  from,
+  period,
+  to,
+  today,
+}: {
+  from: string;
+  period: string;
+  to: string;
+  today: Date;
+}) {
+  if (period === "last_30_days") {
+    return {
+      date: {
+        $gte: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)),
+        $lte: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), today.getDate())),
+      },
+    };
+  }
+
+  return {
+    date: {
+      $gte: from,
+      $lte: to,
+    },
+  };
 }
 
 function parseScope(value: string): "all" | "student" | "instructor" {

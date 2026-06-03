@@ -58,18 +58,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     async function loadUnreadNotifications() {
       if (!role || !userId) return;
       try {
-        const response = await fetch("/api/notifications", {
-          cache: "no-store",
-        });
-        const json = (await response.json()) as {
-          data?: Array<{ id: string; readByUserIds?: string[] }>;
-        };
-        const unreadCount = Array.isArray(json.data)
-          ? json.data.filter((row) => {
-              const readBy = new Set((row.readByUserIds ?? []).map(String));
-              return !readBy.has(userId);
-            }).length
-          : 0;
+        const response = await fetch("/api/notifications/unread-count", { cache: "no-store" });
+        const json = (await response.json()) as { count?: number };
+        const unreadCount = Number(json.count ?? 0);
         if (mounted) setUnreadNotificationCount(unreadCount);
       } catch {
         if (mounted) setUnreadNotificationCount(0);

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getClientSession } from "@/lib/client-session";
 import { hourlyLessonSlotOptions, lessonDayOptions } from "@/lib/options";
 import { formatDisplayText } from "@/lib/utils";
 
@@ -39,20 +38,36 @@ export function InstructorAvailabilityBoard() {
     setLoading(true);
 
     try {
-      const [instructorRows, availabilityRows, scheduleRows, studentRows, courseRows] =
-        await Promise.all([
-          fetchRows("instructors"),
-          fetchRows("instructor-availability"),
-          fetchRows("schedules"),
-          fetchRows("students"),
-          fetchRows("courses"),
-        ]);
+      const params = new URLSearchParams({
+        board: "instructor-availability",
+        month: monthValue(cursorDate),
+        view: viewMode,
+      });
+      const response = await fetch(`/api/calendar-board?${params.toString()}`, { cache: "no-store" });
+      const json = (await response.json()) as {
+        data?: {
+          availability?: Row[];
+          courses?: Row[];
+          instructors?: Row[];
+          role?: string;
+          schedules?: Row[];
+          students?: Row[];
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load availability");
+      }
+
+      const instructorRows = json.data?.instructors ?? [];
 
       setInstructors(instructorRows);
-      setAvailability(availabilityRows);
-      setSchedules(scheduleRows);
-      setStudents(studentRows);
-      setCourses(courseRows);
+      setAvailability(json.data?.availability ?? []);
+      setSchedules(json.data?.schedules ?? []);
+      setStudents(json.data?.students ?? []);
+      setCourses(json.data?.courses ?? []);
+      setSessionRole(json.data?.role ?? "");
       setSelectedInstructorId((current) => current || instructorRows[0]?.id || "");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load availability");
@@ -63,26 +78,7 @@ export function InstructorAvailabilityBoard() {
 
   useEffect(() => {
     void loadData();
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadSessionRole() {
-      try {
-        const session = (await getClientSession()) as { user?: { role?: string } };
-        if (mounted) setSessionRole(session.user?.role ?? "");
-      } catch {
-        if (mounted) setSessionRole("");
-      }
-    }
-
-    void loadSessionRole();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [cursorDate, viewMode]);
 
   const studentsById = useMemo(() => mapById(students), [students]);
   const coursesById = useMemo(() => mapById(courses), [courses]);
@@ -417,17 +413,6 @@ export function InstructorAvailabilityBoard() {
       ) : null}
     </div>
   );
-}
-
-async function fetchRows(resource: string) {
-  const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-  const json = (await response.json()) as { data?: Row[]; error?: string };
-
-  if (!response.ok) {
-    throw new Error(json.error ?? `Unable to load ${resource}`);
-  }
-
-  return Array.isArray(json.data) ? json.data : [];
 }
 
 function AvailabilityFormModal({
@@ -765,6 +750,10 @@ function groupByDate(rows: Row[]) {
 
 function startOfMonth(value: Date) {
   return new Date(Date.UTC(value.getFullYear(), value.getMonth(), 1));
+}
+
+function monthValue(value: Date) {
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function startOfWeek(value: Date) {

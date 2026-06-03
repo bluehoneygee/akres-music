@@ -31,18 +31,34 @@ function serializeUser(user: {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canAccessResource({ role: sessionRole(session), resource: "users", action: "read" })) {
+  const role = sessionRole(session) ?? "";
+  if (!canAccessResource({ role, resource: "users", action: "read" })) {
     return NextResponse.json({ error: "Only System Manager can manage users" }, { status: 403 });
   }
 
   const db = await getMongoDb();
-  const users = await db.collection("users").find({}).sort({ email: 1 }).toArray();
-  return NextResponse.json({ data: users.map(serializeUser) });
+  const page = Math.max(Number(request.nextUrl.searchParams.get("page") || "1"), 1);
+  const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get("limit") || "50"), 1), 100);
+  const search = request.nextUrl.searchParams.get("search")?.trim() ?? "";
+  const filters = parseFilters(request.nextUrl.searchParams.get("filters"));
+  const filter: Record<string, unknown> = { ...filters };
+  if (search) {
+    filter.$or = [
+      { name: { $regex: escapeRegex(search), $options: "i" } },
+      { email: { $regex: escapeRegex(search), $options: "i" } },
+      { role: { $regex: escapeRegex(search), $options: "i" } },
+    ];
+  }
+  const [users, total] = await Promise.all([
+    db.collection("users").find(filter).sort({ email: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
+    db.collection("users").countDocuments(filter),
+  ]);
+  return NextResponse.json({ data: users.map(serializeUser), limit, page, role, total });
 }
 
 export async function POST(request: NextRequest) {
@@ -96,4 +112,18 @@ export async function POST(request: NextRequest) {
 
   const user = await db.collection("users").findOne({ _id: result.insertedId });
   return NextResponse.json({ data: serializeUser(user!) }, { status: 201 });
+}
+
+function parseFilters(value: string | null) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as Record<string, string>;
+    return Object.fromEntries(Object.entries(parsed).filter(([, filterValue]) => Boolean(filterValue)));
+  } catch {
+    return {};
+  }
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

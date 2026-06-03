@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
-import { getClientSession } from "@/lib/client-session";
 import { cn, formatDisplayText } from "@/lib/utils";
 
 type NotificationRow = {
@@ -38,24 +37,21 @@ export function NotificationCenter() {
   async function loadData() {
     setLoading(true);
     try {
-      const [session, notificationRes, studentRes] = await Promise.all([
-        getClientSession(),
-        fetch("/api/notifications", { cache: "no-store" }),
-        fetch("/api/students", { cache: "no-store" }),
-      ]);
-      const notificationsJson = (await notificationRes.json()) as {
-        data?: NotificationRow[];
+      const response = await fetch("/api/notifications-board", { cache: "no-store" });
+      const json = (await response.json()) as {
         error?: string;
+        notifications?: NotificationRow[];
+        students?: StudentRow[];
+        userId?: string;
       };
-      const studentsJson = (await studentRes.json()) as { data?: StudentRow[] };
 
-      if (!notificationRes.ok) {
-        throw new Error(notificationsJson.error ?? "Unable to load notifications");
+      if (!response.ok) {
+        throw new Error(json.error ?? "Unable to load notifications");
       }
 
-      setNotifications(Array.isArray(notificationsJson.data) ? notificationsJson.data : []);
-      setStudents(Array.isArray(studentsJson.data) ? studentsJson.data : []);
-      setUserId(String(session.user?.id ?? ""));
+      setNotifications(json.notifications ?? []);
+      setStudents(json.students ?? []);
+      setUserId(String(json.userId ?? ""));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load notifications");
     } finally {
