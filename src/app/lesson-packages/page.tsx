@@ -150,6 +150,7 @@ export default function LessonPackagesPage() {
             label: "Status",
             type: "select",
             options: lessonPackageStatusOptions,
+            hideOnCreate: true,
           },
         ]}
         resource="lesson-packages"
