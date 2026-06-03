@@ -3,41 +3,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import {
-  ChevronDown,
-  FileText,
-  Home,
-  Info,
-  LogIn,
-  Menu,
-  MicVocal,
-  Trophy,
-  UserRound,
-  X,
-} from "lucide-react";
-import type { ComponentType } from "react";
-import { useEffect, useState } from "react";
+import { ChevronDown, Menu, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/results", label: "Results", icon: Trophy },
-  { href: "/policies", label: "Policies", icon: FileText },
-  {
-    href: "/akres-concert-series",
-    label: "Akres Concert Series",
-    icon: MicVocal,
-  },
-];
+import { getClientSession } from "@/lib/client-session";
+import { getPublicNavigationBySection, publicNavigation } from "@/lib/navigation";
 
 export function LandingNavbar() {
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -48,8 +24,29 @@ export function LandingNavbar() {
   const isHomeActive = pathname === "/";
   const isHomePage = pathname === "/";
   const isAboutActive = pathname === "/about" || pathname.startsWith("/about/");
-  const isInstructorsActive = pathname === "/about/instructors";
   const isActivePath = (href: string) => pathname === href;
+  const homeItem = useMemo(
+    () => publicNavigation.find((item) => item.href === "/" && item.section === "primary"),
+    [],
+  );
+  const aboutItem = useMemo(
+    () => publicNavigation.find((item) => item.section === "about"),
+    [],
+  );
+  const loginItem = useMemo(
+    () => publicNavigation.find((item) => item.section === "auth"),
+    [],
+  );
+  const aboutItems = useMemo(() => getPublicNavigationBySection("about-child"), []);
+  const primaryNavItems = useMemo(
+    () => getPublicNavigationBySection("primary").filter((item) => item.href !== "/"),
+    [],
+  );
+  const HomeIcon = homeItem?.icon;
+  const AboutIcon = aboutItem?.icon;
+  const LoginIcon = loginItem?.icon;
+  const authHref = isLoggedIn ? "/dashboard" : (loginItem?.href ?? "/login");
+  const authLabel = isLoggedIn ? "Dashboard" : (loginItem?.label ?? "Login");
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -66,6 +63,21 @@ export function LandingNavbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [pathname]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSession() {
+      const session = await getClientSession();
+      if (mounted) setIsLoggedIn(Boolean(session.user?.id || session.user?.email));
+    }
+
+    void loadSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <>
@@ -113,63 +125,60 @@ export function LandingNavbar() {
                       ? "text-amber-700"
                       : "!text-black hover:text-amber-700"
                   }`}
-                  href="/"
+                  href={homeItem?.href ?? "/"}
                 >
-                  <Home className="size-4" />
-                  Home
+                  {HomeIcon ? <HomeIcon className="size-4" /> : null}
+                  {homeItem?.label ?? "Home"}
                 </Link>
               </li>
 
-              <li>
-                <button
-                  aria-expanded={aboutOpen}
-                  className={`flex w-full items-center justify-between transition ${
-                    isAboutActive
-                      ? "text-amber-700"
-                      : "!text-black hover:text-amber-700"
-                  }`}
-                  onClick={() => setAboutOpen((prev) => !prev)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2">
-                    <Info className="size-4" />
-                    About
-                  </span>
-                  <ChevronDown
-                    className={`size-4 transition-transform ${aboutOpen ? "rotate-180" : "rotate-0"}`}
-                  />
-                </button>
-                <div
-                  className={`mt-2 space-y-2 overflow-hidden pl-4 transition-[max-height,opacity] duration-200 ${
-                    aboutOpen ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <Link
-                    className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
-                      pathname === "/about"
+              {aboutItem ? (
+                <li>
+                  <button
+                    aria-expanded={aboutOpen}
+                    className={`flex w-full items-center justify-between transition ${
+                      isAboutActive
                         ? "text-amber-700"
-                        : "text-black hover:text-amber-700"
+                        : "!text-black hover:text-amber-700"
                     }`}
-                    href="/about"
+                    onClick={() => setAboutOpen((prev) => !prev)}
+                    type="button"
                   >
-                    <Info className="size-3.5" />
-                    About Akres
-                  </Link>
-                  <Link
-                    className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
-                      isInstructorsActive
-                        ? "text-amber-700"
-                        : "text-black hover:text-amber-700"
+                    <span className="flex items-center gap-2">
+                      {AboutIcon ? <AboutIcon className="size-4" /> : null}
+                      {aboutItem.label}
+                    </span>
+                    <ChevronDown
+                      className={`size-4 transition-transform ${aboutOpen ? "rotate-180" : "rotate-0"}`}
+                    />
+                  </button>
+                  <div
+                    className={`mt-2 space-y-2 overflow-hidden pl-4 transition-[max-height,opacity] duration-200 ${
+                      aboutOpen ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
                     }`}
-                    href="/about/instructors"
                   >
-                    <UserRound className="size-3.5" />
-                    Instructors
-                  </Link>
-                </div>
-              </li>
+                    {aboutItems.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          className={`flex items-center gap-2 text-xs font-semibold capitalize tracking-wide transition ${
+                            pathname === item.href
+                              ? "text-amber-700"
+                              : "text-black hover:text-amber-700"
+                          }`}
+                          href={item.href}
+                          key={`${item.section}-${item.href}-${item.label}`}
+                        >
+                          <Icon className="size-3.5" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </li>
+              ) : null}
 
-              {NAV_ITEMS.map((item) => {
+              {primaryNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>
@@ -188,15 +197,17 @@ export function LandingNavbar() {
                 );
               })}
 
-              <li className="mt-auto border-t border-zinc-200 pt-6 pb-2">
-                <Link
-                  className={`${isActivePath("/login") ? "text-amber-700" : "!text-black hover:text-amber-700"} flex items-center gap-2 transition`}
-                  href="/login"
-                >
-                  <LogIn className="size-4" />
-                  Login
-                </Link>
-              </li>
+              {loginItem ? (
+                <li className="mt-auto border-t border-zinc-200 pt-6 pb-2">
+                  <Link
+                    className={`${isActivePath(authHref) ? "text-amber-700" : "!text-black hover:text-amber-700"} flex items-center gap-2 transition`}
+                    href={authHref}
+                  >
+                    {LoginIcon ? <LoginIcon className="size-4" /> : null}
+                    {authLabel}
+                  </Link>
+                </li>
+              ) : null}
           </ul>
         </aside>
       </div>
@@ -240,47 +251,43 @@ export function LandingNavbar() {
                     ? "text-amber-700"
                     : "text-zinc-600 hover:text-amber-700"
                 }`}
-                href="/"
+                href={homeItem?.href ?? "/"}
               >
-                Home
+                {homeItem?.label ?? "Home"}
               </Link>
             </li>
 
-            <li className="group relative">
-              <Link
-                className={`inline-flex items-center gap-2 transition ${
-                  isAboutActive
-                    ? "text-amber-700"
-                    : "text-zinc-600 hover:text-amber-700"
-                }`}
-                href="/about"
-              >
-                About
-              </Link>
-              <div className="absolute left-1/2 top-full z-30 w-44 -translate-x-1/2 pt-1.5">
-                <div className="pointer-events-none translate-y-2 rounded-xl border border-zinc-200 bg-white p-2 opacity-0 shadow-[0_12px_30px_rgba(24,24,27,0.12)] transition duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
-                  <Link
-                    className={`block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider transition hover:bg-zinc-50 hover:text-amber-700 ${
-                      pathname === "/about" ? "text-amber-700" : "text-black"
-                    }`}
-                    href="/about"
-                  >
-                    About Akres
-                  </Link>
-                  <Link
-                    className={`block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider transition hover:bg-zinc-50 hover:text-amber-700 ${
-                      isInstructorsActive ? "text-amber-700" : "text-black"
-                    }`}
-                    href="/about/instructors"
-                  >
-                    Instructors
-                  </Link>
+            {aboutItem ? (
+              <li className="group relative">
+                <Link
+                  className={`inline-flex items-center gap-2 transition ${
+                    isAboutActive
+                      ? "text-amber-700"
+                      : "text-zinc-600 hover:text-amber-700"
+                  }`}
+                  href={aboutItem.href}
+                >
+                  {aboutItem.label}
+                </Link>
+                <div className="absolute left-1/2 top-full z-30 w-44 -translate-x-1/2 pt-1.5">
+                  <div className="pointer-events-none translate-y-2 rounded-xl border border-zinc-200 bg-white p-2 opacity-0 shadow-[0_12px_30px_rgba(24,24,27,0.12)] transition duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                    {aboutItems.map((item) => (
+                      <Link
+                        className={`block rounded-lg px-3 py-2 text-[11px] uppercase tracking-wider transition hover:bg-zinc-50 hover:text-amber-700 ${
+                          pathname === item.href ? "text-amber-700" : "text-black"
+                        }`}
+                        href={item.href}
+                        key={`${item.section}-${item.href}-${item.label}`}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </li>
+              </li>
+            ) : null}
 
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
+            {primaryNavItems.map((item) => {
               return (
                 <li key={item.href}>
                   <Link
@@ -298,12 +305,14 @@ export function LandingNavbar() {
             })}
           </ul>
 
-          <Link
-            className="hidden rounded-full bg-[#09090b] px-4 py-2 font-medium !text-white shadow-[0_10px_22px_rgba(24,24,27,0.24)] transition hover:bg-[#18181b] md:inline-block"
-            href="/login"
-          >
-            Login
-          </Link>
+          {loginItem ? (
+            <Link
+              className="hidden rounded-full bg-[#09090b] px-4 py-2 font-medium !text-white shadow-[0_10px_22px_rgba(24,24,27,0.24)] transition hover:bg-[#18181b] md:inline-block"
+              href={authHref}
+            >
+              {authLabel}
+            </Link>
+          ) : null}
 
           <span aria-hidden="true" className="block w-[26px] md:hidden" />
         </div>

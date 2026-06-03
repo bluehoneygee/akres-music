@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu, X } from "lucide-react";
+import { Bell, Home, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -217,7 +217,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 isDarkMode={isDarkMode}
               />
             </div>
-            <div className="mt-4 shrink-0">
+            <div className="mt-4 grid shrink-0 gap-2">
+              <HomeLinkButton onNavigate={() => setMobileMenuOpen(false)} />
               <Button
                 className="w-full"
                 onClick={() => signOut({ callbackUrl: "/" })}
@@ -244,7 +245,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               isDarkMode={isDarkMode}
             />
           </div>
-          <div className="mt-4 shrink-0">
+          <div className="mt-4 grid shrink-0 gap-2">
+            <HomeLinkButton compact />
             <Button
               className="h-10 w-full px-0"
               onClick={() => signOut({ callbackUrl: "/" })}
@@ -267,7 +269,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               isDarkMode={isDarkMode}
             />
           </div>
-          <div className="mt-4 shrink-0 px-1 pb-1">
+          <div className="mt-4 grid shrink-0 gap-2 px-1 pb-1">
+            <HomeLinkButton />
             <Button
               className="h-10 w-full"
               onClick={() => signOut({ callbackUrl: "/" })}
@@ -374,6 +377,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </section>
       </div>
     </main>
+  );
+}
+
+function HomeLinkButton({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
+  return (
+    <Link
+      className={cn(
+        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/40 bg-white/40 text-sm font-medium text-zinc-700 shadow-[inset_0_1px_0_rgba(255,255,255,.7)] transition-colors hover:bg-white/65 hover:text-zinc-950",
+        compact && "w-full rounded-full px-0",
+      )}
+      href="/"
+      onClick={onNavigate}
+      title="Home"
+    >
+      <Home className="size-4" />
+      {compact ? null : <span>Home</span>}
+    </Link>
   );
 }
 

@@ -6,15 +6,41 @@ import {
   CalendarDays,
   FileText,
   GraduationCap,
+  Home,
+  Info,
   LayoutDashboard,
+  LogIn,
+  MicVocal,
   Music2,
   Piano,
   SquareLibrary,
+  Trophy,
   UserCog,
+  UserRound,
   Users,
 } from "lucide-react";
 
 import type { AppRole } from "@/lib/roles";
+
+export const publicNavigation = [
+  { label: "Home", href: "/", icon: Home, section: "primary" },
+  { label: "About", href: "/about", icon: Info, section: "about" },
+  { label: "About Akres", href: "/about", icon: Info, section: "about-child" },
+  { label: "Instructors", href: "/about/instructors", icon: UserRound, section: "about-child" },
+  { label: "Results", href: "/results", icon: Trophy, section: "primary" },
+  { label: "Policies", href: "/policies", icon: FileText, section: "primary" },
+  {
+    label: "Akres Concert Series",
+    href: "/akres-concert-series",
+    icon: MicVocal,
+    section: "primary",
+  },
+  { label: "Login", href: "/login", icon: LogIn, section: "auth" },
+] as const;
+
+export function getPublicNavigationBySection(section: (typeof publicNavigation)[number]["section"]) {
+  return publicNavigation.filter((item) => item.section === section);
+}
 
 export const appNavigation = [
   {
