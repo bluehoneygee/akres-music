@@ -1578,6 +1578,8 @@ async function syncScheduleStatusFromAttendance(
       { session },
     );
 
+    if (attendanceStatus !== "Present" && attendanceStatus !== "Rescheduled") return;
+
     if (attendance.confirmed) {
       const confirmedByUserId = actor?.id ?? String(attendance.confirmedByUserId || "");
       const confirmedByName =
