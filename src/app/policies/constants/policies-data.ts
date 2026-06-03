@@ -20,12 +20,6 @@ export const ENROLLMENT_POLICIES: string[] = [
   "Jika studio libur, Akres akan memberikan jadwal pengganti kepada murid.",
 ];
 
-export const LESSON_FEES: string[] = [
-  "Paket A: Rp350.000 (4x pertemuan per bulan / 1x per minggu).",
-  "Paket B: Rp700.000 (8x pertemuan per bulan / 2x per minggu).",
-  "Durasi setiap pertemuan: 60 menit.",
-];
-
 export const FAQS: TextFAQItem[] = [
   {
     q: "Apakah orang dewasa masih bisa mendaftar dan belajar dari nol?",
@@ -50,9 +44,5 @@ export const POLICY_DROPDOWN_SOURCES: PolicyDropdownSource[] = [
   {
     q: "Enrolment Policies",
     items: ENROLLMENT_POLICIES,
-  },
-  {
-    q: "Lesson Fees",
-    items: LESSON_FEES,
   },
 ];
