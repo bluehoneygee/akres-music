@@ -64,33 +64,6 @@ function isoNow() {
   return new Date().toISOString();
 }
 
-function getJakartaNowParts() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value ?? "0");
-
-  return {
-    year: value("year"),
-    month: value("month"),
-    day: value("day"),
-    hour: value("hour"),
-    minute: value("minute"),
-  };
-}
-
-function isMorningReminderWindow(jakartaNow: ReturnType<typeof getJakartaNowParts>) {
-  // GitHub Actions scheduled jobs can be delayed. Avoid sending stale "morning" reminders at noon/afternoon.
-  return jakartaNow.hour === 8 && jakartaNow.minute <= 30;
-}
-
 function parseScheduleStartUtcMs(scheduleDate: string, fromTime: string) {
   const [year, month, day] = scheduleDate.split("-").map((value) => Number(value));
   const [hour, minute] = fromTime.split(":").map((value) => Number(value));
@@ -229,8 +202,6 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
   }>;
   const today = dayOffset(0);
   const nowUtc = Date.now();
-  const jakartaNow = getJakartaNowParts();
-  const isMorningSlot = isMorningReminderWindow(jakartaNow);
   const force = options?.force === true;
   const debugEnabled = options?.debug === true;
   const debugSchedules: NonNullable<NotificationRunResult["debug"]>["schedules"] = [];
@@ -260,9 +231,7 @@ async function runClassReminderRule(mode: ReminderMode, options?: RunSchedulerOp
       continue;
     }
 
-    const shouldSendMorning = force
-      ? (mode === "all" || mode === "morning") && scheduleDate === today
-      : (mode === "all" || mode === "morning") && isMorningSlot && scheduleDate === today;
+    const shouldSendMorning = (mode === "all" || mode === "morning") && scheduleDate === today;
     const diffMs = scheduleStartUtcMs - nowUtc;
     const inThreeHourWindow = diffMs >= 3 * 60 * 60 * 1000 && diffMs < (3 * 60 + 15) * 60 * 1000;
     const shouldSendPreclass = force
