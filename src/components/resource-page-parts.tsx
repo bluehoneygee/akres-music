@@ -224,6 +224,8 @@ export const ResourceTable = memo(function ResourceTable({
   renderValue,
   rows,
   searchTerm,
+  showDeleteAction,
+  showEditAction,
   showActionsColumn,
   tableFields,
   totalRows,
@@ -234,6 +236,8 @@ export const ResourceTable = memo(function ResourceTable({
   renderValue: (row: UiRecord, field: FieldConfig) => ReactNode;
   rows: UiRecord[];
   searchTerm: string;
+  showDeleteAction: boolean;
+  showEditAction: boolean;
   showActionsColumn: boolean;
   tableFields: FieldConfig[];
   totalRows: number;
@@ -267,12 +271,16 @@ export const ResourceTable = memo(function ResourceTable({
               {showActionsColumn ? (
                 <td className="rounded-r-2xl px-3 py-3">
                   <div className="flex justify-end gap-2">
-                    <Button onClick={() => onEdit(row)} size="icon" variant="glass">
-                      <Edit3 className="size-4" />
-                    </Button>
-                    <Button onClick={() => onDelete(row)} size="icon" variant="glass">
-                      <Trash2 className="size-4" />
-                    </Button>
+                    {showEditAction ? (
+                      <Button onClick={() => onEdit(row)} size="icon" variant="glass">
+                        <Edit3 className="size-4" />
+                      </Button>
+                    ) : null}
+                    {showDeleteAction ? (
+                      <Button onClick={() => onDelete(row)} size="icon" variant="glass">
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </td>
               ) : null}

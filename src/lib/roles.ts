@@ -105,7 +105,13 @@ export function canAccessResource({
 
   if (role === "Music Instructor") {
     if (!instructorReadResources.includes(resource)) return false;
-    return action === "read" || resource === "student-attendance" || resource === "instructor-attendance" || resource === "journals";
+    return (
+      action === "read" ||
+      resource === "student-attendance" ||
+      resource === "instructor-attendance" ||
+      resource === "journals" ||
+      resource === "repertoires"
+    );
   }
 
   if (role === "Student Portal User") {

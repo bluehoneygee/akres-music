@@ -182,12 +182,9 @@ export function ResourcePage({
     "Student Portal User",
     "Music Instructor",
   ].includes(sessionRole);
-  const canWriteResource =
-    resource === "users"
-      ? canAccessResource({ role: sessionRole, resource: "users", action: "create" })
-      : canAccessResource({ role: sessionRole, resource, action: "create" }) &&
-        canAccessResource({ role: sessionRole, resource, action: "update" }) &&
-        canAccessResource({ role: sessionRole, resource, action: "delete" });
+  const canCreateResource = canAccessResource({ role: sessionRole, resource, action: "create" });
+  const canUpdateResource = canAccessResource({ role: sessionRole, resource, action: "update" });
+  const canDeleteResource = canAccessResource({ role: sessionRole, resource, action: "delete" });
   const tableFields = useMemo(
     () =>
       fields.filter(
@@ -199,8 +196,8 @@ export function ResourcePage({
       ),
     [fields, hidePortalEnabledColumn, isParentStudentsView],
   );
-  const showActionsColumn = !isParentStudentsView && canWriteResource;
-  const canCreate = allowCreate && !isParentStudentsView && canWriteResource;
+  const showActionsColumn = !isParentStudentsView && (canUpdateResource || canDeleteResource);
+  const canCreate = allowCreate && !isParentStudentsView && canCreateResource;
   const filterAllowlist = useMemo(() => getResourceFilterAllowlist(resource), [resource]);
   const sortConfig = useMemo(() => getResourceSortConfig(resource), [resource]);
   const filterCandidateFields = useMemo(
@@ -549,6 +546,8 @@ export function ResourcePage({
               renderValue={renderTableValue}
               rows={paginatedRows}
               searchTerm={searchTerm}
+              showDeleteAction={canDeleteResource}
+              showEditAction={canUpdateResource}
               showActionsColumn={showActionsColumn}
               tableFields={tableFields}
               totalRows={totalRows}
