@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const board = request.nextUrl.searchParams.get("board") ?? "";
   const month = request.nextUrl.searchParams.get("month") ?? "";
   const view = request.nextUrl.searchParams.get("view") ?? "month";
-  const scheduleFilter = view === "month" && month ? { scheduleMonth: month } : {};
+  const scheduleFilter = view === "month" && month ? scheduleDateMonthFilter(month) : {};
 
   if (board === "student-calendar") {
     if (!canAccessResource({ role, resource: "schedules", action: "read" })) {
@@ -120,4 +120,21 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({ error: "Unknown calendar board" }, { status: 404 });
+}
+
+function scheduleDateMonthFilter(month: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return {};
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const start = new Date(Date.UTC(year, monthIndex, 1));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1));
+
+  return {
+    scheduleDate: {
+      $gte: start.toISOString().slice(0, 10),
+      $lt: end.toISOString().slice(0, 10),
+    },
+  };
 }

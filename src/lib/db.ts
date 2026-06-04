@@ -1015,7 +1015,7 @@ function buildScheduleRecords(payload: Record<string, unknown>, now: string) {
       ...payload,
       id,
       scheduleDate,
-      scheduleMonth,
+      scheduleMonth: scheduleDate.slice(0, 7) || scheduleMonth,
       lessonStartDate,
       lessonDays,
       lessonCount,

@@ -64,7 +64,7 @@ const attendanceBoardResources = [
       "originalScheduleId",
       "rescheduleReason",
     ],
-    monthFilter: (month: string) => (month ? { scheduleMonth: month } : {}),
+    monthFilter: (month: string) => (month ? scheduleDateMonthFilter(month) : {}),
   },
   {
     key: "attendance",
@@ -154,4 +154,21 @@ function mergeMongoFilters(...filters: Array<Filter<Document>>) {
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function scheduleDateMonthFilter(month: string): Filter<Document> {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return {};
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const start = new Date(Date.UTC(year, monthIndex, 1));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1));
+
+  return {
+    scheduleDate: {
+      $gte: start.toISOString().slice(0, 10),
+      $lt: end.toISOString().slice(0, 10),
+    },
+  };
 }

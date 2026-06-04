@@ -9,6 +9,7 @@
     "seed:admin": "node scripts/seed-admin.mjs",
     "seed:rooms": "node scripts/seed-rooms.mjs",
     "seed": "node scripts/seed.mjs",
+    "backfill:schedule-month": "node scripts/backfill-schedule-month.mjs",
     "migrate:sheets": "node scripts/migrate-google-sheets.mjs",
     "dev": "next dev --webpack",
     "build": "next build",
