@@ -245,19 +245,8 @@ export function rescheduleTargetForSchedule(schedules: Row[], schedule: Row) {
   return findRescheduledToSchedule(schedules, originalScheduleId);
 }
 
-export function packageRescheduleQuota(schedule: Row, schedules: Row[]) {
-  const lessonCount = Number(schedule.lessonCount || "");
-  if (Number.isFinite(lessonCount) && lessonCount > 0) return lessonCount >= 8 ? 2 : 1;
-
-  const packageId = String(schedule.lessonPackageId ?? "");
-  const originalCount = schedules.filter(
-    (row) =>
-      String(row.lessonPackageId ?? "") === packageId &&
-      !String(row.originalScheduleId ?? "") &&
-      String(row.scheduleStatus ?? "").toLowerCase() !== "cancelled",
-  ).length;
-
-  return originalCount >= 8 ? 2 : 1;
+export function packageRescheduleQuota(_schedule: Row, _schedules: Row[]) {
+  return 2;
 }
 
 export function packageRescheduleUsage({

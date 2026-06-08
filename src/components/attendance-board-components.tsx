@@ -294,24 +294,24 @@ export function StudentAttendanceModal({
               value={status}
             >
               {studentAttendanceStatusOptions.map((option) => (
-                <option
-                  disabled={option.value === "Rescheduled" && !canSelectStudentReschedule}
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.value === "Rescheduled" && !canSelectStudentReschedule
+              <option
+                disabled={option.value === "Rescheduled" && !canSelectStudentReschedule}
+                key={option.value}
+                value={option.value}
+              >
+                {option.value === "Rescheduled" && !canSelectStudentReschedule
                     ? `${option.label} (${packageQuota}x jatah habis)`
-                    : option.label}
-                </option>
-              ))}
-            </select>
-            {!canSelectStudentReschedule ? (
-              <p className="rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-800">
-                {ownRescheduleUsed
-                  ? "Sesi ini sudah pernah di-reschedule."
-                  : `${rescheduleQuotaMessage} Package ${packageQuota === 2 ? "8 sesi" : "4 sesi"} hanya bisa reschedule ${packageQuota}x.`}
-              </p>
-            ) : null}
+                  : option.label}
+              </option>
+            ))}
+          </select>
+          {!canSelectStudentReschedule ? (
+            <p className="rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-800">
+              {ownRescheduleUsed
+                ? "Sesi ini sudah pernah di-reschedule."
+                : `${rescheduleQuotaMessage} Package ini hanya bisa reschedule ${packageQuota}x.`}
+            </p>
+          ) : null}
 
             {schedule.originalScheduleId ? (
               <RescheduleBadge
@@ -1168,7 +1168,7 @@ export function InstructorAttendanceModal({
             <p className="rounded-2xl border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-800">
               {ownRescheduleUsed
                 ? "Sesi ini sudah pernah di-reschedule."
-                : `${rescheduleQuotaMessage} Package ${packageQuota === 2 ? "8 sesi" : "4 sesi"} hanya bisa reschedule ${packageQuota}x.`}
+                : `${rescheduleQuotaMessage} Package ini hanya bisa reschedule ${packageQuota}x.`}
             </p>
           ) : null}
 

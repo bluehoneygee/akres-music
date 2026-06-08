@@ -772,7 +772,8 @@ function normalizeLessonCount(value: unknown) {
 }
 
 function rescheduleQuotaForLessonCount(value: unknown) {
-  return normalizeLessonCount(value) === 8 ? 2 : 1;
+  void value;
+  return 2;
 }
 
 type ScheduleSlotTime = {
@@ -1970,7 +1971,7 @@ async function createConfirmedRescheduleSchedule(
     { session },
   );
   if (existingRescheduleForOriginal) {
-    throw new Error("Sesi ini sudah pernah di-reschedule. Maksimal 1x reschedule.");
+    throw new Error("Sesi ini sudah pernah di-reschedule. Maksimal 2x reschedule.");
   }
 
   if (lessonPackageId) {
