@@ -608,17 +608,22 @@ async function createLessonPackageWithSchedules(
 async function ensureInvoiceForLessonPackage(
   lessonPackage: Record<string, unknown>,
   now: string,
+  context?: {
+    db?: Db;
+    session?: ClientSession;
+  },
 ) {
   const lessonPackageId = String(lessonPackage.id || "");
   if (!lessonPackageId) return;
 
-  const db = await getMongoDb();
+  const db = context?.db ?? (await getMongoDb());
+  const session = context?.session;
   const course = await db.collection("courses").findOne<{
     courseName?: string;
     defaultFee?: number;
     packageAFee?: number;
     packageBFee?: number;
-  }>({ id: String(lessonPackage.courseId || "") });
+  }>({ id: String(lessonPackage.courseId || "") }, session ? { session } : undefined);
   const invoiceId = `invoice-${lessonPackageId}`;
   const billingPeriod = String(lessonPackage.billingPeriod || "");
 
@@ -646,7 +651,7 @@ async function ensureInvoiceForLessonPackage(
         updatedAt: now,
       },
     },
-    { upsert: true },
+    { upsert: true, session },
   );
 }
 
@@ -1380,6 +1385,11 @@ export async function updateRecord(
   }
 
   const updatePayload = normalizeConfirmationPayload(resource, payload, actor, updatedAt);
+
+  if (resource === "lesson-packages") {
+    return updateLessonPackageWithSchedules(id, updatePayload, previous, updatedAt);
+  }
+
   const result = await records.findOneAndUpdate(
     { id },
     { $set: { ...updatePayload, id, updatedAt } },
@@ -1391,6 +1401,254 @@ export async function updateRecord(
   }
 
   return result ? (fromMongo(result) as AnyRecord) : null;
+}
+
+async function updateLessonPackageWithSchedules(
+  id: string,
+  payload: Record<string, unknown>,
+  previous: Document | null,
+  updatedAt: string,
+) {
+  if (!previous) return null;
+
+  const mergedPayload = {
+    ...previous,
+    ...payload,
+    id,
+  };
+  const packagePayload = await normalizeLessonPackagePayload(mergedPayload);
+  const record = {
+    ...previous,
+    ...packagePayload,
+    id,
+    _id: id,
+    updatedAt,
+  };
+
+  await withMongoTransaction(async ({ db, session }) => {
+    await db.collection("lesson-packages").updateOne(
+      { id },
+      {
+        $set: {
+          ...record,
+          updatedAt,
+        },
+      },
+      { session },
+    );
+
+    const scheduleRecords = buildScheduleRecords(pickLessonPackageSchedulePayload(record), updatedAt);
+    const nextScheduleIds = new Set(scheduleRecords.map((schedule) => String(schedule.id || "")));
+    const existingSchedules = await db
+      .collection("schedules")
+      .find({ lessonPackageId: id }, { session })
+      .toArray();
+    const existingSchedulesById = new Map(existingSchedules.map((schedule) => [String(schedule.id || ""), schedule]));
+
+    for (const schedule of scheduleRecords) {
+      const existing = existingSchedulesById.get(String(schedule.id || ""));
+      const scheduleRecord = {
+        ...schedule,
+        createdAt: String(existing?.createdAt || schedule.createdAt || updatedAt),
+        updatedAt,
+      };
+
+      await db.collection("schedules").updateOne(
+        { id: scheduleRecord.id },
+        {
+          $set: scheduleRecord,
+          $setOnInsert: {
+            _id: scheduleRecord.id,
+            createdAt: scheduleRecord.createdAt,
+          },
+        },
+        { upsert: true, session },
+      );
+      await syncAttendanceForSchedule(scheduleRecord, updatedAt, { db, session });
+    }
+
+    const removedScheduleIds = existingSchedules
+      .map((schedule) => String(schedule.id || ""))
+      .filter((scheduleId) => scheduleId && !nextScheduleIds.has(scheduleId));
+
+    if (removedScheduleIds.length > 0) {
+      await Promise.all([
+        db.collection("schedules").deleteMany({ id: { $in: removedScheduleIds } }, { session }),
+        db.collection("student-attendance").deleteMany({ courseScheduleId: { $in: removedScheduleIds } }, { session }),
+        db.collection("instructor-attendance").deleteMany({ courseScheduleId: { $in: removedScheduleIds } }, { session }),
+      ]);
+    }
+
+    await ensureInvoiceForLessonPackage(record, updatedAt);
+  });
+
+  return fromMongo(record as Document) as AnyRecord;
+}
+
+async function syncAttendanceForSchedule(
+  schedule: Record<string, unknown>,
+  now: string,
+  context?: {
+    db?: Db;
+    session?: ClientSession;
+  },
+) {
+  const db = context?.db ?? (await getMongoDb());
+  const session = context?.session;
+  const scheduleId = String(schedule.id || "");
+  if (!scheduleId) return;
+
+  const studentAttendanceId = `student-attendance-${scheduleId}`;
+  const instructorAttendanceId = `instructor-attendance-${scheduleId}`;
+  const studentAttendance = await db.collection("student-attendance").findOne<{
+    confirmed?: boolean;
+    status?: string;
+    absenceReason?: string;
+    makeupRequired?: boolean;
+    makeupScheduleId?: string;
+    pendingRescheduleDate?: string;
+    pendingRescheduleFromTime?: string;
+    pendingRescheduleToTime?: string;
+    pendingRescheduleStudioRoomId?: string;
+    parentNotified?: boolean;
+    confirmedByUserId?: string;
+    confirmedByName?: string;
+    confirmedAt?: string;
+    notes?: string;
+  }>({ _id: studentAttendanceId } as unknown as Filter<Document>, { session });
+  const instructorAttendance = await db.collection("instructor-attendance").findOne<{
+    confirmed?: boolean;
+    status?: string;
+    substituteInstructorId?: string;
+    rescheduleRequired?: boolean;
+    rescheduleScheduleId?: string;
+    pendingRescheduleDate?: string;
+    pendingRescheduleFromTime?: string;
+    pendingRescheduleToTime?: string;
+    pendingRescheduleStudioRoomId?: string;
+    confirmedByUserId?: string;
+    confirmedByName?: string;
+    confirmedAt?: string;
+    notes?: string;
+  }>({ _id: instructorAttendanceId } as unknown as Filter<Document>, { session });
+
+  await Promise.all([
+    db.collection("student-attendance").updateOne(
+      { _id: studentAttendanceId } as unknown as Filter<Document>,
+      {
+        $set: {
+          lessonPackageId: String(schedule.lessonPackageId || ""),
+          studentId: String(schedule.studentId || ""),
+          courseScheduleId: scheduleId,
+          instrumentId: String(schedule.instrumentId || ""),
+          date: String(schedule.scheduleDate || ""),
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          _id: studentAttendanceId,
+          id: studentAttendanceId,
+          status: "Pending",
+          absenceReason: "",
+          makeupRequired: false,
+          makeupScheduleId: "",
+          pendingRescheduleDate: "",
+          pendingRescheduleFromTime: "",
+          pendingRescheduleToTime: "",
+          pendingRescheduleStudioRoomId: "",
+          parentNotified: false,
+          absenceAlertKey: "",
+          confirmed: false,
+          confirmedByUserId: "",
+          confirmedByName: "",
+          confirmedAt: "",
+          createdAt: now,
+        },
+      },
+      { upsert: true, session },
+    ),
+    db.collection("instructor-attendance").updateOne(
+      { _id: instructorAttendanceId } as unknown as Filter<Document>,
+      {
+        $set: {
+          lessonPackageId: String(schedule.lessonPackageId || ""),
+          instructorId: String(schedule.instructorId || ""),
+          courseScheduleId: scheduleId,
+          instrumentId: String(schedule.instrumentId || ""),
+          attendanceDate: String(schedule.scheduleDate || ""),
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          _id: instructorAttendanceId,
+          id: instructorAttendanceId,
+          status: "Pending",
+          substituteInstructorId: "",
+          rescheduleRequired: false,
+          rescheduleScheduleId: "",
+          pendingRescheduleDate: "",
+          pendingRescheduleFromTime: "",
+          pendingRescheduleToTime: "",
+          pendingRescheduleStudioRoomId: "",
+          confirmed: false,
+          confirmedByUserId: "",
+          confirmedByName: "",
+          confirmedAt: "",
+          notes: "",
+          createdAt: now,
+        },
+      },
+      { upsert: true, session },
+    ),
+  ]);
+
+  if (studentAttendance?.confirmed) {
+    await db.collection("student-attendance").updateOne(
+      { _id: studentAttendanceId } as unknown as Filter<Document>,
+      {
+        $set: {
+          confirmed: true,
+          confirmedByUserId: String(studentAttendance.confirmedByUserId || ""),
+          confirmedByName: String(studentAttendance.confirmedByName || ""),
+          confirmedAt: String(studentAttendance.confirmedAt || now),
+          status: String(studentAttendance.status || "Pending"),
+          absenceReason: String(studentAttendance.absenceReason || ""),
+          makeupRequired: Boolean(studentAttendance.makeupRequired),
+          makeupScheduleId: String(studentAttendance.makeupScheduleId || ""),
+          pendingRescheduleDate: String(studentAttendance.pendingRescheduleDate || ""),
+          pendingRescheduleFromTime: String(studentAttendance.pendingRescheduleFromTime || ""),
+          pendingRescheduleToTime: String(studentAttendance.pendingRescheduleToTime || ""),
+          pendingRescheduleStudioRoomId: String(studentAttendance.pendingRescheduleStudioRoomId || ""),
+          parentNotified: Boolean(studentAttendance.parentNotified),
+          updatedAt: now,
+        },
+      },
+      { session },
+    );
+  }
+
+  if (instructorAttendance?.confirmed) {
+    await db.collection("instructor-attendance").updateOne(
+      { _id: instructorAttendanceId } as unknown as Filter<Document>,
+      {
+        $set: {
+          confirmed: true,
+          confirmedByUserId: String(instructorAttendance.confirmedByUserId || ""),
+          confirmedByName: String(instructorAttendance.confirmedByName || ""),
+          confirmedAt: String(instructorAttendance.confirmedAt || now),
+          status: String(instructorAttendance.status || "Pending"),
+          substituteInstructorId: String(instructorAttendance.substituteInstructorId || ""),
+          rescheduleRequired: Boolean(instructorAttendance.rescheduleRequired),
+          rescheduleScheduleId: String(instructorAttendance.rescheduleScheduleId || ""),
+          pendingRescheduleDate: String(instructorAttendance.pendingRescheduleDate || ""),
+          pendingRescheduleFromTime: String(instructorAttendance.pendingRescheduleFromTime || ""),
+          pendingRescheduleToTime: String(instructorAttendance.pendingRescheduleToTime || ""),
+          pendingRescheduleStudioRoomId: String(instructorAttendance.pendingRescheduleStudioRoomId || ""),
+          notes: String(instructorAttendance.notes || ""),
+          updatedAt: now,
+        },
+      },
+      { session },
+    );
+  }
 }
 
 function isAttendanceResource(resource: ResourceName) {

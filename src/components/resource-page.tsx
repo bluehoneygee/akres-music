@@ -120,6 +120,56 @@ type ScheduleSlotTime = {
   toTime: string;
 };
 
+function inferAvailabilitySlotIds(record: UiRecord, slotOptions: RelationOption[]) {
+  const slotTimes = normalizeScheduleSlotTimes(record);
+  const inferredIds: string[] = [];
+
+  for (const slotTime of slotTimes) {
+    const matchedOption = slotOptions.find(
+      (option) =>
+        String(option.record.dayOfWeek ?? "") === slotTime.dayOfWeek &&
+        String(option.record.fromTime ?? "") === slotTime.fromTime &&
+        String(option.record.toTime ?? "") === slotTime.toTime,
+    );
+
+    if (matchedOption && !inferredIds.includes(matchedOption.value)) {
+      inferredIds.push(matchedOption.value);
+    }
+  }
+
+  return inferredIds;
+}
+
+function normalizeScheduleSlotTimes(record: UiRecord) {
+  const rawScheduleSlotTimes = Array.isArray(record.scheduleSlotTimes)
+    ? (record.scheduleSlotTimes as unknown[])
+    : [];
+
+  const normalized = rawScheduleSlotTimes
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const value = item as Record<string, unknown>;
+
+      return {
+        dayOfWeek: String(value.dayOfWeek ?? ""),
+        fromTime: String(value.fromTime ?? ""),
+        toTime: String(value.toTime ?? ""),
+      };
+    })
+    .filter((item): item is { dayOfWeek: string; fromTime: string; toTime: string } => Boolean(item))
+    .filter((item) => item.dayOfWeek && item.fromTime && item.toTime);
+
+  if (normalized.length > 0) return normalized;
+
+  const lessonDays = Array.isArray(record.lessonDays) ? record.lessonDays.map(String) : [];
+  const fromTime = String(record.fromTime ?? "");
+  const toTime = String(record.toTime ?? "");
+
+  return lessonDays
+    .map((dayOfWeek) => ({ dayOfWeek, fromTime, toTime }))
+    .filter((item) => item.dayOfWeek && item.fromTime && item.toTime);
+}
+
 export function ResourcePage({
   title,
   description,
@@ -416,15 +466,94 @@ export function ResourcePage({
     await loadRows();
   }
 
-  const editRow = useCallback((row: UiRecord) => {
-    setEditingId(row.id);
-    setDraft(
-      Object.fromEntries(
+  const editRow = useCallback(
+    async (row: UiRecord) => {
+      const baseDraft = Object.fromEntries(
         fields.map((field) => [field.key, row[field.key] ?? emptyDraft[field.key]]),
-      ) as Record<string, RecordValue>,
-    );
-    setFormOpen(true);
-  }, [emptyDraft, fields]);
+      ) as Record<string, RecordValue>;
+
+      if (resource !== "lesson-packages") {
+        setEditingId(row.id);
+        setDraft(baseDraft);
+        setFormOpen(true);
+        return;
+      }
+
+      try {
+        const editableFieldList = [
+          "billingPeriod",
+          "courseId",
+          "fromTime",
+          "homeVisitAddress",
+          "id",
+          "instructorId",
+          "instrumentId",
+          "lessonCount",
+          "lessonDays",
+          "lessonMode",
+          "lessonStartDate",
+          "scheduleSlotTimes",
+          "status",
+          "studentId",
+          "studioRoomId",
+          "toTime",
+        ];
+        const params = new URLSearchParams({
+          fields: editableFieldList.join(","),
+          filters: JSON.stringify({ id: row.id }),
+        });
+        const response = await fetch(`/api/lesson-packages?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const json = (await response.json()) as { data?: UiRecord[] };
+        const editableRecord = json.data?.[0] ?? row;
+        const recordDraft = Object.fromEntries(
+          fields.map((field) => [
+            field.key,
+            editableRecord[field.key] ?? baseDraft[field.key] ?? emptyDraft[field.key],
+          ]),
+        ) as Record<string, RecordValue>;
+
+        const availabilitySlotField = fields.find((field) => field.key === "availabilitySlotId");
+        const availabilityDateField = fields.find((field) => field.key === "availableDate");
+        const slotOptions = availabilitySlotField
+          ? (await fetchRelationOptions(availabilitySlotField))[1]
+          : [];
+        const hydratedRelationOptions = {
+          ...relationOptions,
+          ...(availabilitySlotField ? { [availabilitySlotField.key]: slotOptions } : {}),
+        };
+        const inferredSlotIds = inferAvailabilitySlotIds(editableRecord, slotOptions);
+        const draftWithSlots = {
+          ...recordDraft,
+          availabilitySlotId: inferredSlotIds,
+        };
+
+        const availableDates = availabilityDateField
+          ? getAvailabilityDateOptions(
+              availabilityDateField,
+              draftWithSlots,
+              hydratedRelationOptions,
+              [],
+            )
+              .map((option) => option.value)
+              .slice(0, Number(editableRecord.lessonCount ?? 4) === 8 ? 2 : 1)
+          : [];
+
+        setEditingId(row.id);
+        setDraft({
+          ...draftWithSlots,
+          availableDate: availableDates,
+        });
+        setFormOpen(true);
+      } catch {
+        setEditingId(row.id);
+        setDraft(baseDraft);
+        setFormOpen(true);
+      }
+    },
+    [emptyDraft, fields, fetchRelationOptions, relationOptions, resource],
+  );
 
   const renderTableValue = useCallback(
     (row: UiRecord, field: FieldConfig) =>
