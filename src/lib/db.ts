@@ -748,6 +748,8 @@ async function normalizeLessonPackagePayload(payload: Record<string, unknown>) {
 
   return {
     ...payload,
+    availabilitySlotId: availabilitySlotIds,
+    availableDate: availableDates,
     courseId,
     studentId,
     instructorId,

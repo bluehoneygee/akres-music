@@ -481,6 +481,8 @@ export function ResourcePage({
 
       try {
         const editableFieldList = [
+          "availableDate",
+          "availabilitySlotId",
           "billingPeriod",
           "courseId",
           "fromTime",
@@ -523,21 +525,26 @@ export function ResourcePage({
           ...relationOptions,
           ...(availabilitySlotField ? { [availabilitySlotField.key]: slotOptions } : {}),
         };
-        const inferredSlotIds = inferAvailabilitySlotIds(editableRecord, slotOptions);
+        const inferredSlotIds =
+          toMultiSelectValue(editableRecord.availabilitySlotId).length > 0
+            ? toMultiSelectValue(editableRecord.availabilitySlotId)
+            : inferAvailabilitySlotIds(editableRecord, slotOptions);
         const draftWithSlots = {
           ...recordDraft,
           availabilitySlotId: inferredSlotIds,
         };
 
         const availableDates = availabilityDateField
-          ? getAvailabilityDateOptions(
-              availabilityDateField,
-              draftWithSlots,
-              hydratedRelationOptions,
-              [],
-            )
-              .map((option) => option.value)
-              .slice(0, Number(editableRecord.lessonCount ?? 4) === 8 ? 2 : 1)
+          ? toMultiSelectValue(editableRecord.availableDate).length > 0
+            ? toMultiSelectValue(editableRecord.availableDate)
+            : getAvailabilityDateOptions(
+                availabilityDateField,
+                draftWithSlots,
+                hydratedRelationOptions,
+                [],
+              )
+                .map((option) => option.value)
+                .slice(0, Number(editableRecord.lessonCount ?? 4) === 8 ? 2 : 1)
           : [];
 
         setEditingId(row.id);
